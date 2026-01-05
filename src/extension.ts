@@ -1,0 +1,47 @@
+import * as vscode from 'vscode';
+import { translateCurrentMarkdown } from './commands/translateCurrentMarkdown';
+import { deleteAllTranslatedFiles } from './commands/deleteAllTranslatedFiles';
+import { resetOpenRouterApiKey, setOpenRouterApiKey } from './commands/openRouterApiKey';
+import { setOpenRouterModelId } from './commands/openRouterModelId';
+
+export function activate(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.translateCurrentMarkdown', () => {
+      return translateCurrentMarkdown(context);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.translateCurrentMarkdownFull', () => {
+      return translateCurrentMarkdown(context, { mode: 'full' });
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.deleteAllTranslatedFiles', () => {
+      return deleteAllTranslatedFiles();
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.openrouter.setApiKey', () => {
+      return setOpenRouterApiKey(context);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.openrouter.resetApiKey', () => {
+      return resetOpenRouterApiKey(context);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.openrouter.setModelId', () => {
+      return setOpenRouterModelId(context);
+    }),
+  );
+}
+
+export function deactivate() {
+  // no-op
+}

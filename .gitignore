@@ -1,0 +1,9 @@
+node_modules/
+out/
+.vscode-test/
+.vscode/markdown-translator/
+**/.vscode/markdown-translator/
+**/*_mdt.md
+**/*_mdt.meta.json
+.DS_Store
+*.vsix
