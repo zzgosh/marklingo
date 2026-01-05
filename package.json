@@ -1,7 +1,7 @@
 {
   "name": "vscode-markdown-translator",
   "displayName": "Markdown Translator",
-  "description": "Translate Markdown to Simplified Chinese using OpenRouter models, with incremental translation based on Markdown AST blocks.",
+  "description": "Translate Markdown to the selected target language (default: Simplified Chinese) using OpenRouter models, with incremental translation based on Markdown AST blocks.",
   "version": "0.0.1",
   "publisher": "jeejeeguan",
   "engines": {
@@ -15,7 +15,7 @@
     "commands": [
       {
         "command": "markdownTranslator.translateCurrentMarkdown",
-        "title": "Markdown Translator: Translate Current Markdown to Chinese"
+        "title": "Markdown Translator: Translate Current Markdown"
       },
       {
         "command": "markdownTranslator.translateCurrentMarkdownFull",
@@ -69,6 +69,11 @@
           "default": 12,
           "minimum": 1,
           "description": "Max number of blocks to translate per API request."
+        },
+        "markdownTranslator.translation.targetLanguage": {
+          "type": "string",
+          "default": "简体中文",
+          "description": "Target language for translation (shown in onboarding on first use)."
         },
         "markdownTranslator.translation.systemPrompt": {
           "type": "string",
