@@ -13,6 +13,7 @@ export type TranslationMetaV1 = {
   version: 1;
   segmenterVersion: string;
   sourceUri: string;
+  targetLanguage?: string;
   updatedAt: string;
   segments: MetaSegment[];
   translations: Record<string, string>;
@@ -66,6 +67,8 @@ export async function loadTranslationMeta(
     if (typeof json.segmenterVersion !== "string") return null;
     if (!Array.isArray(json.segments)) return null;
     if (!json.translations || typeof json.translations !== "object")
+      return null;
+    if (typeof json.targetLanguage !== "undefined" && typeof json.targetLanguage !== "string")
       return null;
     return json;
   } catch {

@@ -1,6 +1,6 @@
 # VS Code Markdown Translator
 
-一个用于在 VS Code 中**将 Markdown 翻译为简体中文**的扩展，翻译能力来自 **OpenRouter** 大模型。
+一个用于在 VS Code 中**将 Markdown 翻译为目标语言**的扩展（默认：简体中文），翻译能力来自 **OpenRouter** 大模型。
 
 ## 功能
 
@@ -16,10 +16,11 @@
 
 1. 打开任意 Markdown 文件（`editorLangId == markdown`）
 2. 按下快捷键 `Option + Command + V`
-3. 首次使用若未配置，会提示你输入：
+3. **首次使用会要求选择目标翻译语言**（默认：简体中文；也可选英文、日文等常见语言）
+4. 若未配置 OpenRouter，会提示你输入：
    - OpenRouter API Key（会写入 VS Code `SecretStorage`）
    - OpenRouter Model ID（例如：`openai/gpt-4o-mini`；设置后会记住，后续翻译不会再弹出）
-4. 等待翻译完成，右侧会打开预览
+5. 等待翻译完成，右侧会打开预览
 
 ## 设置项
 
@@ -34,6 +35,12 @@
 - `markdownTranslator.translation.maxBlocksPerRequest`
   - 默认：`12`
   - 越大：请求更少，但单次 prompt 更大、越容易超出模型限制
+- `markdownTranslator.translation.targetLanguage`
+  - 默认：`简体中文`
+  - 目标翻译语言（可在设置中选择“自定义...”并配合 `markdownTranslator.translation.targetLanguageCustom`）
+- `markdownTranslator.translation.targetLanguageCustom`
+  - 默认：空
+  - 自定义目标语言（当 `targetLanguage` 选择“自定义...”时生效）
 - `markdownTranslator.translation.systemPrompt`
   - 默认：空
   - 追加到内置 system prompt 之后（用于术语表/风格约束等）
@@ -50,6 +57,29 @@
 - `.vscode/markdown-translator/meta/**/xxx_mdt.meta.json`：增量翻译缓存（用于复用已翻译块；未打开工作区时会回退到原文件同级目录）
 
 > 建议将 `.vscode/markdown-translator/` 加入你项目的 `.gitignore`，避免缓存进入版本控制。
+
+## 目录结构
+
+```
+.
+|-- README.md                     # 项目说明
+|-- package.json                  # 依赖与脚本
+|-- tsconfig.json                 # TypeScript 配置
+`-- src
+    |-- extension.ts              # 扩展入口
+    |-- commands                  # 命令与配置交互
+    |   |-- deleteAllTranslatedFiles.ts
+    |   |-- openRouterApiKey.ts
+    |   |-- openRouterModelId.ts
+    |   |-- targetLanguage.ts
+    |   `-- translateCurrentMarkdown.ts
+    |-- services                  # OpenRouter API 客户端
+    |   `-- openRouterClient.ts
+    `-- translation               # 翻译核心逻辑
+        |-- cache.ts
+        |-- placeholders.ts
+        `-- segmenter.ts
+```
 
 ## 隐私与安全
 
