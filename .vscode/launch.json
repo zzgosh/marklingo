@@ -8,13 +8,10 @@
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
         "--user-data-dir=${workspaceFolder}/.vscode-test/user-data",
-        "--extensions-dir=${workspaceFolder}/.vscode-test/extensions",
-        "${workspaceFolder}/test-docs"
+        "--extensions-dir=${workspaceFolder}/.vscode-test/extensions"
       ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "npm: compile"
     }
   ]
 }
-
-
