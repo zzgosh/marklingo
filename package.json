@@ -1,0 +1,135 @@
+{
+  "name": "vscode-markdown-translator",
+  "displayName": "Markdown Translator",
+  "description": "Translate Markdown to the selected target language (default: Simplified Chinese) using OpenRouter models, with incremental translation based on Markdown AST blocks.",
+  "version": "0.0.1",
+  "publisher": "jeejeeguan",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "markdownTranslator.translateCurrentMarkdown",
+        "title": "Markdown Translator: Translate Current Markdown"
+      },
+      {
+        "command": "markdownTranslator.translateCurrentMarkdownFull",
+        "title": "Markdown Translator: Translate Current Markdown (Full)"
+      },
+      {
+        "command": "markdownTranslator.openrouter.setApiKey",
+        "title": "Markdown Translator: Set OpenRouter API Key"
+      },
+      {
+        "command": "markdownTranslator.openrouter.resetApiKey",
+        "title": "Markdown Translator: Reset OpenRouter API Key"
+      },
+      {
+        "command": "markdownTranslator.openrouter.setModelId",
+        "title": "Markdown Translator: Set OpenRouter Model ID"
+      },
+      {
+        "command": "markdownTranslator.deleteAllTranslatedFiles",
+        "title": "Markdown Translator: Delete all translated files"
+      },
+      {
+        "command": "markdownTranslator.setTargetLanguage",
+        "title": "Markdown Translator: Set Target Language"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "markdownTranslator.translateCurrentMarkdown",
+        "key": "alt+cmd+v",
+        "mac": "alt+cmd+v",
+        "when": "editorLangId == markdown"
+      }
+    ],
+    "configuration": {
+      "title": "Markdown Translator",
+      "properties": {
+        "markdownTranslator.openrouter.baseUrl": {
+          "type": "string",
+          "default": "https://openrouter.ai/api/v1",
+          "description": "OpenRouter API base URL."
+        },
+        "markdownTranslator.openrouter.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter model ID, e.g. openai/gpt-4o-mini."
+        },
+        "markdownTranslator.openrouter.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter API key (recommend storing in SecretStorage; this setting is a fallback)."
+        },
+        "markdownTranslator.translation.maxBlocksPerRequest": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "description": "Max number of blocks to translate per API request."
+        },
+        "markdownTranslator.translation.targetLanguage": {
+          "type": "string",
+          "default": "简体中文",
+          "enum": [
+            "简体中文",
+            "繁体中文",
+            "English",
+            "日本語",
+            "한국어",
+            "Français",
+            "Español",
+            "Deutsch",
+            "自定义..."
+          ],
+          "description": "Target language for translation (shown in onboarding on first use)."
+        },
+        "markdownTranslator.translation.targetLanguageCustom": {
+          "type": "string",
+          "default": "",
+          "description": "自定义目标语言（当 targetLanguage 选择“自定义...”时生效）。"
+        },
+        "markdownTranslator.translation.systemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Additional system prompt appended to the built-in translation prompt."
+        },
+        "markdownTranslator.translation.deletionFallback": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fallback to full translation if block deletion is detected."
+        },
+        "markdownTranslator.translation.similarityThreshold": {
+          "type": "number",
+          "default": 0.6,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Similarity threshold to treat delete+insert as modification."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.0.0"
+  }
+}
