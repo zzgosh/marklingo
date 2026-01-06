@@ -55,6 +55,29 @@
 
 > 建议将 `.vscode/markdown-translator/` 加入你项目的 `.gitignore`，避免缓存进入版本控制。
 
+## 目录结构
+
+```
+.
+|-- README.md                     # 项目说明
+|-- package.json                  # 依赖与脚本
+|-- tsconfig.json                 # TypeScript 配置
+`-- src
+    |-- extension.ts              # 扩展入口
+    |-- commands                  # 命令与配置交互
+    |   |-- deleteAllTranslatedFiles.ts
+    |   |-- openRouterApiKey.ts
+    |   |-- openRouterModelId.ts
+    |   |-- targetLanguage.ts
+    |   `-- translateCurrentMarkdown.ts
+    |-- services                  # OpenRouter API 客户端
+    |   `-- openRouterClient.ts
+    `-- translation               # 翻译核心逻辑
+        |-- cache.ts
+        |-- placeholders.ts
+        `-- segmenter.ts
+```
+
 ## 隐私与安全
 
 - 你的 Markdown 内容会发送到你配置的 OpenRouter 模型进行翻译
