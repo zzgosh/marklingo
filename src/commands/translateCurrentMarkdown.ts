@@ -53,7 +53,7 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   const languageOptions = ['简体中文', '繁体中文', 'English', '日本語', '한국어', 'Français', 'Español', 'Deutsch'];
 
   const picked = await new Promise<string | undefined>((resolve) => {
-    const picker = vscode.window.createQuickPick<string>();
+    const picker = vscode.window.createQuickPick<vscode.QuickPickItem>();
     picker.title = 'Markdown Translator: 选择目标翻译语言';
     picker.placeholder = '选择翻译后的目标语言（默认：简体中文）';
     picker.ignoreFocusOut = true;

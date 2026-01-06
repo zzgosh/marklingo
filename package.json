@@ -36,6 +36,10 @@
       {
         "command": "markdownTranslator.deleteAllTranslatedFiles",
         "title": "Markdown Translator: Delete all translated files"
+      },
+      {
+        "command": "markdownTranslator.setTargetLanguage",
+        "title": "Markdown Translator: Set Target Language"
       }
     ],
     "keybindings": [

@@ -3,6 +3,7 @@ import { translateCurrentMarkdown } from './commands/translateCurrentMarkdown';
 import { deleteAllTranslatedFiles } from './commands/deleteAllTranslatedFiles';
 import { resetOpenRouterApiKey, setOpenRouterApiKey } from './commands/openRouterApiKey';
 import { setOpenRouterModelId } from './commands/openRouterModelId';
+import { setTargetLanguage } from './commands/targetLanguage';
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -38,6 +39,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('markdownTranslator.openrouter.setModelId', () => {
       return setOpenRouterModelId(context);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markdownTranslator.setTargetLanguage', () => {
+      return setTargetLanguage(context);
     }),
   );
 }
