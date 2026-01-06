@@ -42,22 +42,57 @@ function buildBlocksTranslatePrompt(
 }
 
 const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLanguageSelected';
+const CUSTOM_TARGET_LANGUAGE_LABEL = '自定义...';
+const TARGET_LANGUAGE_OPTIONS = [
+  '简体中文',
+  '繁体中文',
+  'English',
+  '日本語',
+  '한국어',
+  'Français',
+  'Español',
+  'Deutsch',
+  CUSTOM_TARGET_LANGUAGE_LABEL,
+];
+
+async function promptCustomTargetLanguage(current: string): Promise<string | null> {
+  const input = await vscode.window.showInputBox({
+    title: 'Markdown Translator: 自定义目标翻译语言',
+    prompt: '请输入目标语言名称（例如 Italiano、Português）',
+    value: current,
+    ignoreFocusOut: true,
+  });
+  const trimmed = (input ?? '').trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
 
 async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<string | null> {
   const cfg = vscode.workspace.getConfiguration('markdownTranslator');
   const selected = context.globalState.get<boolean>(TARGET_LANGUAGE_SELECTED_KEY) ?? false;
   const current = (cfg.get<string>('translation.targetLanguage') ?? '').trim() || '简体中文';
+  const currentCustom = (cfg.get<string>('translation.targetLanguageCustom') ?? '').trim();
 
-  if (selected) return current;
-
-  const languageOptions = ['简体中文', '繁体中文', 'English', '日本語', '한국어', 'Français', 'Español', 'Deutsch'];
+  if (selected) {
+    if (current === CUSTOM_TARGET_LANGUAGE_LABEL) {
+      if (currentCustom) return currentCustom;
+      const input = await promptCustomTargetLanguage('');
+      if (!input) {
+        await vscode.window.showInformationMessage('Markdown Translator: 已取消翻译（需要设置自定义目标语言）。');
+        return null;
+      }
+      await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
+      return input;
+    }
+    return current;
+  }
 
   const picked = await new Promise<string | undefined>((resolve) => {
     const picker = vscode.window.createQuickPick<vscode.QuickPickItem>();
     picker.title = 'Markdown Translator: 选择目标翻译语言';
     picker.placeholder = '选择翻译后的目标语言（默认：简体中文）';
     picker.ignoreFocusOut = true;
-    picker.items = languageOptions.map((label) => ({ label }));
+    picker.items = TARGET_LANGUAGE_OPTIONS.map((label) => ({ label }));
     const active = picker.items.find((item) => item.label === current) ?? picker.items[0];
     if (active) picker.activeItems = [active];
 
@@ -78,6 +113,18 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   if (!picked) {
     await vscode.window.showInformationMessage('Markdown Translator: 已取消翻译（需要先选择目标语言）。');
     return null;
+  }
+
+  if (picked === CUSTOM_TARGET_LANGUAGE_LABEL) {
+    const input = await promptCustomTargetLanguage(currentCustom);
+    if (!input) {
+      await vscode.window.showInformationMessage('Markdown Translator: 已取消翻译（需要设置自定义目标语言）。');
+      return null;
+    }
+    await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.targetLanguage', CUSTOM_TARGET_LANGUAGE_LABEL, vscode.ConfigurationTarget.Global);
+    await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+    return input;
   }
 
   await cfg.update('translation.targetLanguage', picked, vscode.ConfigurationTarget.Global);
@@ -176,7 +223,8 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
 
         const requestedMode: TranslateMode = options.mode ?? 'auto';
         let mode: 'full' | 'incremental' = 'full';
-        if (requestedMode === 'auto' && prevMeta && prevMeta.segmenterVersion === SEGMENTER_VERSION) {
+        const isSameTargetLanguage = prevMeta?.targetLanguage === targetLanguage;
+        if (requestedMode === 'auto' && prevMeta && prevMeta.segmenterVersion === SEGMENTER_VERSION && isSameTargetLanguage) {
           const deleted = deletionFallback ? detectDeletion(prevMeta.segments, nextMetaSegments, similarityThreshold) : false;
           mode = deleted ? 'full' : 'incremental';
         }
@@ -239,6 +287,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
 
         // 生成并保存本次 meta（只保留当前文档相关的 translations）
         const meta = createEmptyMeta(doc.uri);
+        meta.targetLanguage = targetLanguage;
         meta.updatedAt = new Date().toISOString();
         meta.segments = nextMetaSegments;
         const nextTranslations: Record<string, string> = {};

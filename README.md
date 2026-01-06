@@ -37,7 +37,10 @@
   - 越大：请求更少，但单次 prompt 更大、越容易超出模型限制
 - `markdownTranslator.translation.targetLanguage`
   - 默认：`简体中文`
-  - 目标翻译语言（首次使用会提示选择，也可在设置中修改）
+  - 目标翻译语言（可在设置中选择“自定义...”并配合 `markdownTranslator.translation.targetLanguageCustom`）
+- `markdownTranslator.translation.targetLanguageCustom`
+  - 默认：空
+  - 自定义目标语言（当 `targetLanguage` 选择“自定义...”时生效）
 - `markdownTranslator.translation.systemPrompt`
   - 默认：空
   - 追加到内置 system prompt 之后（用于术语表/风格约束等）
