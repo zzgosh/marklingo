@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import * as path from "path";
-import { createHash } from "crypto";
-import { SEGMENTER_VERSION } from "./segmenter";
+import * as path from "node:path";
+import { createHash } from "node:crypto";
+import { SEGMENTER_VERSION } from "./segmenter.js";
 
 export type MetaSegment = {
   type: string;
@@ -13,38 +13,13 @@ export type TranslationMetaV1 = {
   version: 1;
   segmenterVersion: string;
   sourceUri: string;
+  outputUri?: string;
+  outputHash?: string;
   targetLanguage?: string;
   updatedAt: string;
   segments: MetaSegment[];
   translations: Record<string, string>;
 };
-
-export function getMetaFileUri(sourceUri: vscode.Uri): vscode.Uri {
-  const parsed = path.parse(sourceUri.fsPath);
-
-  // 优先将 meta 放到工作区 .vscode/ 下，避免在文档目录旁边生成缓存文件
-  const workspaceFolder = vscode.workspace.getWorkspaceFolder(sourceUri);
-  if (!workspaceFolder) {
-    return vscode.Uri.file(path.join(parsed.dir, `${parsed.name}_mdt.meta.json`));
-  }
-
-  const workspaceRoot = workspaceFolder.uri.fsPath;
-  const rel = path.relative(workspaceRoot, sourceUri.fsPath);
-  const relDir = path.dirname(rel);
-
-  // 当文件不在该 workspace root 内（例如跨盘符）时，退回到 hash 命名避免非法路径
-  const isUnsafeRel = !rel || rel.startsWith('..') || path.isAbsolute(rel);
-  if (isUnsafeRel) {
-    const id = sha256(sourceUri.toString()).slice(0, 16);
-    return vscode.Uri.file(
-      path.join(workspaceRoot, '.vscode', 'markdown-translator', 'meta', `${parsed.name}_${id}_mdt.meta.json`),
-    );
-  }
-
-  return vscode.Uri.file(
-    path.join(workspaceRoot, '.vscode', 'markdown-translator', 'meta', relDir, `${parsed.name}_mdt.meta.json`),
-  );
-}
 
 function normalizeForHash(text: string): string {
   return text.replace(/\r\n/g, "\n");
@@ -67,6 +42,10 @@ export async function loadTranslationMeta(
     if (typeof json.segmenterVersion !== "string") return null;
     if (!Array.isArray(json.segments)) return null;
     if (!json.translations || typeof json.translations !== "object")
+      return null;
+    if (typeof json.outputUri !== "undefined" && typeof json.outputUri !== "string")
+      return null;
+    if (typeof json.outputHash !== "undefined" && typeof json.outputHash !== "string")
       return null;
     if (typeof json.targetLanguage !== "undefined" && typeof json.targetLanguage !== "string")
       return null;
