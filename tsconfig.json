@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "ES2020",
-    "lib": ["ES2020"],
+    "module": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "rootDir": "src",
     "outDir": "out",
     "sourceMap": true,
@@ -10,10 +10,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true
   },
   "exclude": ["node_modules", ".vscode-test"]
 }
-
 
