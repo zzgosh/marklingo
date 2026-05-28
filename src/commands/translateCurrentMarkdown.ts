@@ -1,41 +1,19 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient';
-import { protectMarkdown, restoreMarkdown } from '../translation/placeholders';
-import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter';
-import { createEmptyMeta, detectDeletion, getMetaFileUri, loadTranslationMeta, saveTranslationMeta, sha256 } from '../translation/cache';
-
-function getTranslatedFileUri(sourceUri: vscode.Uri): vscode.Uri {
-  const parsed = path.parse(sourceUri.fsPath);
-  return vscode.Uri.file(path.join(parsed.dir, `${parsed.name}_mdt.md`));
-}
-
-function getLegacyMetaFileUri(sourceUri: vscode.Uri): vscode.Uri {
-  const parsed = path.parse(sourceUri.fsPath);
-  return vscode.Uri.file(path.join(parsed.dir, `${parsed.name}_mdt.meta.json`));
-}
+import * as path from 'node:path';
+import { getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient.js';
+import { getMetaFileUri, getTranslatedFileUri } from '../storage/paths.js';
+import { protectMarkdown, restoreMarkdown } from '../translation/placeholders.js';
+import { resolveSystemPrompt } from '../translation/prompts.js';
+import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
+import { createEmptyMeta, detectDeletion, loadTranslationMeta, saveTranslationMeta, sha256 } from '../translation/cache.js';
 
 function buildBlocksTranslatePrompt(
   input: { blocks: Array<{ id: string; markdown: string }> },
-  options: { systemPromptExtra?: string; targetLanguage: string },
+  options: { systemPrompt?: string; customPrompt?: string; targetLanguage: string },
 ): { system: string; user: string } {
-  const baseSystem = [
-    '你是一个严谨的 Markdown 翻译助手。',
-    `你的任务：把用户提供的 Markdown 片段翻译为${options.targetLanguage}。`,
-    '重要规则：',
-    '- 只翻译自然语言文本。',
-    '- 必须保持 Markdown 结构与格式（标题、列表、引用、表格等）。',
-    '- 代码块、行内代码、YAML frontmatter、HTML 必须原样保留，不能改动任何字符。',
-    '- 链接 URL、图片路径必须原样保留；仅可翻译可见文字（如链接文本、图片 alt 文本）。',
-    '- 输入中出现的占位符 token（形如 __MDT_xxx__）必须原样输出，不能改动、不能翻译、不能插入空格。',
-    '输出格式（非常重要）：',
-    '- 你必须只输出一个合法的 JSON 对象（不要解释、不要代码块）。',
-    '- JSON 的 key 是 block id。',
-    '- JSON 的 value 是字符串数组，每个元素表示一行 Markdown，不包含换行符（空行用空字符串）。',
-  ].join('\n');
-
-  const systemPromptExtra = (options.systemPromptExtra ?? '').trim();
-  const system = systemPromptExtra ? [baseSystem, '', '用户附加 system prompt：', systemPromptExtra].join('\n') : baseSystem;
+  const baseSystem = resolveSystemPrompt(options.systemPrompt, options.targetLanguage);
+  const customPrompt = (options.customPrompt ?? '').trim();
+  const system = customPrompt ? [baseSystem, '', '用户附加 custom prompt：', customPrompt].join('\n') : baseSystem;
 
   const user = ['请翻译下面这些 Markdown blocks：', '---', JSON.stringify(input)].join('\n');
   return { system, user };
@@ -43,6 +21,7 @@ function buildBlocksTranslatePrompt(
 
 const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLanguageSelected';
 const CUSTOM_TARGET_LANGUAGE_LABEL = '自定义...';
+const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
 const TARGET_LANGUAGE_OPTIONS = [
   '简体中文',
   '繁体中文',
@@ -54,6 +33,8 @@ const TARGET_LANGUAGE_OPTIONS = [
   'Deutsch',
   CUSTOM_TARGET_LANGUAGE_LABEL,
 ];
+
+const outputChannel = vscode.window.createOutputChannel('Markdown Translator');
 
 async function promptCustomTargetLanguage(current: string): Promise<string | null> {
   const input = await vscode.window.showInputBox({
@@ -190,8 +171,9 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
 
     const settings = await getOpenRouterSettings(context);
     const cfg = vscode.workspace.getConfiguration('markdownTranslator');
-    const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? 12);
-    const systemPromptExtra = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
+    const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
+    const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
+    const customPrompt = (cfg.get<string>('translation.customPrompt') ?? '').trim();
     const deletionFallback = cfg.get<boolean>('translation.deletionFallback') ?? true;
     const similarityThreshold = cfg.get<number>('translation.similarityThreshold') ?? 0.6;
 
@@ -202,9 +184,8 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       return;
     }
 
-    const translatedUri = getTranslatedFileUri(doc.uri);
-    const metaUri = getMetaFileUri(doc.uri);
-    const legacyMetaUri = getLegacyMetaFileUri(doc.uri);
+    const translatedUri = getTranslatedFileUri(context, doc.uri);
+    const metaUri = getMetaFileUri(context, doc.uri);
 
     const { markdown: translatedMarkdown, meta: nextMeta } = await vscode.window.withProgress(
       {
@@ -212,13 +193,13 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         title: 'Markdown Translator: 正在翻译…',
         cancellable: false,
       },
-      async () => {
+      async (progress) => {
         // 为块计算 hash，用于增量复用
         const translatable = translatableBase.map((s) => ({ ...s, srcHash: sha256(s.text) }));
         const hashById = new Map(translatable.map((s) => [s.id, s.srcHash]));
 
         // 读取上次的 meta（若存在）
-        const prevMeta = (await loadTranslationMeta(metaUri)) ?? (metaUri.fsPath !== legacyMetaUri.fsPath ? await loadTranslationMeta(legacyMetaUri) : null);
+        const prevMeta = await loadTranslationMeta(metaUri);
         const nextMetaSegments = translatable.map((s) => ({ type: s.type, srcHash: s.srcHash, source: s.text }));
 
         const requestedMode: TranslateMode = options.mode ?? 'auto';
@@ -236,7 +217,18 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
 
         const toTranslate = mode === 'full' ? translatable : translatable.filter((s) => !translatedByHash.has(s.srcHash));
         const chunks = chunkArray(toTranslate, maxBlocksPerRequest);
-        for (const chunk of chunks) {
+        const startedAt = Date.now();
+        outputChannel.appendLine(
+          `[${new Date().toISOString()}] Translating ${doc.uri.fsPath} with ${settings.modelId}: ` +
+            `${translatable.length} translatable blocks, ${toTranslate.length} to translate, ${chunks.length} request(s), mode=${mode}.`,
+        );
+
+        if (chunks.length === 0) {
+          progress.report({ message: 'Using cached translations…' });
+        }
+
+        for (const [chunkIndex, chunk] of chunks.entries()) {
+          progress.report({ message: `Request ${chunkIndex + 1}/${chunks.length} (${chunk.length} blocks)…` });
           const protectedBlocks: Array<{ id: string; markdown: string }> = [];
           const placeholdersById = new Map<string, ReturnType<typeof protectMarkdown>>();
 
@@ -246,7 +238,8 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
             placeholdersById.set(seg.id, protectedResult);
           }
 
-          const prompt = buildBlocksTranslatePrompt({ blocks: protectedBlocks }, { systemPromptExtra, targetLanguage });
+          const prompt = buildBlocksTranslatePrompt({ blocks: protectedBlocks }, { systemPrompt, customPrompt, targetLanguage });
+          const requestStartedAt = Date.now();
           const raw = await openRouterChatCompletion(
             settings,
             [
@@ -254,6 +247,10 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
               { role: 'user', content: prompt.user },
             ],
             { timeoutMs: 120_000, temperature: 0 },
+          );
+          outputChannel.appendLine(
+            `[${new Date().toISOString()}] Request ${chunkIndex + 1}/${chunks.length} finished in ${Date.now() - requestStartedAt}ms ` +
+              `(${chunk.length} blocks).`,
           );
 
           const obj = tryParseJsonObject(raw);
@@ -271,6 +268,8 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
             translatedByHash.set(seg.srcHash, restored);
           }
         }
+        outputChannel.appendLine(`[${new Date().toISOString()}] Translation finished in ${Date.now() - startedAt}ms.`);
+        progress.report({ message: 'Writing translated Markdown…' });
 
         // 用“按 offset 替换”的方式合成最终译文，最大程度保留原始格式与不可翻译片段
         let out = '';
@@ -289,6 +288,8 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         const meta = createEmptyMeta(doc.uri);
         meta.targetLanguage = targetLanguage;
         meta.updatedAt = new Date().toISOString();
+        meta.outputUri = translatedUri.toString();
+        meta.outputHash = sha256(out);
         meta.segments = nextMetaSegments;
         const nextTranslations: Record<string, string> = {};
         for (const seg of translatable) {
@@ -301,6 +302,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       },
     );
 
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(translatedUri.fsPath)));
     await vscode.workspace.fs.writeFile(translatedUri, Buffer.from(translatedMarkdown, 'utf8'));
     await saveTranslationMeta(metaUri, nextMeta);
 

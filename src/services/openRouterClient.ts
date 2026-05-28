@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { createHash } from 'node:crypto';
 
 export type OpenRouterSettings = {
   baseUrl: string;
@@ -17,37 +18,97 @@ export type ChatCompletionOptions = {
   timeoutMs?: number;
 };
 
-const OPENROUTER_API_KEY_SECRET = 'markdownTranslator.openrouter.apiKey';
+const OPENROUTER_API_KEY_SECRET_PREFIX = 'markdownTranslator.openrouter.apiKey';
 const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId';
+const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'markdownTranslator.openrouter.confirmedCustomOrigins';
+const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const OFFICIAL_OPENROUTER_ORIGIN = 'https://openrouter.ai';
 
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
   return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
 }
 
+function sha256(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+function parseBaseUrl(baseUrl: string): URL {
+  const normalized = normalizeBaseUrl(baseUrl || DEFAULT_OPENROUTER_BASE_URL);
+  let url: URL;
+  try {
+    url = new URL(normalized);
+  } catch {
+    throw new Error(`OpenRouter baseUrl 不是合法 URL：${baseUrl}`);
+  }
+
+  const isHttps = url.protocol === 'https:';
+  const isLocalHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  if (!isHttps && !isLocalHttp) {
+    throw new Error('OpenRouter baseUrl 必须使用 HTTPS（localhost 调试除外）。');
+  }
+
+  return url;
+}
+
+function isOfficialOpenRouterUrl(url: URL): boolean {
+  return url.origin === OFFICIAL_OPENROUTER_ORIGIN;
+}
+
+function getApiKeySecretKey(origin: string): string {
+  return `${OPENROUTER_API_KEY_SECRET_PREFIX}.${sha256(origin).slice(0, 16)}`;
+}
+
 function getConfiguration() {
   return vscode.workspace.getConfiguration('markdownTranslator');
 }
 
-async function resolveApiKey(context: vscode.ExtensionContext): Promise<string> {
-  const fromSecret = await context.secrets.get(OPENROUTER_API_KEY_SECRET);
-  if (fromSecret?.trim()) return fromSecret.trim();
+async function confirmCustomOrigin(context: vscode.ExtensionContext, url: URL): Promise<void> {
+  if (isOfficialOpenRouterUrl(url)) return;
 
+  const confirmedOrigins = context.globalState.get<string[]>(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS) ?? [];
+  if (confirmedOrigins.includes(url.origin)) return;
+
+  const picked = await vscode.window.showWarningMessage(
+    `Markdown Translator: 将使用自定义 OpenRouter endpoint：${url.origin}。API Key 会按 endpoint 单独保存，不会复用官方 OpenRouter 的 Key。是否继续？`,
+    { modal: true },
+    'Use Custom Endpoint',
+  );
+  if (picked !== 'Use Custom Endpoint') {
+    throw new Error('已取消使用自定义 OpenRouter endpoint。');
+  }
+
+  await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, [...confirmedOrigins, url.origin]);
+}
+
+async function resolveBaseUrl(context: vscode.ExtensionContext): Promise<{ baseUrl: string; origin: string; official: boolean }> {
   const cfg = getConfiguration();
-  const fromSetting = (cfg.get<string>('openrouter.apiKey') ?? '').trim();
-  if (fromSetting) return fromSetting;
+  const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? DEFAULT_OPENROUTER_BASE_URL;
+  const url = parseBaseUrl(rawBaseUrl);
+  await confirmCustomOrigin(context, url);
+  return {
+    baseUrl: normalizeBaseUrl(url.toString()),
+    origin: url.origin,
+    official: isOfficialOpenRouterUrl(url),
+  };
+}
+
+async function resolveApiKey(context: vscode.ExtensionContext, endpoint: { origin: string; official: boolean }): Promise<string> {
+  const secretKey = getApiKeySecretKey(endpoint.origin);
+  const fromSecret = await context.secrets.get(secretKey);
+  if (fromSecret?.trim()) return fromSecret.trim();
 
   const input = await vscode.window.showInputBox({
     title: 'Markdown Translator: OpenRouter API Key',
-    prompt: '请输入 OpenRouter API Key（将安全地存入 VS Code SecretStorage）。',
+    prompt: `请输入 ${endpoint.origin} 的 API Key（将安全地存入 VS Code SecretStorage，并按 endpoint 单独保存）。`,
     password: true,
     ignoreFocusOut: true,
   });
   if (!input?.trim()) {
-    throw new Error('缺少 OpenRouter API Key。请在设置中配置 markdownTranslator.openrouter.apiKey 或在提示框中输入。');
+    throw new Error('缺少 OpenRouter API Key。请通过 Markdown Translator 设置页或 API Key 命令保存。');
   }
   const apiKey = input.trim();
-  await context.secrets.store(OPENROUTER_API_KEY_SECRET, apiKey);
+  await context.secrets.store(secretKey, apiKey);
   return apiKey;
 }
 
@@ -85,16 +146,49 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 }
 
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
-  const cfg = getConfiguration();
-  const baseUrl = normalizeBaseUrl(cfg.get<string>('openrouter.baseUrl') ?? 'https://openrouter.ai/api/v1');
+  const endpoint = await resolveBaseUrl(context);
   const modelId = await resolveModelId(context);
-  const apiKey = await resolveApiKey(context);
+  const apiKey = await resolveApiKey(context, endpoint);
 
   return {
-    baseUrl,
+    baseUrl: endpoint.baseUrl,
     modelId,
     apiKey,
   };
+}
+
+export async function getCurrentOpenRouterEndpoint(context: vscode.ExtensionContext): Promise<{ baseUrl: string; origin: string; official: boolean }> {
+  return resolveBaseUrl(context);
+}
+
+export async function storeOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
+  const endpoint = await resolveBaseUrl(context);
+  await context.secrets.store(getApiKeySecretKey(endpoint.origin), apiKey.trim());
+  return endpoint.origin;
+}
+
+export async function deleteOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext): Promise<string> {
+  const endpoint = await resolveBaseUrl(context);
+  await context.secrets.delete(getApiKeySecretKey(endpoint.origin));
+  return endpoint.origin;
+}
+
+export async function hasOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext): Promise<boolean> {
+  const endpoint = await resolveBaseUrl(context);
+  const secretKey = getApiKeySecretKey(endpoint.origin);
+  const fromSecret = await context.secrets.get(secretKey);
+  if (fromSecret?.trim()) return true;
+  return false;
+}
+
+export async function resetOpenRouterSecretsAndState(context: vscode.ExtensionContext): Promise<void> {
+  const confirmedOrigins = context.globalState.get<string[]>(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS) ?? [];
+  const origins = new Set([OFFICIAL_OPENROUTER_ORIGIN, ...confirmedOrigins]);
+  for (const origin of origins) {
+    await context.secrets.delete(getApiKeySecretKey(origin));
+  }
+  await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, undefined);
+  await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, undefined);
 }
 
 async function fetchJsonWithTimeout(
@@ -163,4 +257,3 @@ export async function openRouterChatCompletion(
   }
   return content;
 }
-

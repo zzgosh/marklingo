@@ -1,0 +1,14 @@
+.gitignore
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+out/**
+node_modules/**
+*.vsix
+*.tgz
+**/*_mdt.md
+**/*_mdt.meta.json
+tsconfig.json
+package-lock.json
+dist/**/*.map
