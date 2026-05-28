@@ -47,6 +47,28 @@ function createPlaceholder(prefix: string, kind: string, index: number): string 
   return `__MDT_${prefix}_${kind}_${index}__`;
 }
 
+function findMarkdownUrlOffset(slice: string, url: string, nodeType: string): number {
+  const candidates: number[] = [];
+  let index = slice.indexOf(url);
+  while (index !== -1) {
+    candidates.push(index);
+    index = slice.indexOf(url, index + url.length);
+  }
+  if (candidates.length === 0) return -1;
+
+  if (nodeType === 'definition') {
+    const colon = slice.indexOf(':');
+    const afterColon = candidates.find((candidate) => colon !== -1 && candidate > colon);
+    if (typeof afterColon === 'number') return afterColon;
+  }
+
+  const inlineMarker = slice.lastIndexOf('](');
+  const inInlineDestination = candidates.find((candidate) => inlineMarker !== -1 && candidate > inlineMarker);
+  if (typeof inInlineDestination === 'number') return inInlineDestination;
+
+  return candidates[candidates.length - 1];
+}
+
 export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectResult {
   const lineStarts = buildLineStartOffsets(markdown);
   const tree = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ['yaml']).parse(markdown) as any;
@@ -72,7 +94,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
     const range = nodeToRange(lineStarts, node);
     if (!range) return;
     const slice = markdown.slice(range.start, range.end);
-    const idx = slice.indexOf(url);
+    const idx = findMarkdownUrlOffset(slice, url, String(node?.type ?? ''));
     if (idx === -1) return;
     const original = url;
     const placeholder = createPlaceholder(tokenPrefix, kind, urlIndex++);
@@ -143,5 +165,4 @@ export function restoreMarkdown(translated: string, placeholders: PlaceholderMap
   }
   return out;
 }
-
 

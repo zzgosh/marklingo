@@ -1,35 +1,84 @@
 import * as vscode from 'vscode';
+import * as path from 'node:path';
+import { getProjectsStorageRoot } from '../storage/paths.js';
+import { loadTranslationMeta, sha256 } from '../translation/cache.js';
 
-export async function deleteAllTranslatedFiles() {
-  const folders = vscode.workspace.workspaceFolders ?? [];
-  if (folders.length === 0) {
-    await vscode.window.showWarningMessage('Markdown Translator: 当前未打开工作区，无法执行清理。');
-    return;
+async function collectFiles(root: vscode.Uri): Promise<vscode.Uri[]> {
+  let entries: [string, vscode.FileType][];
+  try {
+    entries = await vscode.workspace.fs.readDirectory(root);
+  } catch {
+    return [];
   }
 
-  const [translatedFiles, metaFiles] = await Promise.all([
-    vscode.workspace.findFiles('**/*_mdt.md', '**/node_modules/**'),
-    vscode.workspace.findFiles('**/*_mdt.meta.json', '**/node_modules/**'),
-  ]);
+  const files: vscode.Uri[] = [];
+  for (const [name, type] of entries) {
+    const child = vscode.Uri.joinPath(root, name);
+    if (type === vscode.FileType.Directory) {
+      files.push(...await collectFiles(child));
+      continue;
+    }
+    files.push(child);
+  }
+  return files;
+}
 
-  const all = [...translatedFiles, ...metaFiles];
-  const uniq = new Map<string, vscode.Uri>();
-  for (const uri of all) uniq.set(uri.toString(), uri);
-  const targets = [...uniq.values()];
+function isInside(parent: vscode.Uri, child: vscode.Uri): boolean {
+  const relative = path.relative(parent.fsPath, child.fsPath);
+  return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
 
-  if (targets.length === 0) {
-    await vscode.window.showInformationMessage('Markdown Translator: 未找到需要删除的译文文件（*_mdt.md / *_mdt.meta.json）。');
+async function deleteExternalOutput(uri: vscode.Uri, expectedHash: string | undefined): Promise<'deleted' | 'skipped' | 'missing'> {
+  let current: Uint8Array;
+  try {
+    current = await vscode.workspace.fs.readFile(uri);
+  } catch {
+    return 'missing';
+  }
+
+  if (expectedHash) {
+    const currentHash = sha256(Buffer.from(current).toString('utf8'));
+    if (currentHash !== expectedHash) return 'skipped';
+  }
+
+  await vscode.workspace.fs.delete(uri, { useTrash: true });
+  return 'deleted';
+}
+
+type DeleteSummary = {
+  deleted: number;
+  skipped: number;
+  missing: number;
+  errors: string[];
+};
+
+export async function deleteAllTranslatedFiles(context: vscode.ExtensionContext) {
+  const storageRoot = getProjectsStorageRoot(context);
+  const storageFiles = await collectFiles(storageRoot);
+  const metaFiles = storageFiles.filter((uri) => uri.fsPath.endsWith('_mdt.meta.json'));
+
+  const externalOutputs = new Map<string, { uri: vscode.Uri; outputHash?: string }>();
+  for (const metaUri of metaFiles) {
+    const meta = await loadTranslationMeta(metaUri);
+    if (!meta?.outputUri) continue;
+    const outputUri = vscode.Uri.parse(meta.outputUri);
+    if (isInside(storageRoot, outputUri)) continue;
+    externalOutputs.set(outputUri.toString(), { uri: outputUri, outputHash: meta.outputHash });
+  }
+
+  if (storageFiles.length === 0 && externalOutputs.size === 0) {
+    await vscode.window.showInformationMessage('Markdown Translator: 未找到由扩展记录的译文/缓存文件。');
     return;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    `Markdown Translator: 将删除 ${targets.length} 个译文/缓存文件（优先移入回收站）。是否继续？`,
+    `Markdown Translator: 将删除 ${externalOutputs.size} 个已记录的工作区译文文件，并清理扩展私有缓存。是否继续？`,
     { modal: true },
     'Delete',
   );
   if (confirm !== 'Delete') return;
 
-  await vscode.window.withProgress(
+  const summary = await vscode.window.withProgress<DeleteSummary>(
     {
       location: vscode.ProgressLocation.Notification,
       title: 'Markdown Translator: 正在删除译文文件…',
@@ -37,29 +86,49 @@ export async function deleteAllTranslatedFiles() {
     },
     async (progress) => {
       let deleted = 0;
+      let skipped = 0;
+      let missing = 0;
       const errors: string[] = [];
-      for (let i = 0; i < targets.length; i++) {
-        const uri = targets[i];
-        progress.report({ message: `${i + 1}/${targets.length}` });
+
+      const outputs = [...externalOutputs.values()];
+      for (let i = 0; i < outputs.length; i++) {
+        const { uri, outputHash } = outputs[i];
+        progress.report({ message: `${i + 1}/${outputs.length}` });
         try {
-          await vscode.workspace.fs.delete(uri, { useTrash: true });
-          deleted++;
+          const result = await deleteExternalOutput(uri, outputHash);
+          if (result === 'deleted') deleted++;
+          if (result === 'skipped') skipped++;
+          if (result === 'missing') missing++;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           errors.push(`${uri.fsPath}: ${msg}`);
         }
       }
 
-      if (errors.length) {
-        await vscode.window.showWarningMessage(`Markdown Translator: 已删除 ${deleted}/${targets.length} 个文件，${errors.length} 个失败。`);
-        // 失败明细太长时不弹窗刷屏，放到输出面板更合适；这里先控制输出量
-        console.warn('[markdown-translator] delete errors:', errors.slice(0, 20));
-        return;
+      progress.report({ message: '清理私有缓存' });
+      try {
+        await vscode.workspace.fs.delete(storageRoot, { recursive: true, useTrash: true });
+      } catch (e) {
+        if (storageFiles.length > 0) {
+          const msg = e instanceof Error ? e.message : String(e);
+          errors.push(`${storageRoot.fsPath}: ${msg}`);
+        }
       }
 
-      await vscode.window.showInformationMessage(`Markdown Translator: 已删除 ${deleted} 个译文/缓存文件。`);
+      return { deleted, skipped, missing, errors };
     },
   );
+
+  if (summary.errors.length) {
+    console.warn('[markdown-translator] delete errors:', summary.errors.slice(0, 20));
+    await vscode.window.showWarningMessage(
+      `Markdown Translator: 已删除 ${summary.deleted} 个译文文件，${summary.skipped} 个已修改文件被跳过，${summary.missing} 个文件已不存在，${summary.errors.length} 个失败。`,
+    );
+    return;
+  }
+
+  const skippedMessage = summary.skipped > 0 ? `，跳过 ${summary.skipped} 个已修改译文文件` : '';
+  await vscode.window.showInformationMessage(
+    `Markdown Translator: 已清理私有缓存，并删除 ${summary.deleted} 个已记录译文文件${skippedMessage}。`,
+  );
 }
-
-

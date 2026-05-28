@@ -1,5 +1,6 @@
 node_modules/
 out/
+dist/
 .vscode-test/
 .vscode/markdown-translator/
 **/.vscode/markdown-translator/
