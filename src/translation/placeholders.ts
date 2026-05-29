@@ -123,7 +123,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
   visit(tree, (node: any) => {
     const type = String(node?.type ?? '');
 
-    // 整块保护：代码块、行内代码、HTML、YAML
+    // Protect whole syntax nodes: code blocks, inline code, HTML, and YAML.
     if (type === 'code') {
       addWholeNodeReplacement(node, 'CODEBLOCK');
       return;
@@ -141,7 +141,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
       return;
     }
 
-    // URL 保护：链接与图片的 url/path
+    // Protect link and image destinations.
     if (type === 'link') {
       addUrlReplacement(node, 'URL');
       return;
@@ -156,7 +156,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
     }
   });
 
-  // 从后往前替换，避免 offset 被破坏
+  // Replace from the end so earlier replacements do not shift later offsets.
   replacements.sort((a, b) => b.start - a.start || b.end - a.end);
 
   let out = markdown;
@@ -172,7 +172,7 @@ export function restoreMarkdown(translated: string, placeholders: PlaceholderMap
   let out = translated;
   for (const [token, original] of Object.entries(placeholders)) {
     if (!out.includes(token)) {
-      throw new Error(`占位符被模型破坏或丢失：${token}`);
+      throw new Error(`Model output damaged or removed placeholder token: ${token}`);
     }
     out = out.split(token).join(original);
   }

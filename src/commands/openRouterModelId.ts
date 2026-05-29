@@ -10,15 +10,15 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   const input = await vscode.window.showInputBox({
     title: 'Markdown Translator: OpenRouter Model ID',
-    prompt: '请输入 OpenRouter modelId（例如：openai/gpt-4o-mini）。',
+    prompt: 'Enter the OpenRouter model ID, for example openai/gpt-4o-mini.',
     password: false,
-    placeHolder: existing || '例如：openai/gpt-4o-mini',
+    placeHolder: existing || 'Example: openai/gpt-4o-mini',
     ignoreFocusOut: true,
   });
 
   if (input === undefined) return;
   if (!input.trim()) {
-    await vscode.window.showWarningMessage('Markdown Translator: 未输入 modelId，已取消。');
+    await vscode.window.showWarningMessage('Markdown Translator: Model ID was empty, so the operation was canceled.');
     return;
   }
 
@@ -35,5 +35,5 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
       : vscode.ConfigurationTarget.Global;
 
   await cfg.update('openrouter.modelId', modelId, target);
-  await vscode.window.showInformationMessage(`Markdown Translator: 已保存 OpenRouter modelId：${modelId}`);
+  await vscode.window.showInformationMessage(`Markdown Translator: Saved OpenRouter model ID: ${modelId}`);
 }

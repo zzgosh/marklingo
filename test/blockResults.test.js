@@ -29,5 +29,5 @@ test('falls back to source when a placeholder is damaged', () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.fallbackText, 'See [docs](https://example.com)');
-  assert.match(result.reason, /占位符/);
+  assert.match(result.reason, /placeholder/i);
 });
