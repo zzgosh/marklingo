@@ -32,9 +32,12 @@ Search for `Markdown Translator` in VS Code Settings, or use `Markdown Translato
   - Custom endpoints require explicit confirmation before use.
 - `markdownTranslator.openrouter.modelId`
   - Example: `openai/gpt-4o-mini`
+- `markdownTranslator.translation.maxContextUsageRatio`
+  - Default: `0.5`
+  - When the selected OpenRouter model reports a context window, each translation request prompt targets this share of that window.
 - `markdownTranslator.translation.maxBlocksPerRequest`
   - Default: `24`
-  - Higher values reduce network round trips; lower values reduce prompt size and JSON-format risk.
+  - Fallback block count used only when the model context window cannot be read.
 - `markdownTranslator.translation.targetLanguage`
   - Default: `简体中文`
 - `markdownTranslator.translation.targetLanguageCustom`
@@ -55,6 +58,7 @@ Search for `Markdown Translator` in VS Code Settings, or use `Markdown Translato
 ## Security And Privacy
 
 - Markdown content is sent to the configured OpenRouter-compatible endpoint for translation.
+- Translation requests are non-streaming and explicitly request reasoning exclusion (`reasoning.exclude: true`, `reasoning.effort: none`) to avoid returning thinking tokens.
 - The official OpenRouter origin is allowed by default. Custom origins show a modal confirmation before use.
 - API keys are stored separately per endpoint origin. A custom endpoint does not reuse the official OpenRouter API key.
 - Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`.

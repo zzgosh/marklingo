@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient.js';
+import { getOpenRouterModelContextLength, getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient.js';
 import { getMetaFileUri, getTranslatedFileUri } from '../storage/paths.js';
 import { protectMarkdown, restoreMarkdown } from '../translation/placeholders.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
+import { clampContextUsageRatio, planTranslationRequests, type TranslationRequestBlock } from '../translation/requestPlanner.js';
 import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
 import { createEmptyMeta, detectDeletion, loadTranslationMeta, saveTranslationMeta, sha256 } from '../translation/cache.js';
 
@@ -22,6 +23,7 @@ function buildBlocksTranslatePrompt(
 const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLanguageSelected';
 const CUSTOM_TARGET_LANGUAGE_LABEL = '自定义...';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
+const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
 const TARGET_LANGUAGE_OPTIONS = [
   '简体中文',
   '繁体中文',
@@ -113,12 +115,6 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   return picked;
 }
 
-function chunkArray<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
-
 function tryParseJsonObject(text: string): any {
   try {
     return JSON.parse(text);
@@ -172,6 +168,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     const settings = await getOpenRouterSettings(context);
     const cfg = vscode.workspace.getConfiguration('markdownTranslator');
     const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
+    const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
     const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
     const customPrompt = (cfg.get<string>('translation.customPrompt') ?? '').trim();
     const deletionFallback = cfg.get<boolean>('translation.deletionFallback') ?? true;
@@ -216,29 +213,41 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         }
 
         const toTranslate = mode === 'full' ? translatable : translatable.filter((s) => !translatedByHash.has(s.srcHash));
-        const chunks = chunkArray(toTranslate, maxBlocksPerRequest);
+        const protectedBlocks: TranslationRequestBlock[] = [];
+        const placeholdersById = new Map<string, ReturnType<typeof protectMarkdown>>();
+        for (const seg of toTranslate) {
+          const protectedResult = protectMarkdown(seg.text, seg.id);
+          protectedBlocks.push({ id: seg.id, markdown: protectedResult.text });
+          placeholdersById.set(seg.id, protectedResult);
+        }
+
+        progress.report({ message: 'Checking model context window…' });
+        const modelContextLength = await getOpenRouterModelContextLength(settings);
+        const buildPrompt = (blocks: TranslationRequestBlock[]) => buildBlocksTranslatePrompt({ blocks }, { systemPrompt, customPrompt, targetLanguage });
+        const plan = planTranslationRequests(protectedBlocks, {
+          modelContextLength,
+          maxContextUsageRatio,
+          fallbackMaxBlocksPerRequest: maxBlocksPerRequest,
+          buildPrompt,
+        });
+        const segById = new Map(toTranslate.map((seg) => [seg.id, seg]));
         const startedAt = Date.now();
         outputChannel.appendLine(
           `[${new Date().toISOString()}] Translating ${doc.uri.fsPath} with ${settings.modelId}: ` +
-            `${translatable.length} translatable blocks, ${toTranslate.length} to translate, ${chunks.length} request(s), mode=${mode}.`,
+            `${translatable.length} translatable blocks, ${toTranslate.length} to translate, ` +
+            `${plan.chunks.length} request(s), mode=${mode}, strategy=${plan.strategy}, ` +
+            `contextLength=${modelContextLength ?? 'unknown'}, promptBudget=${plan.contextBudgetTokens ?? 'n/a'}.`,
         );
 
-        if (chunks.length === 0) {
+        if (plan.chunks.length === 0) {
           progress.report({ message: 'Using cached translations…' });
         }
 
-        for (const [chunkIndex, chunk] of chunks.entries()) {
-          progress.report({ message: `Request ${chunkIndex + 1}/${chunks.length} (${chunk.length} blocks)…` });
-          const protectedBlocks: Array<{ id: string; markdown: string }> = [];
-          const placeholdersById = new Map<string, ReturnType<typeof protectMarkdown>>();
-
-          for (const seg of chunk) {
-            const protectedResult = protectMarkdown(seg.text, seg.id);
-            protectedBlocks.push({ id: seg.id, markdown: protectedResult.text });
-            placeholdersById.set(seg.id, protectedResult);
-          }
-
-          const prompt = buildBlocksTranslatePrompt({ blocks: protectedBlocks }, { systemPrompt, customPrompt, targetLanguage });
+        for (const [chunkIndex, plannedChunk] of plan.chunks.entries()) {
+          progress.report({
+            message: `Request ${chunkIndex + 1}/${plan.chunks.length} (${plannedChunk.blocks.length} blocks, ~${plannedChunk.estimatedPromptTokens} prompt tokens)…`,
+          });
+          const prompt = buildPrompt(plannedChunk.blocks);
           const requestStartedAt = Date.now();
           const raw = await openRouterChatCompletion(
             settings,
@@ -246,15 +255,24 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
               { role: 'system', content: prompt.system },
               { role: 'user', content: prompt.user },
             ],
-            { timeoutMs: 120_000, temperature: 0 },
+            {
+              timeoutMs: 120_000,
+              temperature: 0,
+              responseFormat: { type: 'json_object' },
+              reasoning: { effort: 'none', exclude: true },
+            },
           );
           outputChannel.appendLine(
-            `[${new Date().toISOString()}] Request ${chunkIndex + 1}/${chunks.length} finished in ${Date.now() - requestStartedAt}ms ` +
-              `(${chunk.length} blocks).`,
+            `[${new Date().toISOString()}] Request ${chunkIndex + 1}/${plan.chunks.length} finished in ${Date.now() - requestStartedAt}ms ` +
+              `(${plannedChunk.blocks.length} blocks, ~${plannedChunk.estimatedPromptTokens} prompt tokens).`,
           );
 
           const obj = tryParseJsonObject(raw);
-          for (const seg of chunk) {
+          for (const block of plannedChunk.blocks) {
+            const seg = segById.get(block.id);
+            if (!seg) {
+              throw new Error(`内部错误：缺少翻译块映射（${block.id}）。`);
+            }
             const value = obj?.[seg.id];
             if (!Array.isArray(value) || !value.every((x) => typeof x === 'string' && !x.includes('\n'))) {
               throw new Error(`模型输出格式错误：block ${seg.id} 不符合“字符串数组(按行)”要求。`);

@@ -77,7 +77,14 @@
           "type": "number",
           "default": 24,
           "minimum": 1,
-          "description": "Max number of blocks to translate per API request. Higher values reduce network round trips; lower values reduce prompt size and JSON-format risk."
+          "description": "Fallback max number of blocks per API request when the model context window cannot be read."
+        },
+        "markdownTranslator.translation.maxContextUsageRatio": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.1,
+          "maximum": 0.9,
+          "description": "Max share of the model context window used for each translation request prompt when context length is available."
         },
         "markdownTranslator.translation.targetLanguage": {
           "type": "string",

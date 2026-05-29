@@ -16,6 +16,26 @@ export type ChatCompletionOptions = {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  responseFormat?: ResponseFormat;
+  reasoning?: ReasoningOptions;
+};
+
+export type ResponseFormat =
+  | { type: 'json_object' }
+  | {
+      type: 'json_schema';
+      json_schema: {
+        name: string;
+        strict?: boolean;
+        schema: object;
+      };
+    };
+
+export type ReasoningOptions = {
+  effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  max_tokens?: number;
+  enabled?: boolean;
+  exclude?: boolean;
 };
 
 const OPENROUTER_API_KEY_SECRET_PREFIX = 'markdownTranslator.openrouter.apiKey';
@@ -23,6 +43,9 @@ const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId
 const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'markdownTranslator.openrouter.confirmedCustomOrigins';
 const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const OFFICIAL_OPENROUTER_ORIGIN = 'https://openrouter.ai';
+const MODEL_CONTEXT_CACHE_TTL_MS = 30 * 60 * 1000;
+
+const modelContextCache = new Map<string, { expiresAt: number; contextLength: number | undefined }>();
 
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
@@ -191,6 +214,68 @@ export async function resetOpenRouterSecretsAndState(context: vscode.ExtensionCo
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, undefined);
 }
 
+function readPositiveInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function readModelContextLength(model: unknown): number | undefined {
+  if (!model || typeof model !== 'object') return undefined;
+  const value = model as Record<string, unknown>;
+  return readPositiveInteger(value.context_length);
+}
+
+function normalizeModelIdForLookup(modelId: string): string {
+  return modelId.trim().split(':')[0] ?? modelId.trim();
+}
+
+function isMatchingModelId(model: unknown, requestedModelId: string): boolean {
+  if (!model || typeof model !== 'object') return false;
+  const value = model as Record<string, unknown>;
+  const id = typeof value.id === 'string' ? value.id : '';
+  const canonicalSlug = typeof value.canonical_slug === 'string' ? value.canonical_slug : '';
+  const requestedBase = normalizeModelIdForLookup(requestedModelId);
+  const idBase = normalizeModelIdForLookup(id);
+  return (
+    id === requestedModelId ||
+    canonicalSlug === requestedModelId ||
+    idBase === requestedBase ||
+    canonicalSlug === requestedBase ||
+    canonicalSlug.startsWith(`${requestedBase}-`)
+  );
+}
+
+export async function getOpenRouterModelContextLength(settings: OpenRouterSettings): Promise<number | undefined> {
+  const cacheKey = `${settings.baseUrl}|${settings.modelId}`;
+  const cached = modelContextCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.contextLength;
+
+  try {
+    const res = await fetchJsonWithTimeout(
+      `${settings.baseUrl}/models`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${settings.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      },
+      5_000,
+    );
+    if (!res.ok || !res.json || typeof res.json !== 'object') return undefined;
+
+    const data = (res.json as { data?: unknown }).data;
+    if (!Array.isArray(data)) return undefined;
+
+    const model = data.find((item) => isMatchingModelId(item, settings.modelId));
+    const contextLength = readModelContextLength(model);
+    modelContextCache.set(cacheKey, { contextLength, expiresAt: Date.now() + MODEL_CONTEXT_CACHE_TTL_MS });
+    return contextLength;
+  } catch {
+    modelContextCache.set(cacheKey, { contextLength: undefined, expiresAt: Date.now() + 60_000 });
+    return undefined;
+  }
+}
+
 async function fetchJsonWithTimeout(
   url: string,
   init: RequestInit,
@@ -227,6 +312,8 @@ export async function openRouterChatCompletion(
     stream: false,
     temperature: options.temperature,
     max_tokens: options.maxTokens,
+    response_format: options.responseFormat,
+    reasoning: options.reasoning ?? { effort: 'none', exclude: true },
   };
 
   const res = await fetchJsonWithTimeout(
