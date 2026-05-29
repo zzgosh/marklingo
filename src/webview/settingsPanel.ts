@@ -5,6 +5,7 @@ import {
   hasOpenRouterApiKeyForCurrentEndpoint,
   resetOpenRouterSecretsAndState,
   storeOpenRouterApiKeyForCurrentEndpoint,
+  DEFAULT_OPENROUTER_MODEL_ID,
 } from '../services/openRouterClient.js';
 import { getOutputLocation, getProjectsStorageRoot, type OutputLocation } from '../storage/paths.js';
 import { DEFAULT_SYSTEM_PROMPT } from '../translation/prompts.js';
@@ -265,7 +266,7 @@ async function readSettingsState(context: vscode.ExtensionContext): Promise<Sett
     baseUrl: cfg.get<string>('openrouter.baseUrl', 'https://openrouter.ai/api/v1'),
     endpointOrigin: endpoint.origin,
     hasApiKey: await hasOpenRouterApiKeyForCurrentEndpoint(context),
-    modelId: cfg.get<string>('openrouter.modelId', ''),
+    modelId: (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID,
     targetLanguage: cfg.get<string>('translation.targetLanguage', '简体中文'),
     targetLanguageCustom: cfg.get<string>('translation.targetLanguageCustom', ''),
     maxBlocksPerRequest: readNumber(cfg, 'translation.maxBlocksPerRequest', DEFAULT_MAX_BLOCKS_PER_REQUEST),
@@ -360,7 +361,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       min-height: 100vh;
     }
     main {
-      width: min(100%, 1180px);
+      width: min(100%, 800px);
       padding: 56px 28px 72px;
       margin: 0 auto;
     }
@@ -389,7 +390,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     }
     .row {
       display: grid;
-      grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.35fr);
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 1.15fr);
       gap: 22px;
       align-items: center;
       padding: 16px 18px;
@@ -402,6 +403,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     }
     .help {
       color: var(--muted);
+      overflow-wrap: anywhere;
     }
     input, select, textarea {
       width: 100%;
@@ -410,8 +412,11 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       border-radius: 6px;
       background: var(--input);
       color: var(--fg);
-      padding: 7px 9px;
+      padding: 7px 10px;
       font: inherit;
+    }
+    select {
+      padding-right: 32px;
     }
     textarea {
       min-height: 150px;
@@ -469,18 +474,21 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       align-items: center;
     }
     .switch input {
-      width: 42px;
-      height: 22px;
+      width: 16px;
+      height: 16px;
+      min-height: 16px;
       accent-color: var(--accent);
     }
     .status {
       display: inline-flex;
       align-items: center;
-      min-height: 26px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--fg) 10%, transparent);
-      color: var(--muted);
+      width: 100%;
+      min-height: 34px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--input);
+      color: var(--fg);
     }
     .notice {
       padding: 10px 12px;
@@ -552,7 +560,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
           <div class="row">
             <div>
               <div class="label">Model ID</div>
-              <div class="help">Example: openai/gpt-4o-mini</div>
+              <div class="help">Default: ${escapeHtml(DEFAULT_OPENROUTER_MODEL_ID)}</div>
             </div>
             <input id="modelId" name="modelId" value="${escapeHtml(state.modelId)}">
           </div>

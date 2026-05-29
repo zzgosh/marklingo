@@ -38,6 +38,8 @@ export type ReasoningOptions = {
   exclude?: boolean;
 };
 
+export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
+
 const OPENROUTER_API_KEY_SECRET_PREFIX = 'markdownTranslator.openrouter.apiKey';
 const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId';
 const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'markdownTranslator.openrouter.confirmedCustomOrigins';
@@ -148,9 +150,10 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 
   const input = await vscode.window.showInputBox({
     title: 'Markdown Translator: OpenRouter Model ID',
-    prompt: 'Enter the OpenRouter model ID, for example openai/gpt-4o-mini. It will be remembered for later translations.',
+    prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}. It will be remembered for later translations.`,
     password: false,
-    placeHolder: 'Example: openai/gpt-4o-mini',
+    value: DEFAULT_OPENROUTER_MODEL_ID,
+    placeHolder: `Default: ${DEFAULT_OPENROUTER_MODEL_ID}`,
     ignoreFocusOut: true,
   });
 
@@ -324,7 +327,7 @@ export async function openRouterChatCompletion(
         Authorization: `Bearer ${settings.apiKey}`,
         'Content-Type': 'application/json',
         // OpenRouter recommended headers.
-        'HTTP-Referer': 'https://github.com/jeejeeguan/vscode-markdown-translator',
+        'HTTP-Referer': 'https://github.com/zzgosh/vscode-markdown-translator',
         'X-Title': 'vscode-markdown-translator',
       },
       body: JSON.stringify(body),

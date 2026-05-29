@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { DEFAULT_OPENROUTER_MODEL_ID } from '../services/openRouterClient.js';
 
 const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId';
 
@@ -10,9 +11,10 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   const input = await vscode.window.showInputBox({
     title: 'Markdown Translator: OpenRouter Model ID',
-    prompt: 'Enter the OpenRouter model ID, for example openai/gpt-4o-mini.',
+    prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}.`,
     password: false,
-    placeHolder: existing || 'Example: openai/gpt-4o-mini',
+    value: existing || DEFAULT_OPENROUTER_MODEL_ID,
+    placeHolder: `Default: ${DEFAULT_OPENROUTER_MODEL_ID}`,
     ignoreFocusOut: true,
   });
 

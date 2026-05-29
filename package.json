@@ -3,7 +3,7 @@
   "displayName": "Markdown Translator",
   "description": "Translate Markdown to the selected target language (default: Simplified Chinese) using OpenRouter models, with incremental translation based on Markdown AST blocks.",
   "version": "0.0.1",
-  "publisher": "jeejeeguan",
+  "publisher": "zzgosh",
   "type": "module",
   "repository": {
     "type": "git",
@@ -70,8 +70,8 @@
         },
         "markdownTranslator.openrouter.modelId": {
           "type": "string",
-          "default": "",
-          "description": "OpenRouter model ID, e.g. openai/gpt-4o-mini."
+          "default": "google/gemini-3.1-flash-lite",
+          "description": "OpenRouter model ID, e.g. google/gemini-3.1-flash-lite."
         },
         "markdownTranslator.translation.maxBlocksPerRequest": {
           "type": "number",
