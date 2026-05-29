@@ -67,12 +67,12 @@ export async function deleteAllTranslatedFiles(context: vscode.ExtensionContext)
   }
 
   if (storageFiles.length === 0 && externalOutputs.size === 0) {
-    await vscode.window.showInformationMessage('Markdown Translator: 未找到由扩展记录的译文/缓存文件。');
+    await vscode.window.showInformationMessage('Markdown Translator: No extension-tracked translated files or private cache were found.');
     return;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    `Markdown Translator: 将删除 ${externalOutputs.size} 个已记录的工作区译文文件，并清理扩展私有缓存。是否继续？`,
+    `Markdown Translator: Delete ${externalOutputs.size} tracked workspace output file(s) and clear the private extension cache?`,
     { modal: true },
     'Delete',
   );
@@ -81,7 +81,7 @@ export async function deleteAllTranslatedFiles(context: vscode.ExtensionContext)
   const summary = await vscode.window.withProgress<DeleteSummary>(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'Markdown Translator: 正在删除译文文件…',
+      title: 'Markdown Translator: Deleting translated files...',
       cancellable: false,
     },
     async (progress) => {
@@ -105,7 +105,7 @@ export async function deleteAllTranslatedFiles(context: vscode.ExtensionContext)
         }
       }
 
-      progress.report({ message: '清理私有缓存' });
+      progress.report({ message: 'Clearing private cache' });
       try {
         await vscode.workspace.fs.delete(storageRoot, { recursive: true, useTrash: true });
       } catch (e) {
@@ -122,13 +122,13 @@ export async function deleteAllTranslatedFiles(context: vscode.ExtensionContext)
   if (summary.errors.length) {
     console.warn('[markdown-translator] delete errors:', summary.errors.slice(0, 20));
     await vscode.window.showWarningMessage(
-      `Markdown Translator: 已删除 ${summary.deleted} 个译文文件，${summary.skipped} 个已修改文件被跳过，${summary.missing} 个文件已不存在，${summary.errors.length} 个失败。`,
+      `Markdown Translator: Deleted ${summary.deleted} translated file(s), skipped ${summary.skipped} modified file(s), ${summary.missing} file(s) were already missing, and ${summary.errors.length} operation(s) failed.`,
     );
     return;
   }
 
-  const skippedMessage = summary.skipped > 0 ? `，跳过 ${summary.skipped} 个已修改译文文件` : '';
+  const skippedMessage = summary.skipped > 0 ? ` Skipped ${summary.skipped} modified translated file(s).` : '';
   await vscode.window.showInformationMessage(
-    `Markdown Translator: 已清理私有缓存，并删除 ${summary.deleted} 个已记录译文文件${skippedMessage}。`,
+    `Markdown Translator: Cleared private cache and deleted ${summary.deleted} tracked translated file(s).${skippedMessage}`,
   );
 }

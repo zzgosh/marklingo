@@ -47,6 +47,22 @@ function createPlaceholder(prefix: string, kind: string, index: number): string 
   return `__MDT_${prefix}_${kind}_${index}__`;
 }
 
+function mayContainProtectedMarkdown(markdown: string): boolean {
+  return (
+    /[`~<\[]/.test(markdown) ||
+    /https?:\/\//i.test(markdown) ||
+    /\bwww\./i.test(markdown) ||
+    mayContainIndentedCode(markdown)
+  );
+}
+
+function mayContainIndentedCode(markdown: string): boolean {
+  return (
+    /(^|\n)(?: {4,}|\t)/.test(markdown) ||
+    /(^|\n)[ \t]{0,3}(?:>[ \t]?)+[ \t]{4,}\S/.test(markdown)
+  );
+}
+
 function findMarkdownUrlOffset(slice: string, url: string, nodeType: string): number {
   const candidates: number[] = [];
   let index = slice.indexOf(url);
@@ -70,6 +86,10 @@ function findMarkdownUrlOffset(slice: string, url: string, nodeType: string): nu
 }
 
 export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectResult {
+  if (!mayContainProtectedMarkdown(markdown)) {
+    return { text: markdown, placeholders: {} };
+  }
+
   const lineStarts = buildLineStartOffsets(markdown);
   const tree = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ['yaml']).parse(markdown) as any;
 
@@ -110,7 +130,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
   visit(tree, (node: any) => {
     const type = String(node?.type ?? '');
 
-    // 整块保护：代码块、行内代码、HTML、YAML
+    // Protect whole syntax nodes: code blocks, inline code, HTML, and YAML.
     if (type === 'code') {
       addWholeNodeReplacement(node, 'CODEBLOCK');
       return;
@@ -128,7 +148,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
       return;
     }
 
-    // URL 保护：链接与图片的 url/path
+    // Protect link and image destinations.
     if (type === 'link') {
       addUrlReplacement(node, 'URL');
       return;
@@ -143,7 +163,7 @@ export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectR
     }
   });
 
-  // 从后往前替换，避免 offset 被破坏
+  // Replace from the end so earlier replacements do not shift later offsets.
   replacements.sort((a, b) => b.start - a.start || b.end - a.end);
 
   let out = markdown;
@@ -159,10 +179,9 @@ export function restoreMarkdown(translated: string, placeholders: PlaceholderMap
   let out = translated;
   for (const [token, original] of Object.entries(placeholders)) {
     if (!out.includes(token)) {
-      throw new Error(`占位符被模型破坏或丢失：${token}`);
+      throw new Error(`Model output damaged or removed placeholder token: ${token}`);
     }
     out = out.split(token).join(original);
   }
   return out;
 }
-

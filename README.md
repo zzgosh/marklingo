@@ -17,7 +17,7 @@ A VS Code extension for translating Markdown files with OpenRouter-compatible ch
 
 1. Open a saved Markdown file.
 2. Run `Markdown Translator: Open Settings`.
-3. Set an OpenRouter model ID, such as `openai/gpt-4o-mini`.
+3. Set an OpenRouter model ID, such as `google/gemini-3.1-flash-lite`.
 4. Save an API key. API keys are stored in VS Code `SecretStorage`.
 5. Run `Markdown Translator: Translate Current Markdown`.
 
@@ -31,7 +31,7 @@ Search for `Markdown Translator` in VS Code Settings, or use `Markdown Translato
   - Default: `https://openrouter.ai/api/v1`
   - Custom endpoints require explicit confirmation before use.
 - `markdownTranslator.openrouter.modelId`
-  - Example: `openai/gpt-4o-mini`
+  - Default: `google/gemini-3.1-flash-lite`
 - `markdownTranslator.translation.maxContextUsageRatio`
   - Default: `0.5`
   - When the selected OpenRouter model reports a context window, each translation request prompt targets this share of that window.
@@ -41,7 +41,7 @@ Search for `Markdown Translator` in VS Code Settings, or use `Markdown Translato
 - `markdownTranslator.translation.targetLanguage`
   - Default: `简体中文`
 - `markdownTranslator.translation.targetLanguageCustom`
-  - Used when `targetLanguage` is `自定义...`.
+  - Used when `targetLanguage` is `Custom...`.
 - `markdownTranslator.translation.systemPrompt`
   - Base system prompt template. Leave empty to use the extension default. Use `{targetLanguage}` as the target language placeholder.
 - `markdownTranslator.translation.customPrompt`
@@ -68,7 +68,11 @@ Search for `Markdown Translator` in VS Code Settings, or use `Markdown Translato
 
 - `sourceFolder` output: `xxx_mdt.md` is written next to `xxx.md`.
 - `privateStorage` output: translated Markdown is written under the extension private storage directory.
-- Metadata is written under VS Code private global storage.
+- Metadata is written under VS Code private global storage. It includes cached source/translation blocks plus a structured `debug` section with run status, extension/environment versions, non-secret settings, request planning details, warnings, and errors.
+
+## Token Estimates
+
+Notification token counts are rough prompt estimates used only for request planning. They include the system prompt, the user prompt wrapper, JSON block payload, placeholder-expanded Markdown, and a small chat-message overhead. They do not use the exact tokenizer for the selected model, so they will not match external token counters exactly.
 
 The delete command removes extension-tracked outputs and private metadata. If a tracked source-folder output was edited after generation, it is skipped instead of deleted.
 

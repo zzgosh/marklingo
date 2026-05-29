@@ -1,8 +1,10 @@
 .gitignore
+AGENTS.md
 .vscode/**
 .vscode-test/**
 src/**
 test/**
+scripts/**
 out/**
 node_modules/**
 *.vsix
