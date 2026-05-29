@@ -18,12 +18,14 @@ Do not edit generated `out/` or `dist/` files manually. Use the package scripts.
 - `npm run compile`: type-check and compile TypeScript into `out/`.
 - `npm test`: compile, then run Node test files under `test/**/*.test.js`.
 - `npm run check`: compile and run tests.
+- `npm run test:vscode`: build the extension, launch an isolated VS Code Extension Host, and run integration tests under `test/integration/`.
+- `npm run check:integration`: run `npm run check`, then `npm run test:vscode`.
 - `npm run benchmark:postprocessing`: run the local Markdown postprocessing benchmark.
 - `npm run package`: compile and bundle `dist/extension.js`.
 - `npm run package:dry`: build the extension and list VSIX contents.
 - `npm run vsix`: run checks, then create the `.vsix` package.
 
-For code changes, run at least `npm run check`. For packaging or VSIX-related changes, also run `npm run package:dry` or `npm run vsix`.
+For code changes, run at least `npm run check`. For extension-host behavior, storage, command, SecretStorage, or OpenRouter request-flow changes, also run `npm run test:vscode`. For packaging or VSIX-related changes, run `npm run package:dry` or `npm run vsix`.
 
 ## Main Architecture
 
@@ -84,6 +86,12 @@ When installing a VSIX from a terminal, verify the `code` binary actually target
 ```sh
 "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension ./vscode-markdown-translator-0.0.1.vsix --force
 ```
+
+## Integration Testing Notes
+
+The VS Code integration test runner uses `@vscode/test-electron`, a temporary workspace under `.vscode-test/workspace`, a temporary user data directory, and a local mock OpenRouter server. It must not use the developer's real VS Code profile, installed VSIX settings, or real OpenRouter API key.
+
+Test-only commands are registered only when `context.extensionMode === vscode.ExtensionMode.Test`. Keep them out of `package.json` `contributes.commands` so normal users cannot discover them from the Command Palette.
 
 ## Development Constraints
 

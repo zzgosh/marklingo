@@ -88,6 +88,12 @@ function getConfiguration() {
   return vscode.workspace.getConfiguration('markdownTranslator');
 }
 
+async function rememberConfirmedCustomOrigin(context: vscode.ExtensionContext, origin: string): Promise<void> {
+  const confirmedOrigins = context.globalState.get<string[]>(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS) ?? [];
+  if (confirmedOrigins.includes(origin)) return;
+  await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, [...confirmedOrigins, origin]);
+}
+
 async function confirmCustomOrigin(context: vscode.ExtensionContext, url: URL): Promise<void> {
   if (isOfficialOpenRouterUrl(url)) return;
 
@@ -103,14 +109,19 @@ async function confirmCustomOrigin(context: vscode.ExtensionContext, url: URL): 
     throw new Error('Custom OpenRouter endpoint was canceled.');
   }
 
-  await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, [...confirmedOrigins, url.origin]);
+  await rememberConfirmedCustomOrigin(context, url.origin);
 }
 
-async function resolveBaseUrl(context: vscode.ExtensionContext): Promise<{ baseUrl: string; origin: string; official: boolean }> {
+async function resolveBaseUrl(
+  context: vscode.ExtensionContext,
+  options: { confirmCustomEndpoint?: boolean } = {},
+): Promise<{ baseUrl: string; origin: string; official: boolean }> {
   const cfg = getConfiguration();
   const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? DEFAULT_OPENROUTER_BASE_URL;
   const url = parseBaseUrl(rawBaseUrl);
-  await confirmCustomOrigin(context, url);
+  if (options.confirmCustomEndpoint ?? true) {
+    await confirmCustomOrigin(context, url);
+  }
   return {
     baseUrl: normalizeBaseUrl(url.toString()),
     origin: url.origin,
@@ -190,6 +201,22 @@ export async function getCurrentOpenRouterEndpoint(context: vscode.ExtensionCont
 export async function storeOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
   const endpoint = await resolveBaseUrl(context);
   await context.secrets.store(getApiKeySecretKey(endpoint.origin), apiKey.trim());
+  return endpoint.origin;
+}
+
+export async function seedOpenRouterApiKeyForCurrentEndpointForTest(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
+  if (context.extensionMode !== vscode.ExtensionMode.Test) {
+    throw new Error('OpenRouter test credential seeding is only available in VS Code test mode.');
+  }
+  const trimmedApiKey = apiKey.trim();
+  if (!trimmedApiKey) {
+    throw new Error('OpenRouter test credential seeding requires a non-empty API key.');
+  }
+  const endpoint = await resolveBaseUrl(context, { confirmCustomEndpoint: false });
+  if (!endpoint.official) {
+    await rememberConfirmedCustomOrigin(context, endpoint.origin);
+  }
+  await context.secrets.store(getApiKeySecretKey(endpoint.origin), trimmedApiKey);
   return endpoint.origin;
 }
 
