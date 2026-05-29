@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
-import { translateCurrentMarkdown } from './commands/translateCurrentMarkdown.js';
+import { seedTargetLanguageSelectionForTest, translateCurrentMarkdown } from './commands/translateCurrentMarkdown.js';
 import { deleteAllTranslatedFiles } from './commands/deleteAllTranslatedFiles.js';
 import { resetOpenRouterApiKey, setOpenRouterApiKey } from './commands/openRouterApiKey.js';
 import { setOpenRouterModelId } from './commands/openRouterModelId.js';
 import { setTargetLanguage } from './commands/targetLanguage.js';
 import { openSettingsPanel } from './webview/settingsPanel.js';
+import { seedOpenRouterApiKeyForCurrentEndpointForTest } from './services/openRouterClient.js';
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -54,6 +55,17 @@ export function activate(context: vscode.ExtensionContext) {
       return openSettingsPanel(context);
     }),
   );
+
+  if (context.extensionMode === vscode.ExtensionMode.Test) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand('markdownTranslator.test.seedState', async (options?: { apiKey?: string }) => {
+        await seedTargetLanguageSelectionForTest(context);
+        const apiKey = (options?.apiKey ?? 'test-key').trim();
+        const origin = await seedOpenRouterApiKeyForCurrentEndpointForTest(context, apiKey);
+        return { globalStorageUri: context.globalStorageUri.toString(), origin };
+      }),
+    );
+  }
 }
 
 export function deactivate() {
