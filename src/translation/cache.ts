@@ -59,7 +59,7 @@ export async function saveTranslationMeta(
   metaUri: vscode.Uri,
   meta: TranslationMetaV1
 ): Promise<void> {
-  const raw = JSON.stringify(meta, null, 2);
+  const raw = JSON.stringify(meta);
   await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(metaUri.fsPath)));
   await vscode.workspace.fs.writeFile(metaUri, Buffer.from(raw, "utf8"));
 }

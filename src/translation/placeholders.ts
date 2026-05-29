@@ -47,6 +47,15 @@ function createPlaceholder(prefix: string, kind: string, index: number): string 
   return `__MDT_${prefix}_${kind}_${index}__`;
 }
 
+function mayContainProtectedMarkdown(markdown: string): boolean {
+  return (
+    /[`~<\[]/.test(markdown) ||
+    /https?:\/\//i.test(markdown) ||
+    /\bwww\./i.test(markdown) ||
+    /(^|\n)(?: {4,}|\t)/.test(markdown)
+  );
+}
+
 function findMarkdownUrlOffset(slice: string, url: string, nodeType: string): number {
   const candidates: number[] = [];
   let index = slice.indexOf(url);
@@ -70,6 +79,10 @@ function findMarkdownUrlOffset(slice: string, url: string, nodeType: string): nu
 }
 
 export function protectMarkdown(markdown: string, tokenPrefix: string): ProtectResult {
+  if (!mayContainProtectedMarkdown(markdown)) {
+    return { text: markdown, placeholders: {} };
+  }
+
   const lineStarts = buildLineStartOffsets(markdown);
   const tree = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ['yaml']).parse(markdown) as any;
 
@@ -165,4 +178,3 @@ export function restoreMarkdown(translated: string, placeholders: PlaceholderMap
   }
   return out;
 }
-

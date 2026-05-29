@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { getOpenRouterModelContextLength, getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient.js';
 import { getMetaFileUri, getTranslatedFileUri } from '../storage/paths.js';
-import { protectMarkdown, restoreMarkdown } from '../translation/placeholders.js';
+import { restoreTranslatedBlock } from '../translation/blockResults.js';
+import { protectMarkdown } from '../translation/placeholders.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
 import { clampContextUsageRatio, planTranslationRequests, type TranslationRequestBlock } from '../translation/requestPlanner.js';
 import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
@@ -37,6 +38,11 @@ const TARGET_LANGUAGE_OPTIONS = [
 ];
 
 const outputChannel = vscode.window.createOutputChannel('Markdown Translator');
+
+type TranslationWarning = {
+  blockId: string;
+  reason: string;
+};
 
 async function promptCustomTargetLanguage(current: string): Promise<string | null> {
   const input = await vscode.window.showInputBox({
@@ -231,6 +237,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
           buildPrompt,
         });
         const segById = new Map(toTranslate.map((seg) => [seg.id, seg]));
+        const warnings: TranslationWarning[] = [];
         const startedAt = Date.now();
         outputChannel.appendLine(
           `[${new Date().toISOString()}] Translating ${doc.uri.fsPath} with ${settings.modelId}: ` +
@@ -273,34 +280,39 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
             if (!seg) {
               throw new Error(`内部错误：缺少翻译块映射（${block.id}）。`);
             }
-            const value = obj?.[seg.id];
-            if (!Array.isArray(value) || !value.every((x) => typeof x === 'string' && !x.includes('\n'))) {
-              throw new Error(`模型输出格式错误：block ${seg.id} 不符合“字符串数组(按行)”要求。`);
-            }
-            const protectedTranslated = value.join('\n');
             const protectedResult = placeholdersById.get(seg.id);
             if (!protectedResult) {
               throw new Error(`内部错误：缺少占位符映射（${seg.id}）。`);
             }
-            const restored = restoreMarkdown(protectedTranslated, protectedResult.placeholders);
-            translatedByHash.set(seg.srcHash, restored);
+            const result = restoreTranslatedBlock(obj?.[seg.id], seg.id, seg.text, protectedResult);
+            if (!result.ok) {
+              warnings.push({ blockId: seg.id, reason: result.reason });
+              outputChannel.appendLine(`[${new Date().toISOString()}] Warning: block ${seg.id} kept as source: ${result.reason}`);
+            }
+            translatedByHash.set(seg.srcHash, result.ok ? result.text : result.fallbackText);
           }
         }
         outputChannel.appendLine(`[${new Date().toISOString()}] Translation finished in ${Date.now() - startedAt}ms.`);
+        if (warnings.length > 0) {
+          outputChannel.appendLine(
+            `[${new Date().toISOString()}] Translation completed with ${warnings.length} block warning(s): ` +
+              warnings.map((warning) => warning.blockId).join(', '),
+          );
+        }
         progress.report({ message: 'Writing translated Markdown…' });
 
         // 用“按 offset 替换”的方式合成最终译文，最大程度保留原始格式与不可翻译片段
-        let out = '';
+        const parts: string[] = [];
         let cursor = 0;
-        const sorted = [...segments].sort((a, b) => a.startOffset - b.startOffset || a.endOffset - b.endOffset);
-        for (const seg of sorted) {
-          out += sourceText.slice(cursor, seg.startOffset);
+        for (const seg of segments) {
+          parts.push(sourceText.slice(cursor, seg.startOffset));
           const h = seg.translatable ? hashById.get(seg.id) : undefined;
           const replacement = seg.translatable && h ? translatedByHash.get(h) ?? seg.text : seg.text;
-          out += replacement;
+          parts.push(replacement);
           cursor = seg.endOffset;
         }
-        out += sourceText.slice(cursor);
+        parts.push(sourceText.slice(cursor));
+        const out = parts.join('');
 
         // 生成并保存本次 meta（只保留当前文档相关的 translations）
         const meta = createEmptyMeta(doc.uri);
@@ -321,12 +333,15 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     );
 
     await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(translatedUri.fsPath)));
-    await vscode.workspace.fs.writeFile(translatedUri, Buffer.from(translatedMarkdown, 'utf8'));
-    await saveTranslationMeta(metaUri, nextMeta);
+    await Promise.all([
+      vscode.workspace.fs.writeFile(translatedUri, Buffer.from(translatedMarkdown, 'utf8')),
+      saveTranslationMeta(metaUri, nextMeta),
+    ]);
 
     await vscode.commands.executeCommand('markdown.showPreviewToSide', translatedUri);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    outputChannel.appendLine(`[${new Date().toISOString()}] Error: ${msg}`);
     await vscode.window.showErrorMessage(`Markdown Translator: 翻译失败。${msg}`);
   }
 }
