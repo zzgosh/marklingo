@@ -17,7 +17,7 @@ A VS Code extension for translating Markdown files with OpenRouter-compatible ch
 
 1. Open a saved Markdown file.
 2. Run `Markdown Translator: Open Settings`.
-3. Set an OpenRouter model ID, such as `openai/gpt-4o-mini`.
+3. Set an OpenRouter model ID, such as `google/gemini-3.1-flash-lite`.
 4. Save an API key. API keys are stored in VS Code `SecretStorage`.
 5. Run `Markdown Translator: Translate Current Markdown`.
 
@@ -31,7 +31,7 @@ Search for `Markdown Translator` in VS Code Settings, or use `Markdown Translato
   - Default: `https://openrouter.ai/api/v1`
   - Custom endpoints require explicit confirmation before use.
 - `markdownTranslator.openrouter.modelId`
-  - Example: `openai/gpt-4o-mini`
+  - Default: `google/gemini-3.1-flash-lite`
 - `markdownTranslator.translation.maxContextUsageRatio`
   - Default: `0.5`
   - When the selected OpenRouter model reports a context window, each translation request prompt targets this share of that window.
