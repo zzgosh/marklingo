@@ -88,6 +88,7 @@ export type TranslationMetaDebug = {
     outputHash?: string;
     translatedBlocks: number;
     reusedBlocks: number;
+    fallbackBlocks: number;
     warningCount: number;
   };
   warnings: Array<{ blockId: string; reason: string }>;

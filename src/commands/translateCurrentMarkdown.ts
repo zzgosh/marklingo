@@ -45,6 +45,9 @@ const TARGET_LANGUAGE_OPTIONS = [
 ];
 
 const outputChannel = vscode.window.createOutputChannel('Markdown Translator');
+const MAX_DEBUG_EVENT_MESSAGE_LENGTH = 1000;
+const MAX_DEBUG_ERROR_MESSAGE_LENGTH = 4000;
+const MAX_DEBUG_ERROR_STACK_LENGTH = 8000;
 
 type TranslationWarning = {
   blockId: string;
@@ -100,8 +103,17 @@ function addDebugEvent(debug: TranslationMetaDebug, level: 'info' | 'warning' | 
   const timestamp = new Date().toISOString();
   outputChannel.appendLine(`[${timestamp}] ${level === 'info' ? '' : `${level[0].toUpperCase()}${level.slice(1)}: `}${message}`);
   if (debug.events.length < 200) {
-    debug.events.push({ timestamp, level, message: message.slice(0, 1000) });
+    debug.events.push({
+      timestamp,
+      level,
+      message: truncateDebugText(message, MAX_DEBUG_EVENT_MESSAGE_LENGTH) ?? '',
+    });
   }
+}
+
+function truncateDebugText(value: string | undefined, maxLength: number): string | undefined {
+  if (!value || value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}...[truncated ${value.length - maxLength} chars]`;
 }
 
 function finishDebug(
@@ -114,9 +126,11 @@ function finishDebug(
   debug.durationMs = Date.now() - startedAtMs;
   debug.status = status;
   if (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
     debug.error = {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+      message: truncateDebugText(message, MAX_DEBUG_ERROR_MESSAGE_LENGTH) ?? '',
+      stack: truncateDebugText(stack, MAX_DEBUG_ERROR_STACK_LENGTH),
     };
   }
   return debug;
@@ -318,8 +332,12 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         }
 
         const translatedByHash = new Map<string, string>();
+        const outputByHash = new Map<string, string>();
         if (mode === 'incremental' && prevMeta) {
-          for (const [h, t] of Object.entries(prevMeta.translations)) translatedByHash.set(h, t);
+          for (const [h, t] of Object.entries(prevMeta.translations)) {
+            translatedByHash.set(h, t);
+            outputByHash.set(h, t);
+          }
         }
 
         const toTranslate = mode === 'full' ? translatable : translatable.filter((s) => !translatedByHash.has(s.srcHash));
@@ -427,7 +445,12 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
               warnings.push({ blockId: seg.id, reason: result.reason });
               addDebugEvent(debug, 'warning', `Block ${seg.id} kept as source: ${result.reason}`);
             }
-            translatedByHash.set(seg.srcHash, result.ok ? result.text : result.fallbackText);
+            if (result.ok) {
+              translatedByHash.set(seg.srcHash, result.text);
+              outputByHash.set(seg.srcHash, result.text);
+            } else if (!outputByHash.has(seg.srcHash)) {
+              outputByHash.set(seg.srcHash, result.fallbackText);
+            }
           }
         }
         addDebugEvent(debug, 'info', `Translation finished in ${Date.now() - startedAt}ms.`);
@@ -446,7 +469,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         for (const seg of segments) {
           parts.push(sourceText.slice(cursor, seg.startOffset));
           const h = seg.translatable ? hashById.get(seg.id) : undefined;
-          const replacement = seg.translatable && h ? translatedByHash.get(h) ?? seg.text : seg.text;
+          const replacement = seg.translatable && h ? outputByHash.get(h) ?? seg.text : seg.text;
           parts.push(replacement);
           cursor = seg.endOffset;
         }
@@ -469,6 +492,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
           outputHash: meta.outputHash,
           translatedBlocks: Math.max(0, toTranslate.length - warnings.length),
           reusedBlocks: translatable.length - toTranslate.length,
+          fallbackBlocks: warnings.length,
           warningCount: warnings.length,
         };
         meta.debug = finishDebug(debug, debugStartedAtMs, 'success');
