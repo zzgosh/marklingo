@@ -9,6 +9,95 @@ export type MetaSegment = {
   source: string;
 };
 
+export type TranslationDebugEvent = {
+  timestamp: string;
+  level: "info" | "warning" | "error";
+  message: string;
+};
+
+export type TranslationRequestDebug = {
+  index: number;
+  blockCount: number;
+  estimatedPromptTokens: number;
+  durationMs?: number;
+  status?: "success" | "error";
+};
+
+export type TranslationMetaDebug = {
+  schemaVersion: 1;
+  runId: string;
+  startedAt: string;
+  finishedAt?: string;
+  durationMs?: number;
+  status: "success" | "error";
+  extension: {
+    id: string;
+    version: string;
+    mode: string;
+  };
+  environment: {
+    appName: string;
+    vscodeVersion: string;
+    uiKind: string;
+    remoteName?: string;
+    workspaceFolderCount: number;
+  };
+  document: {
+    languageId: string;
+    lineCount: number;
+    sourceBytes: number;
+    sourceHash: string;
+    totalSegments?: number;
+    translatableBlocks?: number;
+    blocksToTranslate?: number;
+    cacheHits?: number;
+  };
+  settings?: {
+    baseUrl: string;
+    modelId: string;
+    targetLanguage?: string;
+    outputLocation: string;
+    maxBlocksPerRequest?: number;
+    maxContextUsageRatio?: number;
+    deletionFallback?: boolean;
+    similarityThreshold?: number;
+    systemPromptSource?: "default" | "custom";
+    systemPromptHash?: string;
+    customPromptSet?: boolean;
+    customPromptHash?: string;
+    request: {
+      stream: false;
+      temperature: number;
+      responseFormat: string;
+      reasoning: {
+        effort: "none";
+        exclude: true;
+      };
+    };
+  };
+  plan?: {
+    mode: "full" | "incremental";
+    requestedMode: "auto" | "full";
+    strategy: "contextWindow" | "fallbackBlocks";
+    modelContextLength?: number;
+    contextBudgetTokens?: number;
+    chunkCount: number;
+    chunks: TranslationRequestDebug[];
+  };
+  result?: {
+    outputHash?: string;
+    translatedBlocks: number;
+    reusedBlocks: number;
+    warningCount: number;
+  };
+  warnings: Array<{ blockId: string; reason: string }>;
+  error?: {
+    message: string;
+    stack?: string;
+  };
+  events: TranslationDebugEvent[];
+};
+
 export type TranslationMetaV1 = {
   version: 1;
   segmenterVersion: string;
@@ -19,6 +108,7 @@ export type TranslationMetaV1 = {
   updatedAt: string;
   segments: MetaSegment[];
   translations: Record<string, string>;
+  debug?: TranslationMetaDebug;
 };
 
 function normalizeForHash(text: string): string {
@@ -72,7 +162,7 @@ function normalizeForSimilarity(text: string): string[] {
     .replace(/\s+/g, " ")
     .trim();
   if (!s) return [];
-  // 英文按空格分词；中文保持为单字符粒度（粗略但可用）
+  // Split Latin text by spaces and CJK text at a rough single-character granularity.
   if (/[a-z0-9]/.test(s)) return s.split(" ");
   return s.split("");
 }
@@ -101,12 +191,12 @@ export function detectDeletion(
   if (missingPrev.length === 0) return false;
 
   const addedNext = next.filter((n) => !prevHashes.has(n.srcHash));
-  // 更保守的判定：只有在“净减少”的情况下，才认为发生了精简/删除
-  // 这样像“整段替换”这种修改（missingPrev 与 addedNext 数量相当）不会误触发全量重译。
+  // Treat deletion conservatively: only a net block decrease triggers a full retranslation.
+  // This avoids treating whole-block rewrites as deletions when missing and added counts are similar.
   const netDecrease = missingPrev.length > addedNext.length || next.length < prev.length;
   if (!netDecrease) return false;
 
-  // 若缺失块与新增块在文本上高度相似，视为“改写/合并”而非删除，避免不必要的全量重译。
+  // If missing blocks closely match added blocks, treat the change as a rewrite/merge instead of deletion.
   const threshold = Math.max(0, Math.min(1, similarityThreshold));
   if (threshold > 0 && addedNext.length > 0) {
     let allMatched = true;

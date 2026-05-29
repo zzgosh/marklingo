@@ -11,5 +11,5 @@ export function normalizeTranslatedBlockLines(value: unknown, blockId: string): 
     return value.flatMap((item) => splitMarkdownLines(item));
   }
 
-  throw new Error(`模型输出格式错误：block ${blockId} 必须是字符串或字符串数组。`);
+  throw new Error(`Invalid model output: block ${blockId} must be a string or an array of strings.`);
 }

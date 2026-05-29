@@ -19,7 +19,7 @@ const TARGET_LANGUAGE_OPTIONS = [
   'Français',
   'Español',
   'Deutsch',
-  '自定义...',
+  'Custom...',
 ];
 const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLanguageSelected';
 const TRANSLATE_COMMAND = 'markdownTranslator.translateCurrentMarkdown';

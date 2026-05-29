@@ -5,7 +5,7 @@ import { DEFAULT_SYSTEM_PROMPT, resolveSystemPrompt } from '../out/translation/p
 test('resolves the default system prompt with target language placeholder', () => {
   const prompt = resolveSystemPrompt('', 'English');
 
-  assert.match(prompt, /翻译为English/);
+  assert.match(prompt, /translate the provided Markdown blocks into English/i);
   assert.equal(prompt.includes('{targetLanguage}'), false);
 });
 
@@ -17,5 +17,5 @@ test('resolves a custom system prompt template', () => {
 
 test('keeps the default prompt visible for settings UI', () => {
   assert.match(DEFAULT_SYSTEM_PROMPT, /__MDT_xxx__/);
-  assert.match(DEFAULT_SYSTEM_PROMPT, /合法的 JSON 对象/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /valid JSON object/);
 });
