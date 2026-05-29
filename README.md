@@ -82,8 +82,11 @@ The delete command removes extension-tracked outputs and private metadata. If a 
 npm install
 npm run compile
 npm test
+npm run test:vscode
 npm run package:dry
 ```
+
+`npm test` runs fast Node unit tests. `npm run test:vscode` launches an isolated VS Code Extension Host with a temporary workspace, a local mock OpenRouter endpoint, and a fake SecretStorage API key. It does not use your installed VSIX settings or real OpenRouter key.
 
 Debug in VS Code with `Run Extension` from `.vscode/launch.json`.
 
