@@ -8,6 +8,7 @@ import {
 } from '../services/openRouterClient.js';
 import { getOutputLocation, getProjectsStorageRoot, type OutputLocation } from '../storage/paths.js';
 import { DEFAULT_SYSTEM_PROMPT } from '../translation/prompts.js';
+import { clampContextUsageRatio } from '../translation/requestPlanner.js';
 
 const TARGET_LANGUAGE_OPTIONS = [
   '简体中文',
@@ -24,6 +25,7 @@ const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLangu
 const TRANSLATE_COMMAND = 'markdownTranslator.translateCurrentMarkdown';
 const DEFAULT_TRANSLATE_KEY = 'alt+cmd+v';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
+const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
 
 type SettingsState = {
   shortcutLabel: string;
@@ -36,6 +38,7 @@ type SettingsState = {
   targetLanguage: string;
   targetLanguageCustom: string;
   maxBlocksPerRequest: number;
+  maxContextUsageRatio: number;
   deletionFallback: boolean;
   similarityThreshold: number;
   systemPrompt: string;
@@ -56,6 +59,7 @@ const CONFIGURATION_KEYS = [
   'translation.targetLanguage',
   'translation.targetLanguageCustom',
   'translation.maxBlocksPerRequest',
+  'translation.maxContextUsageRatio',
   'translation.deletionFallback',
   'translation.similarityThreshold',
   'translation.systemPrompt',
@@ -265,6 +269,7 @@ async function readSettingsState(context: vscode.ExtensionContext): Promise<Sett
     targetLanguage: cfg.get<string>('translation.targetLanguage', '简体中文'),
     targetLanguageCustom: cfg.get<string>('translation.targetLanguageCustom', ''),
     maxBlocksPerRequest: readNumber(cfg, 'translation.maxBlocksPerRequest', DEFAULT_MAX_BLOCKS_PER_REQUEST),
+    maxContextUsageRatio: clampContextUsageRatio(readNumber(cfg, 'translation.maxContextUsageRatio', DEFAULT_MAX_CONTEXT_USAGE_RATIO)),
     deletionFallback: cfg.get<boolean>('translation.deletionFallback', false),
     similarityThreshold: readNumber(cfg, 'translation.similarityThreshold', 0.6),
     systemPrompt: cfg.get<string>('translation.systemPrompt', '').trim() || DEFAULT_SYSTEM_PROMPT,
@@ -282,6 +287,7 @@ async function updateSettings(context: vscode.ExtensionContext, payload: Record<
     ['translation.targetLanguage', String(payload.targetLanguage ?? '简体中文').trim() || '简体中文'],
     ['translation.targetLanguageCustom', String(payload.targetLanguageCustom ?? '').trim()],
     ['translation.maxBlocksPerRequest', Math.max(1, Number(payload.maxBlocksPerRequest) || DEFAULT_MAX_BLOCKS_PER_REQUEST)],
+    ['translation.maxContextUsageRatio', clampContextUsageRatio(Number(payload.maxContextUsageRatio) || DEFAULT_MAX_CONTEXT_USAGE_RATIO)],
     ['translation.deletionFallback', Boolean(payload.deletionFallback)],
     ['translation.similarityThreshold', Math.max(0, Math.min(1, Number(payload.similarityThreshold) || 0))],
     ['translation.systemPrompt', String(payload.systemPrompt ?? '').trim()],
@@ -570,8 +576,18 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
           </div>
           <div class="row">
             <div>
-              <div class="label">Max Blocks Per Request</div>
-              <div class="help">Higher values reduce network round trips; lower values reduce prompt size and JSON-format risk.</div>
+              <div class="label">Context Usage Ratio</div>
+              <div class="help">When the model context window is available, each request prompt targets this share of it.</div>
+            </div>
+            <div class="inline">
+              <input id="maxContextUsageRatio" name="maxContextUsageRatio" type="range" min="0.1" max="0.9" step="0.05" value="${state.maxContextUsageRatio}">
+              <span id="context-ratio-value">${Math.round(state.maxContextUsageRatio * 100)}%</span>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="label">Fallback Blocks Per Request</div>
+              <div class="help">Used only when the model context window cannot be read.</div>
             </div>
             <input id="maxBlocksPerRequest" name="maxBlocksPerRequest" type="number" min="1" value="${state.maxBlocksPerRequest}">
           </div>
@@ -648,11 +664,17 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     const form = document.getElementById('settings-form');
     const threshold = document.getElementById('similarityThreshold');
     const thresholdValue = document.getElementById('threshold-value');
+    const contextRatio = document.getElementById('maxContextUsageRatio');
+    const contextRatioValue = document.getElementById('context-ratio-value');
     const toast = document.getElementById('toast');
     const defaultSystemPrompt = ${defaultSystemPromptJson};
 
     threshold.addEventListener('input', () => {
       thresholdValue.textContent = Number(threshold.value).toFixed(2);
+    });
+
+    contextRatio.addEventListener('input', () => {
+      contextRatioValue.textContent = Math.round(Number(contextRatio.value) * 100) + '%';
     });
 
     form.addEventListener('submit', (event) => {
@@ -666,6 +688,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
           targetLanguage: data.get('targetLanguage'),
           targetLanguageCustom: data.get('targetLanguageCustom'),
           maxBlocksPerRequest: data.get('maxBlocksPerRequest'),
+          maxContextUsageRatio: data.get('maxContextUsageRatio'),
           deletionFallback: data.has('deletionFallback'),
           similarityThreshold: data.get('similarityThreshold'),
           systemPrompt: data.get('systemPrompt'),
