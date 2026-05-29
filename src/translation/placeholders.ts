@@ -52,7 +52,14 @@ function mayContainProtectedMarkdown(markdown: string): boolean {
     /[`~<\[]/.test(markdown) ||
     /https?:\/\//i.test(markdown) ||
     /\bwww\./i.test(markdown) ||
-    /(^|\n)(?: {4,}|\t)/.test(markdown)
+    mayContainIndentedCode(markdown)
+  );
+}
+
+function mayContainIndentedCode(markdown: string): boolean {
+  return (
+    /(^|\n)(?: {4,}|\t)/.test(markdown) ||
+    /(^|\n)[ \t]{0,3}(?:>[ \t]?)+[ \t]{4,}\S/.test(markdown)
   );
 }
 
