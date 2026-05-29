@@ -38,6 +38,8 @@ export type ReasoningOptions = {
   exclude?: boolean;
 };
 
+export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
+
 const OPENROUTER_API_KEY_SECRET_PREFIX = 'markdownTranslator.openrouter.apiKey';
 const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId';
 const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'markdownTranslator.openrouter.confirmedCustomOrigins';
@@ -62,13 +64,13 @@ function parseBaseUrl(baseUrl: string): URL {
   try {
     url = new URL(normalized);
   } catch {
-    throw new Error(`OpenRouter baseUrl 不是合法 URL：${baseUrl}`);
+    throw new Error(`OpenRouter baseUrl is not a valid URL: ${baseUrl}`);
   }
 
   const isHttps = url.protocol === 'https:';
   const isLocalHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
   if (!isHttps && !isLocalHttp) {
-    throw new Error('OpenRouter baseUrl 必须使用 HTTPS（localhost 调试除外）。');
+    throw new Error('OpenRouter baseUrl must use HTTPS, except for localhost debugging.');
   }
 
   return url;
@@ -93,12 +95,12 @@ async function confirmCustomOrigin(context: vscode.ExtensionContext, url: URL): 
   if (confirmedOrigins.includes(url.origin)) return;
 
   const picked = await vscode.window.showWarningMessage(
-    `Markdown Translator: 将使用自定义 OpenRouter endpoint：${url.origin}。API Key 会按 endpoint 单独保存，不会复用官方 OpenRouter 的 Key。是否继续？`,
+    `Markdown Translator: You are about to use a custom OpenRouter endpoint: ${url.origin}. API keys are stored separately per endpoint and the official OpenRouter key will not be reused. Continue?`,
     { modal: true },
     'Use Custom Endpoint',
   );
   if (picked !== 'Use Custom Endpoint') {
-    throw new Error('已取消使用自定义 OpenRouter endpoint。');
+    throw new Error('Custom OpenRouter endpoint was canceled.');
   }
 
   await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, [...confirmedOrigins, url.origin]);
@@ -123,12 +125,12 @@ async function resolveApiKey(context: vscode.ExtensionContext, endpoint: { origi
 
   const input = await vscode.window.showInputBox({
     title: 'Markdown Translator: OpenRouter API Key',
-    prompt: `请输入 ${endpoint.origin} 的 API Key（将安全地存入 VS Code SecretStorage，并按 endpoint 单独保存）。`,
+    prompt: `Enter the API key for ${endpoint.origin}. It will be stored in VS Code SecretStorage and separated by endpoint.`,
     password: true,
     ignoreFocusOut: true,
   });
   if (!input?.trim()) {
-    throw new Error('缺少 OpenRouter API Key。请通过 Markdown Translator 设置页或 API Key 命令保存。');
+    throw new Error('Missing OpenRouter API key. Save it from Markdown Translator settings or the API key command.');
   }
   const apiKey = input.trim();
   await context.secrets.store(secretKey, apiKey);
@@ -148,20 +150,21 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 
   const input = await vscode.window.showInputBox({
     title: 'Markdown Translator: OpenRouter Model ID',
-    prompt: '请输入 OpenRouter modelId（例如：openai/gpt-4o-mini）。设置后将自动记住，后续翻译不会再弹出。',
+    prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}. It will be remembered for later translations.`,
     password: false,
-    placeHolder: '例如：openai/gpt-4o-mini',
+    value: DEFAULT_OPENROUTER_MODEL_ID,
+    placeHolder: `Default: ${DEFAULT_OPENROUTER_MODEL_ID}`,
     ignoreFocusOut: true,
   });
 
-  // 用户按 ESC / 关闭：input === undefined
+  // Pressing ESC or closing the prompt returns undefined.
   if (input === undefined) {
-    throw new Error('缺少 OpenRouter modelId。请在设置中配置 markdownTranslator.openrouter.modelId 或在提示框中输入。');
+    throw new Error('Missing OpenRouter modelId. Configure markdownTranslator.openrouter.modelId in settings or enter it in the prompt.');
   }
 
   const finalModelId = input.trim();
   if (!finalModelId) {
-    throw new Error('缺少 OpenRouter modelId。请在设置中配置 markdownTranslator.openrouter.modelId 或在提示框中输入。');
+    throw new Error('Missing OpenRouter modelId. Configure markdownTranslator.openrouter.modelId in settings or enter it in the prompt.');
   }
 
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, finalModelId);
@@ -290,7 +293,7 @@ async function fetchJsonWithTimeout(
     try {
       json = text ? JSON.parse(text) : undefined;
     } catch {
-      // ignore
+      // Ignore invalid JSON here so callers can still inspect the response text.
     }
     return { ok: res.ok, status: res.status, statusText: res.statusText, json, text };
   } finally {
@@ -323,8 +326,8 @@ export async function openRouterChatCompletion(
       headers: {
         Authorization: `Bearer ${settings.apiKey}`,
         'Content-Type': 'application/json',
-        // OpenRouter 推荐 Header
-        'HTTP-Referer': 'https://github.com/jeejeeguan/vscode-markdown-translator',
+        // OpenRouter recommended headers.
+        'HTTP-Referer': 'https://github.com/zzgosh/vscode-markdown-translator',
         'X-Title': 'vscode-markdown-translator',
       },
       body: JSON.stringify(body),
@@ -334,13 +337,13 @@ export async function openRouterChatCompletion(
 
   if (!res.ok) {
     const errorDetail = typeof res.text === 'string' && res.text.trim() ? res.text.trim() : res.statusText;
-    throw new Error(`OpenRouter 请求失败：HTTP ${res.status}. ${errorDetail}`);
+    throw new Error(`OpenRouter request failed: HTTP ${res.status}. ${errorDetail}`);
   }
 
   const data = res.json as any;
   const content: unknown = data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('OpenRouter 返回内容为空或格式不符合预期。');
+    throw new Error('OpenRouter returned empty content or an unexpected response shape.');
   }
   return content;
 }

@@ -3,7 +3,7 @@
   "displayName": "Markdown Translator",
   "description": "Translate Markdown to the selected target language (default: Simplified Chinese) using OpenRouter models, with incremental translation based on Markdown AST blocks.",
   "version": "0.0.1",
-  "publisher": "jeejeeguan",
+  "publisher": "zzgosh",
   "type": "module",
   "repository": {
     "type": "git",
@@ -70,8 +70,8 @@
         },
         "markdownTranslator.openrouter.modelId": {
           "type": "string",
-          "default": "",
-          "description": "OpenRouter model ID, e.g. openai/gpt-4o-mini."
+          "default": "google/gemini-3.1-flash-lite",
+          "description": "OpenRouter model ID, e.g. google/gemini-3.1-flash-lite."
         },
         "markdownTranslator.translation.maxBlocksPerRequest": {
           "type": "number",
@@ -98,14 +98,14 @@
             "Français",
             "Español",
             "Deutsch",
-            "自定义..."
+            "Custom..."
           ],
           "description": "Target language for translation (shown in onboarding on first use)."
         },
         "markdownTranslator.translation.targetLanguageCustom": {
           "type": "string",
           "default": "",
-          "description": "自定义目标语言（当 targetLanguage 选择“自定义...”时生效）。"
+          "description": "Custom target language used when targetLanguage is Custom..."
         },
         "markdownTranslator.translation.systemPrompt": {
           "type": "string",
@@ -151,6 +151,7 @@
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node --test \"test/**/*.test.js\"",
     "check": "npm run compile && npm test",
+    "benchmark:postprocessing": "npm run compile && node scripts/benchmark-postprocessing.mjs",
     "package": "npm run compile && npm run bundle",
     "package:dry": "npm run package && vsce ls --tree",
     "vsix": "npm run check && vsce package",

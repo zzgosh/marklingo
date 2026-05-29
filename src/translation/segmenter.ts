@@ -54,32 +54,32 @@ export function segmentMarkdownDocument(doc: vscode.TextDocument): Segment[] {
     if (!node) return;
     const type = String(node.type ?? '');
 
-    // 不可翻译的 block
+    // Non-translatable blocks.
     if (type === 'yaml' || type === 'code' || type === 'html' || type === 'definition' || type === 'thematicBreak') {
       add(node, false);
       return;
     }
 
-    // list：按 listItem 粒度切分
+    // Split lists by listItem.
     if (type === 'list') {
       const children = Array.isArray(node.children) ? node.children : [];
       for (const child of children) collect(child);
       return;
     }
 
-    // listItem：作为翻译块（内部若包含代码块，后续用占位符保护）
+    // Treat list items as translation blocks. Nested code is protected later by placeholders.
     if (type === 'listItem') {
       add(node, true);
       return;
     }
 
-    // 常见可翻译 block
+    // Common translatable blocks.
     if (type === 'heading' || type === 'paragraph' || type === 'blockquote' || type === 'table') {
       add(node, true);
       return;
     }
 
-    // 兜底：有位置就当作一个可翻译块；否则下钻 children
+    // Fallback: use any positioned node as a block; otherwise walk into children.
     if (node?.position?.start && node?.position?.end) {
       add(node, true);
       return;
@@ -92,13 +92,13 @@ export function segmentMarkdownDocument(doc: vscode.TextDocument): Segment[] {
   const rootChildren = Array.isArray(tree?.children) ? tree.children : [];
   for (const child of rootChildren) collect(child);
 
-  // 排序并赋予稳定顺序 id
+  // Sort and assign stable sequential ids.
   segments.sort((a, b) => a.startOffset - b.startOffset || a.endOffset - b.endOffset);
 
   const deduped: Omit<Segment, 'id'>[] = [];
   let lastEnd = -1;
   for (const seg of segments) {
-    // 防止出现重叠范围导致替换异常
+    // Skip overlapping ranges to avoid invalid replacements.
     if (seg.startOffset < lastEnd) continue;
     deduped.push(seg);
     lastEnd = seg.endOffset;
@@ -106,5 +106,4 @@ export function segmentMarkdownDocument(doc: vscode.TextDocument): Segment[] {
 
   return deduped.map((seg, i) => ({ ...seg, id: `b${i}` }));
 }
-
 
