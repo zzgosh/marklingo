@@ -54,6 +54,13 @@ type TranslationWarning = {
   reason: string;
 };
 
+export async function seedTargetLanguageSelectionForTest(context: vscode.ExtensionContext): Promise<void> {
+  if (context.extensionMode !== vscode.ExtensionMode.Test) {
+    throw new Error('Target language test state seeding is only available in VS Code test mode.');
+  }
+  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+}
+
 function getExtensionVersion(context: vscode.ExtensionContext): string {
   const pkg = context.extension.packageJSON as { version?: unknown };
   return typeof pkg.version === 'string' ? pkg.version : 'unknown';
