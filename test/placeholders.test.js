@@ -30,3 +30,11 @@ test('restores protected markdown tokens exactly', () => {
 
   assert.equal(restoreMarkdown(translated, protectedMarkdown.placeholders), '`code` 和 [docs](https://example.com)');
 });
+
+test('skips placeholder parsing for plain text blocks', () => {
+  const source = 'Plain translatable text without code, links, HTML, or images.';
+  const protectedResult = protectMarkdown(source, 'b0');
+
+  assert.equal(protectedResult.text, source);
+  assert.deepEqual(protectedResult.placeholders, {});
+});
