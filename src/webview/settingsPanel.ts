@@ -267,15 +267,17 @@ function coerceSettingValue(key: string, raw: unknown): unknown {
   return value;
 }
 
-async function updateSingleSetting(context: vscode.ExtensionContext, key: string, raw: unknown): Promise<void> {
+async function updateSingleSetting(context: vscode.ExtensionContext, key: string, raw: unknown): Promise<unknown> {
   if (!UPDATABLE_SETTING_KEYS.has(key)) {
     throw new Error(`MarkLingo: Unsupported setting "${key}".`);
   }
   const cfg = vscode.workspace.getConfiguration('marklingo');
-  await cfg.update(key, coerceSettingValue(key, raw), vscode.ConfigurationTarget.Global);
+  const value = coerceSettingValue(key, raw);
+  await cfg.update(key, value, vscode.ConfigurationTarget.Global);
   if (key === 'translation.targetLanguage' || key === 'translation.targetLanguageCustom') {
     await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
   }
+  return value;
 }
 
 function renderOptions(selected: string): string {
@@ -647,13 +649,14 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     const textByKey = new Map();
     const instantByKey = new Map();
     const hintTimers = new Map();
+    let nextSaveId = 1;
 
     document.querySelectorAll('.save-btn').forEach((button) => {
       const fieldId = button.getAttribute('data-field');
       const key = button.getAttribute('data-key');
       const input = fieldId ? document.getElementById(fieldId) : null;
       if (!input || !key) return;
-      const state = { input, button, baseline: input.value, timer: undefined };
+      const state = { input, button, baseline: input.value, timer: undefined, pendingSaveId: undefined, pendingValue: undefined };
       textByKey.set(key, state);
       input.addEventListener('input', () => {
         if (state.timer) { clearTimeout(state.timer); state.timer = undefined; }
@@ -663,7 +666,12 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       });
       button.addEventListener('click', () => {
         if (input.value === state.baseline) return;
-        vscode.postMessage({ type: 'updateSetting', key: key, value: input.value });
+        const saveId = nextSaveId++;
+        state.pendingSaveId = saveId;
+        state.pendingValue = input.value;
+        button.textContent = 'Saving...';
+        button.disabled = true;
+        vscode.postMessage({ type: 'updateSetting', key: key, value: input.value, saveId: saveId });
       });
     });
 
@@ -702,23 +710,46 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     registerInstant('outputLocation', 'storage.outputLocation');
     syncCustomLanguageVisibility(false);
 
-    function handleSaved(key) {
+    function handleSaved(key, saveId, value) {
       const text = textByKey.get(key);
       if (text) {
-        text.baseline = text.input.value;
-        text.button.disabled = true;
-        text.button.textContent = 'Saved';
-        text.button.classList.add('saved');
+        if (saveId !== undefined && text.pendingSaveId !== saveId) return;
+        const pendingValue = text.pendingValue;
+        const savedValue = typeof value === 'string' ? value : pendingValue;
+        text.pendingSaveId = undefined;
+        text.pendingValue = undefined;
+        text.baseline = savedValue;
         if (text.timer) clearTimeout(text.timer);
-        text.timer = setTimeout(() => {
+        if (text.input.value === pendingValue) {
+          text.input.value = savedValue;
+          text.button.disabled = true;
+          text.button.textContent = 'Saved';
+          text.button.classList.add('saved');
+          text.timer = setTimeout(() => {
+            text.button.textContent = 'Save';
+            text.button.classList.remove('saved');
+            text.timer = undefined;
+          }, 2500);
+        } else {
           text.button.textContent = 'Save';
           text.button.classList.remove('saved');
+          text.button.disabled = text.input.value === text.baseline;
           text.timer = undefined;
-        }, 2500);
+        }
         return;
       }
       const hintId = instantByKey.get(key);
       if (hintId) flashHint(hintId);
+    }
+
+    function handleSaveFailed(key, saveId) {
+      const text = textByKey.get(key);
+      if (!text || (saveId !== undefined && text.pendingSaveId !== saveId)) return;
+      text.pendingSaveId = undefined;
+      text.pendingValue = undefined;
+      text.button.textContent = 'Save';
+      text.button.classList.remove('saved');
+      text.button.disabled = text.input.value === text.baseline;
     }
 
     // API key: inline password entry. The value is posted once and never stored in webview state.
@@ -779,7 +810,11 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       const msg = event.data;
       if (!msg || typeof msg.type !== 'string') return;
       if (msg.type === 'saved') {
-        handleSaved(msg.key);
+        handleSaved(msg.key, msg.saveId, msg.value);
+        return;
+      }
+      if (msg.type === 'saveFailed') {
+        handleSaveFailed(msg.key, msg.saveId);
         return;
       }
       if (msg.type === 'apiKeyStatus') {
@@ -875,8 +910,13 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
   panel.webview.onDidReceiveMessage(async (message) => {
     try {
       if (message?.type === 'updateSetting' && typeof message.key === 'string') {
-        await updateSingleSetting(context, message.key, message.value);
-        await panel.webview.postMessage({ type: 'saved', key: message.key });
+        try {
+          const value = await updateSingleSetting(context, message.key, message.value);
+          await panel.webview.postMessage({ type: 'saved', key: message.key, value, saveId: message.saveId });
+        } catch (error) {
+          await panel.webview.postMessage({ type: 'saveFailed', key: message.key, saveId: message.saveId });
+          throw error;
+        }
         return;
       }
       if (message?.type === 'setApiKey') {
