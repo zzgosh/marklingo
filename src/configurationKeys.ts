@@ -5,8 +5,6 @@ export const MARKLINGO_CONFIGURATION_KEYS = [
   'translation.targetLanguageCustom',
   'translation.maxBlocksPerRequest',
   'translation.maxContextUsageRatio',
-  'translation.deletionFallback',
-  'translation.similarityThreshold',
   'translation.systemPrompt',
   'translation.customPrompt',
   'storage.outputLocation',
