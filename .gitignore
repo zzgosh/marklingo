@@ -1,9 +1,10 @@
 node_modules/
 out/
 dist/
+local-docs/
 .vscode-test/
-.vscode/markdown-translator/
-**/.vscode/markdown-translator/
+.vscode/marklingo/
+**/.vscode/marklingo/
 **/*_mdt.md
 **/*_mdt.meta.json
 .DS_Store

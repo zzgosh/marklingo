@@ -1,10 +1,12 @@
 .gitignore
 AGENTS.md
+CLAUDE.md
 .vscode/**
 .vscode-test/**
 src/**
 test/**
 scripts/**
+local-docs/**
 out/**
 node_modules/**
 *.vsix

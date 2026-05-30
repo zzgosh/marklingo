@@ -40,11 +40,11 @@ test('skips placeholder parsing for plain text blocks', () => {
 });
 
 test('protects indented code blocks inside blockquotes', () => {
-  const source = '>     npm install markdown-translator';
+  const source = '>     npm install marklingo';
   const protectedResult = protectMarkdown(source, 'b0');
   const placeholder = Object.keys(protectedResult.placeholders).find((key) => key.includes('CODEBLOCK'));
 
   assert.ok(placeholder);
   assert.match(protectedResult.text, /__MDT_b0_CODEBLOCK_0__/);
-  assert.match(protectedResult.placeholders[placeholder], /npm install markdown-translator/);
+  assert.match(protectedResult.placeholders[placeholder], /npm install marklingo/);
 });
