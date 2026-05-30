@@ -40,9 +40,9 @@ export type ReasoningOptions = {
 
 export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
 
-const OPENROUTER_API_KEY_SECRET_PREFIX = 'markdownTranslator.openrouter.apiKey';
-const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId';
-const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'markdownTranslator.openrouter.confirmedCustomOrigins';
+const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey';
+const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
+const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'marklingo.openrouter.confirmedCustomOrigins';
 const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const OFFICIAL_OPENROUTER_ORIGIN = 'https://openrouter.ai';
 const MODEL_CONTEXT_CACHE_TTL_MS = 30 * 60 * 1000;
@@ -85,7 +85,7 @@ function getApiKeySecretKey(origin: string): string {
 }
 
 function getConfiguration() {
-  return vscode.workspace.getConfiguration('markdownTranslator');
+  return vscode.workspace.getConfiguration('marklingo');
 }
 
 async function rememberConfirmedCustomOrigin(context: vscode.ExtensionContext, origin: string): Promise<void> {
@@ -101,7 +101,7 @@ async function confirmCustomOrigin(context: vscode.ExtensionContext, url: URL): 
   if (confirmedOrigins.includes(url.origin)) return;
 
   const picked = await vscode.window.showWarningMessage(
-    `Markdown Translator: You are about to use a custom OpenRouter endpoint: ${url.origin}. API keys are stored separately per endpoint and the official OpenRouter key will not be reused. Continue?`,
+    `MarkLingo: You are about to use a custom OpenRouter endpoint: ${url.origin}. API keys are stored separately per endpoint and the official OpenRouter key will not be reused. Continue?`,
     { modal: true },
     'Use Custom Endpoint',
   );
@@ -135,13 +135,13 @@ async function resolveApiKey(context: vscode.ExtensionContext, endpoint: { origi
   if (fromSecret?.trim()) return fromSecret.trim();
 
   const input = await vscode.window.showInputBox({
-    title: 'Markdown Translator: OpenRouter API Key',
+    title: 'MarkLingo: OpenRouter API Key',
     prompt: `Enter the API key for ${endpoint.origin}. It will be stored in VS Code SecretStorage and separated by endpoint.`,
     password: true,
     ignoreFocusOut: true,
   });
   if (!input?.trim()) {
-    throw new Error('Missing OpenRouter API key. Save it from Markdown Translator settings or the API key command.');
+    throw new Error('Missing OpenRouter API key. Save it from MarkLingo settings or the API key command.');
   }
   const apiKey = input.trim();
   await context.secrets.store(secretKey, apiKey);
@@ -160,7 +160,7 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
   if (lastUsed) return lastUsed;
 
   const input = await vscode.window.showInputBox({
-    title: 'Markdown Translator: OpenRouter Model ID',
+    title: 'MarkLingo: OpenRouter Model ID',
     prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}. It will be remembered for later translations.`,
     password: false,
     value: DEFAULT_OPENROUTER_MODEL_ID,
@@ -170,12 +170,12 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 
   // Pressing ESC or closing the prompt returns undefined.
   if (input === undefined) {
-    throw new Error('Missing OpenRouter modelId. Configure markdownTranslator.openrouter.modelId in settings or enter it in the prompt.');
+    throw new Error('Missing OpenRouter modelId. Configure marklingo.openrouter.modelId in settings or enter it in the prompt.');
   }
 
   const finalModelId = input.trim();
   if (!finalModelId) {
-    throw new Error('Missing OpenRouter modelId. Configure markdownTranslator.openrouter.modelId in settings or enter it in the prompt.');
+    throw new Error('Missing OpenRouter modelId. Configure marklingo.openrouter.modelId in settings or enter it in the prompt.');
   }
 
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, finalModelId);
@@ -354,8 +354,8 @@ export async function openRouterChatCompletion(
         Authorization: `Bearer ${settings.apiKey}`,
         'Content-Type': 'application/json',
         // OpenRouter recommended headers.
-        'HTTP-Referer': 'https://github.com/zzgosh/vscode-markdown-translator',
-        'X-Title': 'vscode-markdown-translator',
+        'HTTP-Referer': 'https://github.com/zzgosh/marklingo',
+        'X-Title': 'MarkLingo',
       },
       body: JSON.stringify(body),
     },

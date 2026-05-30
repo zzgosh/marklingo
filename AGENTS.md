@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This repository contains a VS Code extension named `Markdown Translator`. It translates saved Markdown documents through OpenRouter-compatible chat models while preserving Markdown structure, protected syntax, links, image paths, code, HTML, and frontmatter.
+This repository contains a VS Code extension named `MarkLingo`. It translates saved Markdown documents through OpenRouter-compatible chat models while preserving Markdown structure, protected syntax, links, image paths, code, HTML, and frontmatter.
 
 The extension is authored in TypeScript as native ESM:
 
@@ -45,7 +45,7 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 
 API keys must only use VS Code `SecretStorage`. Keys are separated by endpoint origin. Do not store API keys in workspace settings, metadata, logs, or debug output.
 
-Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, source blocks, cached translated blocks, output hashes, and structured debug metadata. Source-folder output may still write a visible `*_mdt.md` next to the source Markdown when `markdownTranslator.storage.outputLocation` is `sourceFolder`.
+Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, source blocks, cached translated blocks, output hashes, and structured debug metadata. Source-folder output may still write a visible `*_mdt.md` next to the source Markdown when `marklingo.storage.outputLocation` is `sourceFolder`.
 
 The delete command should delete only extension-tracked outputs and private metadata. If a source-folder output was edited after generation, it should be skipped instead of deleted.
 
@@ -84,7 +84,7 @@ After installing a VSIX into an already-open VS Code window, reload the window w
 When installing a VSIX from a terminal, verify the `code` binary actually targets Visual Studio Code. Some local machines may alias or symlink `code` to another editor such as Cursor. The VS Code app-bundled CLI is:
 
 ```sh
-"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension ./vscode-markdown-translator-0.0.1.vsix --force
+"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension ./marklingo-0.0.1.vsix --force
 ```
 
 ## Integration Testing Notes

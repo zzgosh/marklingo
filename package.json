@@ -1,92 +1,120 @@
 {
-  "name": "vscode-markdown-translator",
-  "displayName": "Markdown Translator",
-  "description": "Translate Markdown to the selected target language (default: Simplified Chinese) using OpenRouter models, with incremental translation based on Markdown AST blocks.",
+  "name": "marklingo",
+  "displayName": "MarkLingo - Translate Markdown with Any AI Model",
+  "description": "Translate Markdown files into any language using AI models via OpenRouter",
   "version": "0.0.1",
   "publisher": "zzgosh",
   "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zzgosh/vscode-markdown-translator.git"
+    "url": "https://github.com/zzgosh/marklingo.git"
   },
+  "bugs": {
+    "url": "https://github.com/zzgosh/marklingo/issues"
+  },
+  "homepage": "https://github.com/zzgosh/marklingo#readme",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "markdown",
+    "translate",
+    "translation",
+    "ai",
+    "openrouter",
+    "i18n",
+    "localization"
+  ],
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
   "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "MarkLingo reads Markdown documents and can send their content to a configured translation endpoint, so the workspace should be trusted before translation runs."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "MarkLingo currently writes translated files using local filesystem paths and does not support virtual workspace file systems."
+    }
+  },
   "contributes": {
     "commands": [
       {
-        "command": "markdownTranslator.translateCurrentMarkdown",
-        "title": "Markdown Translator: Translate Current Markdown"
+        "command": "marklingo.translateCurrentMarkdown",
+        "title": "MarkLingo: Translate Current Markdown"
       },
       {
-        "command": "markdownTranslator.translateCurrentMarkdownFull",
-        "title": "Markdown Translator: Translate Current Markdown (Full)"
+        "command": "marklingo.translateCurrentMarkdownFull",
+        "title": "MarkLingo: Translate Current Markdown (Full)"
       },
       {
-        "command": "markdownTranslator.openrouter.setApiKey",
-        "title": "Markdown Translator: Set OpenRouter API Key"
+        "command": "marklingo.openrouter.setApiKey",
+        "title": "MarkLingo: Set OpenRouter API Key"
       },
       {
-        "command": "markdownTranslator.openrouter.resetApiKey",
-        "title": "Markdown Translator: Reset OpenRouter API Key"
+        "command": "marklingo.openrouter.setModelId",
+        "title": "MarkLingo: Set OpenRouter Model ID"
       },
       {
-        "command": "markdownTranslator.openrouter.setModelId",
-        "title": "Markdown Translator: Set OpenRouter Model ID"
+        "command": "marklingo.deleteAllTranslatedFiles",
+        "title": "MarkLingo: Delete all translated files"
       },
       {
-        "command": "markdownTranslator.deleteAllTranslatedFiles",
-        "title": "Markdown Translator: Delete all translated files"
+        "command": "marklingo.setTargetLanguage",
+        "title": "MarkLingo: Set Target Language"
       },
       {
-        "command": "markdownTranslator.setTargetLanguage",
-        "title": "Markdown Translator: Set Target Language"
-      },
-      {
-        "command": "markdownTranslator.openSettings",
-        "title": "Markdown Translator: Open Settings"
+        "command": "marklingo.openSettings",
+        "title": "MarkLingo: Open Settings"
       }
     ],
     "keybindings": [
       {
-        "command": "markdownTranslator.translateCurrentMarkdown",
-        "key": "alt+cmd+v",
-        "mac": "alt+cmd+v",
-        "when": "editorLangId == markdown"
+        "command": "marklingo.translateCurrentMarkdown",
+        "key": "ctrl+alt+cmd+t",
+        "mac": "ctrl+alt+cmd+t",
+        "when": "editorTextFocus && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)"
       }
     ],
     "configuration": {
-      "title": "Markdown Translator",
+      "title": "MarkLingo",
       "properties": {
-        "markdownTranslator.openrouter.baseUrl": {
+        "marklingo.openrouter.baseUrl": {
           "type": "string",
           "scope": "application",
           "default": "https://openrouter.ai/api/v1",
           "description": "OpenRouter API base URL."
         },
-        "markdownTranslator.openrouter.modelId": {
+        "marklingo.openrouter.modelId": {
           "type": "string",
           "default": "google/gemini-3.1-flash-lite",
           "description": "OpenRouter model ID, e.g. google/gemini-3.1-flash-lite."
         },
-        "markdownTranslator.translation.maxBlocksPerRequest": {
+        "marklingo.translation.maxBlocksPerRequest": {
           "type": "number",
           "default": 24,
           "minimum": 1,
           "description": "Fallback max number of blocks per API request when the model context window cannot be read."
         },
-        "markdownTranslator.translation.maxContextUsageRatio": {
+        "marklingo.translation.maxContextUsageRatio": {
           "type": "number",
           "default": 0.5,
           "minimum": 0.1,
           "maximum": 0.9,
           "description": "Max share of the model context window used for each translation request prompt when context length is available."
         },
-        "markdownTranslator.translation.targetLanguage": {
+        "marklingo.translation.targetLanguage": {
           "type": "string",
           "default": "简体中文",
           "enum": [
@@ -102,34 +130,34 @@
           ],
           "description": "Target language for translation (shown in onboarding on first use)."
         },
-        "markdownTranslator.translation.targetLanguageCustom": {
+        "marklingo.translation.targetLanguageCustom": {
           "type": "string",
           "default": "",
           "description": "Custom target language used when targetLanguage is Custom..."
         },
-        "markdownTranslator.translation.systemPrompt": {
+        "marklingo.translation.systemPrompt": {
           "type": "string",
           "default": "",
           "description": "Base system prompt template. Leave empty to use the extension default. Use {targetLanguage} as the target language placeholder."
         },
-        "markdownTranslator.translation.customPrompt": {
+        "marklingo.translation.customPrompt": {
           "type": "string",
           "default": "",
           "description": "Optional custom prompt appended after the system prompt, such as terminology or style rules."
         },
-        "markdownTranslator.translation.deletionFallback": {
+        "marklingo.translation.deletionFallback": {
           "type": "boolean",
           "default": false,
           "description": "Fallback to full translation if block deletion is detected."
         },
-        "markdownTranslator.translation.similarityThreshold": {
+        "marklingo.translation.similarityThreshold": {
           "type": "number",
           "default": 0.6,
           "minimum": 0,
           "maximum": 1,
           "description": "Similarity threshold to treat delete+insert as modification."
         },
-        "markdownTranslator.storage.outputLocation": {
+        "marklingo.storage.outputLocation": {
           "type": "string",
           "default": "sourceFolder",
           "enum": [

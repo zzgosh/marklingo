@@ -1,16 +1,16 @@
 import * as vscode from 'vscode';
 import { DEFAULT_OPENROUTER_MODEL_ID } from '../services/openRouterClient.js';
 
-const OPENROUTER_MODEL_ID_LAST_USED = 'markdownTranslator.openrouter.lastModelId';
+const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
 
 export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
   const activeUri = vscode.window.activeTextEditor?.document?.uri;
-  const cfg = vscode.workspace.getConfiguration('markdownTranslator', activeUri);
+  const cfg = vscode.workspace.getConfiguration('marklingo', activeUri);
 
   const existing = (context.globalState.get<string>(OPENROUTER_MODEL_ID_LAST_USED) ?? '').trim();
 
   const input = await vscode.window.showInputBox({
-    title: 'Markdown Translator: OpenRouter Model ID',
+    title: 'MarkLingo: OpenRouter Model ID',
     prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}.`,
     password: false,
     value: existing || DEFAULT_OPENROUTER_MODEL_ID,
@@ -20,7 +20,7 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   if (input === undefined) return;
   if (!input.trim()) {
-    await vscode.window.showWarningMessage('Markdown Translator: Model ID was empty, so the operation was canceled.');
+    await vscode.window.showWarningMessage('MarkLingo: Model ID was empty, so the operation was canceled.');
     return;
   }
 
@@ -37,5 +37,5 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
       : vscode.ConfigurationTarget.Global;
 
   await cfg.update('openrouter.modelId', modelId, target);
-  await vscode.window.showInformationMessage(`Markdown Translator: Saved OpenRouter model ID: ${modelId}`);
+  await vscode.window.showInformationMessage(`MarkLingo: Saved OpenRouter model ID: ${modelId}`);
 }

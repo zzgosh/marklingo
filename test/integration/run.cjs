@@ -4,7 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 const vscode = require('vscode');
 
-const EXTENSION_ID = 'zzgosh.vscode-markdown-translator';
+const EXTENSION_ID = 'zzgosh.marklingo';
 const MODEL_ID = 'test/mock-model';
 
 function sendJson(res, status, value) {
@@ -107,13 +107,13 @@ async function configureExtension(mockServer) {
   assert.ok(extension, `expected extension ${EXTENSION_ID}`);
   await extension.activate();
 
-  const cfg = vscode.workspace.getConfiguration('markdownTranslator');
+  const cfg = vscode.workspace.getConfiguration('marklingo');
   await cfg.update('openrouter.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
   await cfg.update('translation.targetLanguage', 'English', vscode.ConfigurationTarget.Global);
   await cfg.update('storage.outputLocation', 'sourceFolder', vscode.ConfigurationTarget.Global);
 
-  const seeded = await vscode.commands.executeCommand('markdownTranslator.test.seedState', { apiKey: 'test-key' });
+  const seeded = await vscode.commands.executeCommand('marklingo.test.seedState', { apiKey: 'test-key' });
   assert.equal(seeded.origin, new URL(mockServer.baseUrl).origin);
   return seeded;
 }
@@ -134,11 +134,14 @@ async function replaceMarkdown(uri, content) {
   await doc.save();
 }
 
-async function translate(uri) {
+async function translate(uri, languageId) {
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-  const doc = await vscode.workspace.openTextDocument(uri);
+  let doc = await vscode.workspace.openTextDocument(uri);
+  if (languageId) {
+    doc = await vscode.languages.setTextDocumentLanguage(doc, languageId);
+  }
   await vscode.window.showTextDocument(doc);
-  await vscode.commands.executeCommand('markdownTranslator.translateCurrentMarkdown');
+  await vscode.commands.executeCommand('marklingo.translateCurrentMarkdown');
 }
 
 function translatedPath(sourceUri) {
@@ -182,6 +185,10 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   const output = readText(translatedPath(source));
   assert.match(output, /MOCK:# Title/);
   assert.match(output, /MOCK:See \[docs\]\(https:\/\/example\.com\)\./);
+  assert.ok(
+    vscode.window.visibleTextEditors.some((editor) => editor.document.uri.fsPath === translatedPath(source)),
+    'expected translated Markdown file to be open as a visible editor',
+  );
 
   const request = context.server.state.chatRequests[0];
   assert.equal(request.body.stream, false);
@@ -213,6 +220,18 @@ async function testReusesCachedTranslations(context) {
   assert.equal(context.server.state.chatRequests.length, 1);
   assert.equal(context.server.state.chatRequests[0].blocks.length, 1);
   assert.match(context.server.state.chatRequests[0].blocks[0].markdown, /Second paragraph/);
+}
+
+async function testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown('SKILL.md', '# Skill\n\nTranslate this file.\n');
+
+  context.server.state.chatRequests = [];
+  await translate(source, 'plaintext');
+
+  const output = readText(translatedPath(source));
+  assert.match(output, /MOCK:# Skill/);
+  assert.equal(context.server.state.chatRequests.length, 1);
 }
 
 async function testRetriesFallbackBlocks(context) {
@@ -258,6 +277,7 @@ async function run() {
     const context = { server, seeded };
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
     await runTest('reuses cached translations on incremental runs', testReusesCachedTranslations, context);
+    await runTest('translates .md files even when VS Code uses a different language mode', testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode, context);
     await runTest('retries fallback blocks instead of caching source fallback', testRetriesFallbackBlocks, context);
   } finally {
     await server.close();
