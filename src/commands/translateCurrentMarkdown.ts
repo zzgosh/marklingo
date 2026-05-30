@@ -9,7 +9,6 @@ import { clampContextUsageRatio, planTranslationRequests, type TranslationReques
 import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
 import {
   createEmptyMeta,
-  detectDeletion,
   loadTranslationMeta,
   saveTranslationMeta,
   sha256,
@@ -299,8 +298,6 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
     const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
     const customPrompt = (cfg.get<string>('translation.customPrompt') ?? '').trim();
-    const deletionFallback = cfg.get<boolean>('translation.deletionFallback') ?? true;
-    const similarityThreshold = cfg.get<number>('translation.similarityThreshold') ?? 0.6;
     debug.settings = {
       baseUrl: settings.baseUrl,
       modelId: settings.modelId,
@@ -308,8 +305,6 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       outputLocation: getOutputLocation(),
       maxBlocksPerRequest,
       maxContextUsageRatio,
-      deletionFallback,
-      similarityThreshold,
       systemPromptSource: systemPrompt ? 'custom' : 'default',
       systemPromptHash: sha256(systemPrompt || DEFAULT_SYSTEM_PROMPT),
       customPromptSet: Boolean(customPrompt),
@@ -352,8 +347,9 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         let mode: 'full' | 'incremental' = 'full';
         const isSameTargetLanguage = prevMeta?.targetLanguage === targetLanguage;
         if (requestedMode === 'auto' && prevMeta && prevMeta.segmenterVersion === SEGMENTER_VERSION && isSameTargetLanguage) {
-          const deleted = deletionFallback ? detectDeletion(prevMeta.segments, nextMetaSegments, similarityThreshold) : false;
-          mode = deleted ? 'full' : 'incremental';
+          // Incremental reuse is keyed by block hash, so deleted blocks simply drop out of the
+          // rebuilt output and removed translations are pruned on write. No full-retranslate fallback needed.
+          mode = 'incremental';
         }
 
         const translatedByHash = new Map<string, string>();

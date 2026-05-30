@@ -59,8 +59,6 @@ export type TranslationMetaDebug = {
     outputLocation: string;
     maxBlocksPerRequest?: number;
     maxContextUsageRatio?: number;
-    deletionFallback?: boolean;
-    similarityThreshold?: number;
     systemPromptSource?: "default" | "custom";
     systemPromptHash?: string;
     customPromptSet?: boolean;
@@ -153,70 +151,6 @@ export async function saveTranslationMeta(
   const raw = JSON.stringify(meta);
   await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(metaUri.fsPath)));
   await vscode.workspace.fs.writeFile(metaUri, Buffer.from(raw, "utf8"));
-}
-
-function normalizeForSimilarity(text: string): string[] {
-  const s = text
-    .toLowerCase()
-    .replace(/[\r\n\t]+/g, " ")
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!s) return [];
-  // Split Latin text by spaces and CJK text at a rough single-character granularity.
-  if (/[a-z0-9]/.test(s)) return s.split(" ");
-  return s.split("");
-}
-
-export function similarity(a: string, b: string): number {
-  const ta = normalizeForSimilarity(a);
-  const tb = normalizeForSimilarity(b);
-  if (ta.length === 0 || tb.length === 0) return 0;
-  const setA = new Set(ta);
-  const setB = new Set(tb);
-  let inter = 0;
-  for (const x of setA) if (setB.has(x)) inter++;
-  const union = setA.size + setB.size - inter;
-  return union === 0 ? 0 : inter / union;
-}
-
-export function detectDeletion(
-  prev: MetaSegment[],
-  next: MetaSegment[],
-  similarityThreshold: number
-): boolean {
-  const prevHashes = new Set(prev.map((s) => s.srcHash));
-  const nextHashes = new Set(next.map((s) => s.srcHash));
-
-  const missingPrev = prev.filter((p) => !nextHashes.has(p.srcHash));
-  if (missingPrev.length === 0) return false;
-
-  const addedNext = next.filter((n) => !prevHashes.has(n.srcHash));
-  // Treat deletion conservatively: only a net block decrease triggers a full retranslation.
-  // This avoids treating whole-block rewrites as deletions when missing and added counts are similar.
-  const netDecrease = missingPrev.length > addedNext.length || next.length < prev.length;
-  if (!netDecrease) return false;
-
-  // If missing blocks closely match added blocks, treat the change as a rewrite/merge instead of deletion.
-  const threshold = Math.max(0, Math.min(1, similarityThreshold));
-  if (threshold > 0 && addedNext.length > 0) {
-    let allMatched = true;
-    for (const p of missingPrev) {
-      let best = 0;
-      for (const n of addedNext) {
-        const s = similarity(p.source, n.source);
-        if (s > best) best = s;
-        if (best >= threshold) break;
-      }
-      if (best < threshold) {
-        allMatched = false;
-        break;
-      }
-    }
-    if (allMatched) return false;
-  }
-
-  return true;
 }
 
 export function createEmptyMeta(sourceUri: vscode.Uri): TranslationMetaV1 {

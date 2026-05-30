@@ -138,24 +138,12 @@
         "marklingo.translation.systemPrompt": {
           "type": "string",
           "default": "",
-          "description": "Base system prompt template. Leave empty to use the extension default. Use {targetLanguage} as the target language placeholder."
+          "description": "Advanced override for the base system prompt template (not shown in the MarkLingo settings panel). Leave empty to use the extension default. Use {targetLanguage} as the target language placeholder. Editing this can break Markdown and placeholder protection, so most users should use Custom Instructions instead."
         },
         "marklingo.translation.customPrompt": {
           "type": "string",
           "default": "",
-          "description": "Optional custom prompt appended after the system prompt, such as terminology or style rules."
-        },
-        "marklingo.translation.deletionFallback": {
-          "type": "boolean",
-          "default": false,
-          "description": "Fallback to full translation if block deletion is detected."
-        },
-        "marklingo.translation.similarityThreshold": {
-          "type": "number",
-          "default": 0.6,
-          "minimum": 0,
-          "maximum": 1,
-          "description": "Similarity threshold to treat delete+insert as modification."
+          "description": "Custom instructions appended after the built-in translation prompt, such as terminology or style rules. The base Markdown and placeholder protection always applies."
         },
         "marklingo.storage.outputLocation": {
           "type": "string",

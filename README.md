@@ -19,7 +19,7 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 1. Open a saved Markdown file.
 2. Run `MarkLingo: Open Settings`.
 3. Set an OpenRouter model ID, such as `google/gemini-3.1-flash-lite`.
-4. Save an API key. API keys are stored in VS Code `SecretStorage`, separated by endpoint origin.
+4. Save an API key. The API key is stored once in VS Code `SecretStorage` and is used for the configured Base URL.
 5. Run `MarkLingo: Translate Current Markdown`.
 
 The first translation also asks for a target language if one has not been selected yet.
@@ -30,7 +30,7 @@ Search for `MarkLingo` in VS Code Settings, or use `MarkLingo: Open Settings`.
 
 - `marklingo.openrouter.baseUrl`
   - Default: `https://openrouter.ai/api/v1`
-  - Custom endpoints require explicit confirmation before use.
+  - Custom endpoints must use HTTPS, except for localhost debugging.
 - `marklingo.openrouter.modelId`
   - Default: `google/gemini-3.1-flash-lite`
 - `marklingo.translation.maxContextUsageRatio`
@@ -44,29 +44,24 @@ Search for `MarkLingo` in VS Code Settings, or use `MarkLingo: Open Settings`.
 - `marklingo.translation.targetLanguageCustom`
   - Used when `targetLanguage` is `Custom...`.
 - `marklingo.translation.systemPrompt`
-  - Base system prompt template. Leave empty to use the extension default. Use `{targetLanguage}` as the target language placeholder.
+  - Advanced base system prompt override, not shown in the MarkLingo settings panel. Leave empty to use the extension default. Use `{targetLanguage}` as the target language placeholder.
 - `marklingo.translation.customPrompt`
-  - Optional custom prompt appended after the system prompt, such as terminology or style rules.
-- `marklingo.translation.deletionFallback`
-  - Default: `false`
-  - Runs a full translation when block deletion is detected.
-- `marklingo.translation.similarityThreshold`
-  - Default: `0.6`
+  - Custom instructions appended after the built-in translation prompt, such as terminology or style rules.
 - `marklingo.storage.outputLocation`
   - `sourceFolder`: write the visible translated Markdown file next to the source file.
   - `privateStorage`: write translated Markdown under the extension private storage directory.
 
-The custom settings page uses a manual save model for provider, translation, prompt, and output settings. After editing those fields, click `Save` at the bottom of the page. API key `Set` and `Reset` actions take effect immediately. `Reload` refreshes the settings page from the current VS Code settings and keybinding state without saving unsaved form edits.
+The custom settings page saves dropdown changes immediately. Free-text fields have their own inline `Save` button. API key actions and Clear Data actions take effect immediately after their in-panel confirmation.
 
 ## Security And Privacy
 
 - Markdown content is sent to the configured OpenRouter-compatible endpoint for translation.
 - Translation requests are non-streaming and explicitly request reasoning exclusion (`reasoning.exclude: true`, `reasoning.effort: none`) to avoid returning thinking tokens.
-- The official OpenRouter origin is allowed by default. Custom origins show a modal confirmation before use.
+- The official OpenRouter endpoint is used by default. Custom endpoints must use HTTPS, except for localhost debugging.
 - API keys are stored in VS Code `SecretStorage`, not in workspace files, VS Code settings, translation metadata, or logs. VS Code owns the underlying OS credential storage, so the raw secret is not exposed as a normal file to browse in this repository.
-- API keys are stored separately per endpoint origin. A custom endpoint does not reuse the official OpenRouter API key.
-- Delete the API key for the current endpoint from `MarkLingo: Open Settings` with the API Key `Reset` button.
-- Use `Clear Data...` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
+- The API key is stored once and sent to whatever Base URL is configured. Changing the Base URL changes where future requests send the saved key.
+- Delete the saved API key from `MarkLingo: Open Settings` with the API Key `Clear` button.
+- Use `Clear Data` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
 - Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`.
 - Writing translated Markdown to `privateStorage` keeps generated files out of the workspace, but Markdown Preview resolves relative links and images from the private storage directory. Use `sourceFolder` when relative links or local images must keep working.
 
@@ -80,14 +75,14 @@ The custom settings page uses a manual save model for provider, translation, pro
 
 ## Uninstall / Cleanup
 
-Before uninstalling MarkLingo, run `MarkLingo: Open Settings`, then click `Clear Data...`. The action shows a multi-select cleanup picker:
+Before uninstalling MarkLingo, run `MarkLingo: Open Settings`, select the data to delete in `Clear Data`, type `CLEAR`, then click `Clear data`:
 
-- `Delete saved API keys`: selected by default.
-- `Delete MarkLingo user settings`: selected by default. Removes `marklingo.*` User settings.
-- `Delete private metadata/cache`: selected by default. Deletes the extension `globalStorage` folder.
-- `Delete tracked workspace translated files`: not selected by default. Deletes tracked source-folder `*_mdt.md` outputs only when they were not edited after generation.
+- `Saved API key`: selected by default. Removes the saved MarkLingo API key.
+- `MarkLingo settings`: selected by default. Removes current MarkLingo User settings.
+- `Private cache & metadata`: selected by default. Deletes the extension `globalStorage` folder.
+- `Tracked translated files (*_mdt.md)`: not selected by default. Deletes tracked source-folder `*_mdt.md` outputs only when they were not edited after generation.
 
-If MarkLingo has already been uninstalled, reinstall it, run `MarkLingo: Open Settings`, and click `Clear Data...`; or remove the leftovers manually:
+If MarkLingo has already been uninstalled, reinstall it, run `MarkLingo: Open Settings`, and use `Clear Data`; or remove the leftovers manually:
 
 - Open `Preferences: Open User Settings (JSON)` and remove keys that start with `marklingo.`.
 - Open `Preferences: Open Keyboard Shortcuts (JSON)` and remove entries whose `command` starts with `marklingo.` or `-marklingo.`.
