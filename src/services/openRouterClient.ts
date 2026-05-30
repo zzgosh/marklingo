@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { createHash } from 'node:crypto';
 
 export type OpenRouterSettings = {
   baseUrl: string;
@@ -40,11 +39,11 @@ export type ReasoningOptions = {
 
 export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
 
-const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey';
+// A single API key is stored regardless of the configured Base URL. The key is sent to whatever
+// endpoint Base URL points at; a bad key or mismatched endpoint simply fails at request time.
+const OPENROUTER_API_KEY_SECRET = 'marklingo.openrouter.apiKey';
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
-const OPENROUTER_CONFIRMED_CUSTOM_ORIGINS = 'marklingo.openrouter.confirmedCustomOrigins';
 const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-const OFFICIAL_OPENROUTER_ORIGIN = 'https://openrouter.ai';
 const MODEL_CONTEXT_CACHE_TTL_MS = 30 * 60 * 1000;
 
 const modelContextCache = new Map<string, { expiresAt: number; contextLength: number | undefined }>();
@@ -52,10 +51,6 @@ const modelContextCache = new Map<string, { expiresAt: number; contextLength: nu
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
   return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
-}
-
-function sha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
 function parseBaseUrl(baseUrl: string): URL {
@@ -76,67 +71,24 @@ function parseBaseUrl(baseUrl: string): URL {
   return url;
 }
 
-function isOfficialOpenRouterUrl(url: URL): boolean {
-  return url.origin === OFFICIAL_OPENROUTER_ORIGIN;
-}
-
-function getApiKeySecretKey(origin: string): string {
-  return `${OPENROUTER_API_KEY_SECRET_PREFIX}.${sha256(origin).slice(0, 16)}`;
-}
-
 function getConfiguration() {
   return vscode.workspace.getConfiguration('marklingo');
 }
 
-async function rememberConfirmedCustomOrigin(context: vscode.ExtensionContext, origin: string): Promise<void> {
-  const confirmedOrigins = context.globalState.get<string[]>(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS) ?? [];
-  if (confirmedOrigins.includes(origin)) return;
-  await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, [...confirmedOrigins, origin]);
-}
-
-async function confirmCustomOrigin(context: vscode.ExtensionContext, url: URL): Promise<void> {
-  if (isOfficialOpenRouterUrl(url)) return;
-
-  const confirmedOrigins = context.globalState.get<string[]>(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS) ?? [];
-  if (confirmedOrigins.includes(url.origin)) return;
-
-  const picked = await vscode.window.showWarningMessage(
-    `MarkLingo: You are about to use a custom OpenRouter endpoint: ${url.origin}. API keys are stored separately per endpoint and the official OpenRouter key will not be reused. Continue?`,
-    { modal: true },
-    'Use Custom Endpoint',
-  );
-  if (picked !== 'Use Custom Endpoint') {
-    throw new Error('Custom OpenRouter endpoint was canceled.');
-  }
-
-  await rememberConfirmedCustomOrigin(context, url.origin);
-}
-
-async function resolveBaseUrl(
-  context: vscode.ExtensionContext,
-  options: { confirmCustomEndpoint?: boolean } = {},
-): Promise<{ baseUrl: string; origin: string; official: boolean }> {
+function resolveBaseUrl(): { baseUrl: string; origin: string } {
   const cfg = getConfiguration();
   const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? DEFAULT_OPENROUTER_BASE_URL;
   const url = parseBaseUrl(rawBaseUrl);
-  if (options.confirmCustomEndpoint ?? true) {
-    await confirmCustomOrigin(context, url);
-  }
-  return {
-    baseUrl: normalizeBaseUrl(url.toString()),
-    origin: url.origin,
-    official: isOfficialOpenRouterUrl(url),
-  };
+  return { baseUrl: normalizeBaseUrl(url.toString()), origin: url.origin };
 }
 
-async function resolveApiKey(context: vscode.ExtensionContext, endpoint: { origin: string; official: boolean }): Promise<string> {
-  const secretKey = getApiKeySecretKey(endpoint.origin);
-  const fromSecret = await context.secrets.get(secretKey);
+async function resolveApiKey(context: vscode.ExtensionContext): Promise<string> {
+  const fromSecret = await context.secrets.get(OPENROUTER_API_KEY_SECRET);
   if (fromSecret?.trim()) return fromSecret.trim();
 
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: OpenRouter API Key',
-    prompt: `Enter the API key for ${endpoint.origin}. It will be stored in VS Code SecretStorage and separated by endpoint.`,
+    prompt: 'Enter your OpenRouter API key. It will be stored in VS Code SecretStorage.',
     password: true,
     ignoreFocusOut: true,
   });
@@ -144,7 +96,7 @@ async function resolveApiKey(context: vscode.ExtensionContext, endpoint: { origi
     throw new Error('Missing OpenRouter API key. Save it from MarkLingo settings or the API key command.');
   }
   const apiKey = input.trim();
-  await context.secrets.store(secretKey, apiKey);
+  await context.secrets.store(OPENROUTER_API_KEY_SECRET, apiKey);
   return apiKey;
 }
 
@@ -183,28 +135,18 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 }
 
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
-  const endpoint = await resolveBaseUrl(context);
+  const { baseUrl } = resolveBaseUrl();
   const modelId = await resolveModelId(context);
-  const apiKey = await resolveApiKey(context, endpoint);
+  const apiKey = await resolveApiKey(context);
 
-  return {
-    baseUrl: endpoint.baseUrl,
-    modelId,
-    apiKey,
-  };
+  return { baseUrl, modelId, apiKey };
 }
 
-export async function getCurrentOpenRouterEndpoint(context: vscode.ExtensionContext): Promise<{ baseUrl: string; origin: string; official: boolean }> {
-  return resolveBaseUrl(context);
+export async function storeOpenRouterApiKey(context: vscode.ExtensionContext, apiKey: string): Promise<void> {
+  await context.secrets.store(OPENROUTER_API_KEY_SECRET, apiKey.trim());
 }
 
-export async function storeOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
-  const endpoint = await resolveBaseUrl(context);
-  await context.secrets.store(getApiKeySecretKey(endpoint.origin), apiKey.trim());
-  return endpoint.origin;
-}
-
-export async function seedOpenRouterApiKeyForCurrentEndpointForTest(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
+export async function seedOpenRouterApiKeyForTest(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
   if (context.extensionMode !== vscode.ExtensionMode.Test) {
     throw new Error('OpenRouter test credential seeding is only available in VS Code test mode.');
   }
@@ -212,35 +154,21 @@ export async function seedOpenRouterApiKeyForCurrentEndpointForTest(context: vsc
   if (!trimmedApiKey) {
     throw new Error('OpenRouter test credential seeding requires a non-empty API key.');
   }
-  const endpoint = await resolveBaseUrl(context, { confirmCustomEndpoint: false });
-  if (!endpoint.official) {
-    await rememberConfirmedCustomOrigin(context, endpoint.origin);
-  }
-  await context.secrets.store(getApiKeySecretKey(endpoint.origin), trimmedApiKey);
-  return endpoint.origin;
+  await context.secrets.store(OPENROUTER_API_KEY_SECRET, trimmedApiKey);
+  return resolveBaseUrl().origin;
 }
 
-export async function deleteOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext): Promise<string> {
-  const endpoint = await resolveBaseUrl(context);
-  await context.secrets.delete(getApiKeySecretKey(endpoint.origin));
-  return endpoint.origin;
+export async function deleteOpenRouterApiKey(context: vscode.ExtensionContext): Promise<void> {
+  await context.secrets.delete(OPENROUTER_API_KEY_SECRET);
 }
 
-export async function hasOpenRouterApiKeyForCurrentEndpoint(context: vscode.ExtensionContext): Promise<boolean> {
-  const endpoint = await resolveBaseUrl(context);
-  const secretKey = getApiKeySecretKey(endpoint.origin);
-  const fromSecret = await context.secrets.get(secretKey);
-  if (fromSecret?.trim()) return true;
-  return false;
+export async function hasOpenRouterApiKey(context: vscode.ExtensionContext): Promise<boolean> {
+  const fromSecret = await context.secrets.get(OPENROUTER_API_KEY_SECRET);
+  return Boolean(fromSecret?.trim());
 }
 
 export async function resetOpenRouterSecretsAndState(context: vscode.ExtensionContext): Promise<void> {
-  const confirmedOrigins = context.globalState.get<string[]>(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS) ?? [];
-  const origins = new Set([OFFICIAL_OPENROUTER_ORIGIN, ...confirmedOrigins]);
-  for (const origin of origins) {
-    await context.secrets.delete(getApiKeySecretKey(origin));
-  }
-  await context.globalState.update(OPENROUTER_CONFIRMED_CUSTOM_ORIGINS, undefined);
+  await context.secrets.delete(OPENROUTER_API_KEY_SECRET);
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, undefined);
 }
 
