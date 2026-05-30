@@ -12,7 +12,7 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 - View the current translate shortcut and jump directly to VS Code Keyboard Shortcuts from the settings page.
 - Store translation metadata in VS Code private global storage instead of the workspace.
 - Delete only extension-tracked translated files and private metadata with `MarkLingo: Delete all translated files`.
-- Clear saved API keys, user settings, user keybindings, private metadata/cache, and optionally tracked workspace outputs from the settings page.
+- Clear saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs from the settings page.
 
 ## Usage
 
@@ -66,7 +66,7 @@ The custom settings page uses a manual save model for provider, translation, pro
 - API keys are stored in VS Code `SecretStorage`, not in workspace files, VS Code settings, translation metadata, or logs. VS Code owns the underlying OS credential storage, so the raw secret is not exposed as a normal file to browse in this repository.
 - API keys are stored separately per endpoint origin. A custom endpoint does not reuse the official OpenRouter API key.
 - Delete the API key for the current endpoint from `MarkLingo: Open Settings` with the API Key `Reset` button.
-- Use `Clear Data...` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, user keybindings, private metadata/cache, and optionally tracked workspace outputs.
+- Use `Clear Data...` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
 - Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`.
 - Writing translated Markdown to `privateStorage` keeps generated files out of the workspace, but Markdown Preview resolves relative links and images from the private storage directory. Use `sourceFolder` when relative links or local images must keep working.
 
@@ -84,7 +84,6 @@ Before uninstalling MarkLingo, run `MarkLingo: Open Settings`, then click `Clear
 
 - `Delete saved API keys`: selected by default.
 - `Delete MarkLingo user settings`: selected by default. Removes `marklingo.*` User settings.
-- `Delete MarkLingo user keybindings`: selected by default. Removes User keybindings whose command starts with `marklingo.`.
 - `Delete private metadata/cache`: selected by default. Deletes the extension `globalStorage` folder.
 - `Delete tracked workspace translated files`: not selected by default. Deletes tracked source-folder `*_mdt.md` outputs only when they were not edited after generation.
 

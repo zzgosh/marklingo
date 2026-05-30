@@ -3,93 +3,25 @@ import {
   deleteTrackedWorkspaceOutputs,
   type WorkspaceOutputDeleteSummary,
 } from './deleteAllTranslatedFiles.js';
+import { MARKLINGO_CONFIGURATION_KEYS } from '../configurationKeys.js';
 import { resetOpenRouterSecretsAndState } from '../services/openRouterClient.js';
 
 const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
-const MARKLINGO_COMMAND_PREFIX = 'marklingo.';
 
-const CONFIGURATION_KEYS = [
-  'openrouter.baseUrl',
-  'openrouter.modelId',
-  'translation.targetLanguage',
-  'translation.targetLanguageCustom',
-  'translation.maxBlocksPerRequest',
-  'translation.maxContextUsageRatio',
-  'translation.deletionFallback',
-  'translation.similarityThreshold',
-  'translation.systemPrompt',
-  'translation.customPrompt',
-  'storage.outputLocation',
-];
-
-type CleanupOptionId = 'apiKeys' | 'settings' | 'keybindings' | 'globalStorage' | 'workspaceOutputs';
+type CleanupOptionId = 'apiKeys' | 'settings' | 'globalStorage' | 'workspaceOutputs';
 
 type CleanupOptionItem = vscode.QuickPickItem & {
   id: CleanupOptionId;
 };
 
-type UserKeybinding = {
-  command?: unknown;
-  [key: string]: unknown;
-};
-
 type ClearExtensionDataSummary = {
   apiKeysCleared: boolean;
   settingsCleared: number;
-  keybindingsCleared: number;
   globalStorageCleared: boolean;
   workspaceOutputs?: WorkspaceOutputDeleteSummary;
+  failedOperations: string[];
   errors: string[];
 };
-
-function stripJsonComments(text: string): string {
-  let output = '';
-  let inString = false;
-  let quote = '';
-  let escaped = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const next = text[i + 1];
-    if (inString) {
-      output += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === quote) {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      inString = true;
-      quote = char;
-      output += char;
-      continue;
-    }
-
-    if (char === '/' && next === '/') {
-      while (i < text.length && text[i] !== '\n') i++;
-      output += '\n';
-      continue;
-    }
-
-    if (char === '/' && next === '*') {
-      i += 2;
-      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
-      i++;
-      continue;
-    }
-
-    output += char;
-  }
-  return output.replace(/,\s*([}\]])/g, '$1');
-}
-
-function getUserKeybindingsUri(context: vscode.ExtensionContext): vscode.Uri {
-  return vscode.Uri.joinPath(context.globalStorageUri, '..', '..', 'keybindings.json');
-}
 
 async function uriExists(uri: vscode.Uri): Promise<boolean> {
   try {
@@ -100,44 +32,23 @@ async function uriExists(uri: vscode.Uri): Promise<boolean> {
   }
 }
 
-function isMarkLingoKeybinding(value: unknown): value is UserKeybinding {
-  if (!value || typeof value !== 'object') return false;
-  const binding = value as UserKeybinding;
-  if (typeof binding.command !== 'string') return false;
-  const command = binding.command.startsWith('-') ? binding.command.slice(1) : binding.command;
-  return command.startsWith(MARKLINGO_COMMAND_PREFIX);
-}
-
-async function clearUserKeybindings(context: vscode.ExtensionContext): Promise<number> {
-  const uri = getUserKeybindingsUri(context);
-  if (!(await uriExists(uri))) return 0;
-
-  const raw = await vscode.workspace.fs.readFile(uri);
-  const parsed = JSON.parse(stripJsonComments(Buffer.from(raw).toString('utf8'))) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error('User keybindings.json is not a JSON array.');
-  }
-
-  const filtered = parsed.filter((item) => !isMarkLingoKeybinding(item));
-  const removed = parsed.length - filtered.length;
-  if (removed === 0) return 0;
-
-  const body = `// Place your key bindings in this file to override the defaults\n${JSON.stringify(filtered, null, 2)}\n`;
-  await vscode.workspace.fs.writeFile(uri, Buffer.from(body, 'utf8'));
-  return removed;
-}
-
 async function clearUserSettings(context: vscode.ExtensionContext): Promise<number> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
   let cleared = 0;
 
-  for (const key of CONFIGURATION_KEYS) {
+  for (const key of MARKLINGO_CONFIGURATION_KEYS) {
     if (cfg.inspect(key)?.globalValue !== undefined) cleared++;
     await cfg.update(key, undefined, vscode.ConfigurationTarget.Global);
   }
 
   await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, undefined);
   return cleared;
+}
+
+function addCleanupError(summary: ClearExtensionDataSummary, label: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  summary.failedOperations.push(label);
+  summary.errors.push(`${label}: ${message}`);
 }
 
 async function clearExtensionGlobalStorage(context: vscode.ExtensionContext): Promise<boolean> {
@@ -160,13 +71,6 @@ function getCleanupItems(): CleanupOptionItem[] {
       label: 'Delete MarkLingo user settings',
       description: 'Selected by default',
       detail: 'Removes marklingo.* keys from VS Code User settings.',
-      picked: true,
-    },
-    {
-      id: 'keybindings',
-      label: 'Delete MarkLingo user keybindings',
-      description: 'Selected by default',
-      detail: 'Removes user keybindings whose command starts with marklingo.',
       picked: true,
     },
     {
@@ -203,7 +107,6 @@ function buildSummaryMessage(summary: ClearExtensionDataSummary): string {
   const parts: string[] = [];
   if (summary.apiKeysCleared) parts.push('API keys');
   if (summary.settingsCleared > 0) parts.push(`${summary.settingsCleared} user setting(s)`);
-  if (summary.keybindingsCleared > 0) parts.push(`${summary.keybindingsCleared} user keybinding(s)`);
   if (summary.globalStorageCleared) parts.push('private metadata/cache');
   if (summary.workspaceOutputs) {
     parts.push(`${summary.workspaceOutputs.deleted} workspace translated file(s)`);
@@ -214,6 +117,14 @@ function buildSummaryMessage(summary: ClearExtensionDataSummary): string {
 
   if (parts.length === 0) return 'MarkLingo: No selected data was found to clear.';
   return `MarkLingo: Cleared ${parts.join(', ')}.`;
+}
+
+function buildWarningMessage(summary: ClearExtensionDataSummary): string {
+  const failed = [...new Set(summary.failedOperations)];
+  const failureSummary = failed.length > 0
+    ? `Failed: ${failed.join(', ')}.`
+    : `${summary.errors.length} cleanup issue(s) occurred.`;
+  return `${buildSummaryMessage(summary)} ${failureSummary} See Developer Tools for details.`;
 }
 
 export async function clearExtensionData(context: vscode.ExtensionContext): Promise<boolean> {
@@ -243,36 +154,50 @@ export async function clearExtensionData(context: vscode.ExtensionContext): Prom
       const result: ClearExtensionDataSummary = {
         apiKeysCleared: false,
         settingsCleared: 0,
-        keybindingsCleared: 0,
         globalStorageCleared: false,
+        failedOperations: [],
         errors: [],
       };
 
       if (ids.has('apiKeys')) {
         progress.report({ message: 'Deleting saved API keys' });
-        await resetOpenRouterSecretsAndState(context);
-        result.apiKeysCleared = true;
+        try {
+          await resetOpenRouterSecretsAndState(context);
+          result.apiKeysCleared = true;
+        } catch (error) {
+          addCleanupError(result, 'saved API keys', error);
+        }
       }
 
       if (ids.has('settings')) {
         progress.report({ message: 'Deleting user settings' });
-        result.settingsCleared = await clearUserSettings(context);
-      }
-
-      if (ids.has('keybindings')) {
-        progress.report({ message: 'Deleting user keybindings' });
-        result.keybindingsCleared = await clearUserKeybindings(context);
+        try {
+          result.settingsCleared = await clearUserSettings(context);
+        } catch (error) {
+          addCleanupError(result, 'user settings', error);
+        }
       }
 
       if (ids.has('workspaceOutputs')) {
         progress.report({ message: 'Deleting tracked workspace translated files' });
-        result.workspaceOutputs = await deleteTrackedWorkspaceOutputs(context, progress);
-        result.errors.push(...result.workspaceOutputs.errors);
+        try {
+          result.workspaceOutputs = await deleteTrackedWorkspaceOutputs(context, progress);
+          if (result.workspaceOutputs.errors.length > 0) {
+            result.failedOperations.push('tracked workspace translated files');
+          }
+          result.errors.push(...result.workspaceOutputs.errors);
+        } catch (error) {
+          addCleanupError(result, 'tracked workspace translated files', error);
+        }
       }
 
       if (ids.has('globalStorage')) {
         progress.report({ message: 'Deleting private metadata/cache' });
-        result.globalStorageCleared = await clearExtensionGlobalStorage(context);
+        try {
+          result.globalStorageCleared = await clearExtensionGlobalStorage(context);
+        } catch (error) {
+          addCleanupError(result, 'private metadata/cache', error);
+        }
       }
 
       return result;
@@ -281,9 +206,7 @@ export async function clearExtensionData(context: vscode.ExtensionContext): Prom
 
   if (summary.errors.length > 0) {
     console.warn('[marklingo] clear extension data errors:', summary.errors.slice(0, 20));
-    await vscode.window.showWarningMessage(
-      `${buildSummaryMessage(summary)} ${summary.errors.length} operation(s) failed. See Developer Tools for details.`,
-    );
+    await vscode.window.showWarningMessage(buildWarningMessage(summary));
     return true;
   }
 
