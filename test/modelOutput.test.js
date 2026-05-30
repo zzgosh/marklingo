@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { normalizeTranslatedBlockLines } from '../out/translation/modelOutput.js';
 
 test('normalizes string block output into markdown lines', () => {
-  const value = '- `markdownTranslator.openrouter.baseUrl`\n  - Default: `https://openrouter.ai/api/v1`';
+  const value = '- `marklingo.openrouter.baseUrl`\n  - Default: `https://openrouter.ai/api/v1`';
 
   assert.deepEqual(normalizeTranslatedBlockLines(value, 'b20'), [
-    '- `markdownTranslator.openrouter.baseUrl`',
+    '- `marklingo.openrouter.baseUrl`',
     '  - Default: `https://openrouter.ai/api/v1`',
   ]);
 });
