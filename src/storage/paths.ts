@@ -57,7 +57,7 @@ export function getPrivateTranslatedFileUri(context: vscode.ExtensionContext, so
 
 export function getOutputLocation(): OutputLocation {
   const configured = vscode.workspace
-    .getConfiguration('markdownTranslator')
+    .getConfiguration('marklingo')
     .get<string>('storage.outputLocation', 'sourceFolder');
   return configured === 'privateStorage' ? 'privateStorage' : 'sourceFolder';
 }

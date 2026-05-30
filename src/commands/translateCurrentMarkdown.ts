@@ -28,7 +28,7 @@ function buildBlocksTranslatePrompt(
   return { system, user };
 }
 
-const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLanguageSelected';
+const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
 const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
@@ -44,7 +44,7 @@ const TARGET_LANGUAGE_OPTIONS = [
   CUSTOM_TARGET_LANGUAGE_LABEL,
 ];
 
-const outputChannel = vscode.window.createOutputChannel('Markdown Translator');
+const outputChannel = vscode.window.createOutputChannel('MarkLingo');
 const MAX_DEBUG_EVENT_MESSAGE_LENGTH = 1000;
 const MAX_DEBUG_ERROR_MESSAGE_LENGTH = 4000;
 const MAX_DEBUG_ERROR_STACK_LENGTH = 8000;
@@ -145,7 +145,7 @@ function finishDebug(
 
 async function promptCustomTargetLanguage(current: string): Promise<string | null> {
   const input = await vscode.window.showInputBox({
-    title: 'Markdown Translator: Custom Target Language',
+    title: 'MarkLingo: Custom Target Language',
     prompt: 'Enter the target language name, for example Italiano or Portuguese.',
     value: current,
     ignoreFocusOut: true,
@@ -156,7 +156,7 @@ async function promptCustomTargetLanguage(current: string): Promise<string | nul
 }
 
 async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<string | null> {
-  const cfg = vscode.workspace.getConfiguration('markdownTranslator');
+  const cfg = vscode.workspace.getConfiguration('marklingo');
   const selected = context.globalState.get<boolean>(TARGET_LANGUAGE_SELECTED_KEY) ?? false;
   const current = (cfg.get<string>('translation.targetLanguage') ?? '').trim() || '简体中文';
   const currentCustom = (cfg.get<string>('translation.targetLanguageCustom') ?? '').trim();
@@ -166,7 +166,7 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
       if (currentCustom) return currentCustom;
       const input = await promptCustomTargetLanguage('');
       if (!input) {
-        await vscode.window.showInformationMessage('Markdown Translator: Translation canceled because a custom target language is required.');
+        await vscode.window.showInformationMessage('MarkLingo: Translation canceled because a custom target language is required.');
         return null;
       }
       await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
@@ -177,7 +177,7 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
 
   const picked = await new Promise<string | undefined>((resolve) => {
     const picker = vscode.window.createQuickPick<vscode.QuickPickItem>();
-    picker.title = 'Markdown Translator: Select Target Language';
+    picker.title = 'MarkLingo: Select Target Language';
     picker.placeholder = 'Select the target language. Default: Simplified Chinese.';
     picker.ignoreFocusOut = true;
     picker.items = TARGET_LANGUAGE_OPTIONS.map((label) => ({ label }));
@@ -199,14 +199,14 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   });
 
   if (!picked) {
-    await vscode.window.showInformationMessage('Markdown Translator: Translation canceled because a target language is required.');
+    await vscode.window.showInformationMessage('MarkLingo: Translation canceled because a target language is required.');
     return null;
   }
 
   if (picked === CUSTOM_TARGET_LANGUAGE_LABEL) {
     const input = await promptCustomTargetLanguage(currentCustom);
     if (!input) {
-      await vscode.window.showInformationMessage('Markdown Translator: Translation canceled because a custom target language is required.');
+      await vscode.window.showInformationMessage('MarkLingo: Translation canceled because a custom target language is required.');
       return null;
     }
     await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
@@ -236,32 +236,50 @@ function tryParseJsonObject(text: string): any {
 
 export type TranslateMode = 'auto' | 'full';
 
+function hasMarkdownFileExtension(uri: vscode.Uri): boolean {
+  const ext = path.extname(uri.fsPath).toLowerCase();
+  return ext === '.md' || ext === '.markdown';
+}
+
+function isMarkdownDocument(doc: vscode.TextDocument): boolean {
+  return doc.languageId === 'markdown' || hasMarkdownFileExtension(doc.uri);
+}
+
+async function openTranslatedMarkdown(translatedUri: vscode.Uri): Promise<void> {
+  const translatedDoc = await vscode.workspace.openTextDocument(translatedUri);
+  await vscode.window.showTextDocument(translatedDoc, {
+    viewColumn: vscode.ViewColumn.Active,
+    preview: false,
+  });
+  await vscode.commands.executeCommand('markdown.showLockedPreviewToSide', translatedUri);
+}
+
 export async function translateCurrentMarkdown(context: vscode.ExtensionContext, options: { mode?: TranslateMode } = {}) {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
-    await vscode.window.showErrorMessage('Markdown Translator: No active editor is available.');
+    await vscode.window.showErrorMessage('MarkLingo: No active editor is available.');
     return;
   }
 
   const doc = editor.document;
-  if (doc.languageId !== 'markdown') {
-    await vscode.window.showErrorMessage('Markdown Translator: The active file is not Markdown.');
+  if (!isMarkdownDocument(doc)) {
+    await vscode.window.showErrorMessage('MarkLingo: The active file is not Markdown.');
     return;
   }
   if (doc.isUntitled) {
-    await vscode.window.showErrorMessage('Markdown Translator: Save the file before translating.');
+    await vscode.window.showErrorMessage('MarkLingo: Save the file before translating.');
     return;
   }
 
   const parsed = path.parse(doc.uri.fsPath);
   if (parsed.name.endsWith('_mdt')) {
-    await vscode.window.showErrorMessage('Markdown Translator: This file already looks like translated output (*_mdt.md). Run translation on the source Markdown file.');
+    await vscode.window.showErrorMessage('MarkLingo: This file already looks like translated output (*_mdt.md). Run translation on the source Markdown file.');
     return;
   }
 
   const sourceText = doc.getText();
   if (!sourceText.trim()) {
-    await vscode.window.showInformationMessage('Markdown Translator: The active document is empty.');
+    await vscode.window.showInformationMessage('MarkLingo: The active document is empty.');
     return;
   }
 
@@ -276,7 +294,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     if (!targetLanguage) return;
 
     const settings = await getOpenRouterSettings(context);
-    const cfg = vscode.workspace.getConfiguration('markdownTranslator');
+    const cfg = vscode.workspace.getConfiguration('marklingo');
     const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
     const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
     const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
@@ -310,14 +328,14 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     const segments = segmentMarkdownDocument(doc);
     const translatableBase = segments.filter((s) => s.translatable && s.text.trim());
     if (translatableBase.length === 0) {
-      await vscode.window.showInformationMessage('Markdown Translator: No translatable Markdown content was found.');
+      await vscode.window.showInformationMessage('MarkLingo: No translatable Markdown content was found.');
       return;
     }
 
     const { markdown: translatedMarkdown, meta: nextMeta } = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Markdown Translator: Translating...',
+        title: 'MarkLingo: Translating...',
         cancellable: false,
       },
       async (progress) => {
@@ -514,7 +532,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       saveTranslationMeta(metaUri, nextMeta),
     ]);
 
-    await vscode.commands.executeCommand('markdown.showPreviewToSide', translatedUri);
+    await openTranslatedMarkdown(translatedUri);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     addDebugEvent(debug, 'error', msg);
@@ -528,6 +546,6 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       const metaMessage = metaError instanceof Error ? metaError.message : String(metaError);
       outputChannel.appendLine(`[${new Date().toISOString()}] Error: failed to write translation debug metadata: ${metaMessage}`);
     }
-    await vscode.window.showErrorMessage(`Markdown Translator: Translation failed. ${msg}`);
+    await vscode.window.showErrorMessage(`MarkLingo: Translation failed. ${msg}`);
   }
 }

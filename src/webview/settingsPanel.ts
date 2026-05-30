@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
+import * as path from 'node:path';
 import {
   deleteOpenRouterApiKeyForCurrentEndpoint,
   getCurrentOpenRouterEndpoint,
   hasOpenRouterApiKeyForCurrentEndpoint,
-  resetOpenRouterSecretsAndState,
   storeOpenRouterApiKeyForCurrentEndpoint,
   DEFAULT_OPENROUTER_MODEL_ID,
 } from '../services/openRouterClient.js';
+import { clearExtensionData } from '../commands/clearExtensionData.js';
 import { getOutputLocation, getProjectsStorageRoot, type OutputLocation } from '../storage/paths.js';
 import { DEFAULT_SYSTEM_PROMPT } from '../translation/prompts.js';
 import { clampContextUsageRatio } from '../translation/requestPlanner.js';
@@ -22,9 +23,9 @@ const TARGET_LANGUAGE_OPTIONS = [
   'Deutsch',
   'Custom...',
 ];
-const TARGET_LANGUAGE_SELECTED_KEY = 'markdownTranslator.translation.targetLanguageSelected';
-const TRANSLATE_COMMAND = 'markdownTranslator.translateCurrentMarkdown';
-const DEFAULT_TRANSLATE_KEY = 'alt+cmd+v';
+const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
+const TRANSLATE_COMMAND = 'marklingo.translateCurrentMarkdown';
+const DEFAULT_TRANSLATE_KEY = 'ctrl+alt+cmd+t';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
 const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
 
@@ -53,20 +54,6 @@ type UserKeybinding = {
   command?: string;
   when?: string;
 };
-
-const CONFIGURATION_KEYS = [
-  'openrouter.baseUrl',
-  'openrouter.modelId',
-  'translation.targetLanguage',
-  'translation.targetLanguageCustom',
-  'translation.maxBlocksPerRequest',
-  'translation.maxContextUsageRatio',
-  'translation.deletionFallback',
-  'translation.similarityThreshold',
-  'translation.systemPrompt',
-  'translation.customPrompt',
-  'storage.outputLocation',
-];
 
 let currentPanel: vscode.WebviewPanel | undefined;
 
@@ -246,7 +233,7 @@ async function getShortcutState(context: vscode.ExtensionContext): Promise<Pick<
     return {
       shortcutLabel: formatKeybinding(displayedKey),
       shortcutStatus: `Potential user keybinding conflict: ${commands}`,
-      shortcutWarning: 'If VS Code routes this key to another command, Markdown Translator cannot show a prompt because its command is not invoked.',
+      shortcutWarning: 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.',
     };
   }
 
@@ -258,7 +245,7 @@ async function getShortcutState(context: vscode.ExtensionContext): Promise<Pick<
 }
 
 async function readSettingsState(context: vscode.ExtensionContext): Promise<SettingsState> {
-  const cfg = vscode.workspace.getConfiguration('markdownTranslator');
+  const cfg = vscode.workspace.getConfiguration('marklingo');
   const endpoint = await getCurrentOpenRouterEndpoint(context);
   const shortcutState = await getShortcutState(context);
   return {
@@ -281,7 +268,7 @@ async function readSettingsState(context: vscode.ExtensionContext): Promise<Sett
 }
 
 async function updateSettings(context: vscode.ExtensionContext, payload: Record<string, unknown>): Promise<void> {
-  const cfg = vscode.workspace.getConfiguration('markdownTranslator');
+  const cfg = vscode.workspace.getConfiguration('marklingo');
   const updates: Array<[string, unknown]> = [
     ['openrouter.baseUrl', String(payload.baseUrl ?? '').trim()],
     ['openrouter.modelId', String(payload.modelId ?? '').trim()],
@@ -300,15 +287,6 @@ async function updateSettings(context: vscode.ExtensionContext, payload: Record<
     await cfg.update(key, value, vscode.ConfigurationTarget.Global);
   }
   await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
-}
-
-async function resetAllSettings(context: vscode.ExtensionContext): Promise<void> {
-  const cfg = vscode.workspace.getConfiguration('markdownTranslator');
-  for (const key of CONFIGURATION_KEYS) {
-    await cfg.update(key, undefined, vscode.ConfigurationTarget.Global);
-  }
-  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, undefined);
-  await resetOpenRouterSecretsAndState(context);
 }
 
 function renderOptions(selected: string): string {
@@ -335,7 +313,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Markdown Translator Settings</title>
+  <title>MarkLingo Settings</title>
   <style>
     :root {
       color-scheme: dark light;
@@ -660,7 +638,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
 
         <div class="actions">
           <span id="toast" class="toast" role="status"></span>
-          <button class="danger" id="reset-all" type="button">Reset All</button>
+          <button class="danger" id="clear-data" type="button">Clear Data...</button>
           <button class="secondary" id="reload" type="button">Reload</button>
           <button type="submit">Save</button>
         </div>
@@ -713,7 +691,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       document.getElementById('systemPrompt').value = defaultSystemPrompt;
       toast.textContent = 'System prompt restored locally. Save to apply.';
     });
-    document.getElementById('reset-all').addEventListener('click', () => vscode.postMessage({ type: 'resetAll' }));
+    document.getElementById('clear-data').addEventListener('click', () => vscode.postMessage({ type: 'clearData' }));
     document.getElementById('reload').addEventListener('click', () => vscode.postMessage({ type: 'reload' }));
     document.getElementById('reveal-storage').addEventListener('click', () => vscode.postMessage({ type: 'revealStorage' }));
 
@@ -732,6 +710,36 @@ async function refreshPanel(context: vscode.ExtensionContext, panel: vscode.Webv
   panel.webview.html = getHtml(panel.webview, await readSettingsState(context));
 }
 
+function watchUserKeybindings(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): vscode.Disposable {
+  const keybindingsUri = getUserKeybindingsUri(context);
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(path.dirname(keybindingsUri.fsPath), path.basename(keybindingsUri.fsPath)),
+  );
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const scheduleRefresh = () => {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined;
+      if (currentPanel === panel) void refreshPanel(context, panel);
+    }, 250);
+  };
+
+  const subscriptions = [
+    watcher,
+    watcher.onDidCreate(scheduleRefresh),
+    watcher.onDidChange(scheduleRefresh),
+    watcher.onDidDelete(scheduleRefresh),
+    {
+      dispose: () => {
+        if (refreshTimer) clearTimeout(refreshTimer);
+      },
+    },
+  ];
+
+  return vscode.Disposable.from(...subscriptions);
+}
+
 export async function openSettingsPanel(context: vscode.ExtensionContext): Promise<void> {
   if (currentPanel) {
     currentPanel.reveal(vscode.ViewColumn.Active);
@@ -740,8 +748,8 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
   }
 
   const panel = vscode.window.createWebviewPanel(
-    'markdownTranslatorSettings',
-    'Markdown Translator Settings',
+    'marklingoSettings',
+    'MarkLingo Settings',
     vscode.ViewColumn.Active,
     {
       enableScripts: true,
@@ -749,7 +757,9 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
     },
   );
   currentPanel = panel;
+  const keybindingsWatcher = watchUserKeybindings(context, panel);
   panel.onDidDispose(() => {
+    keybindingsWatcher.dispose();
     currentPanel = undefined;
   });
 
@@ -763,7 +773,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
       if (message?.type === 'setApiKey') {
         const input = await vscode.window.showInputBox({
-          title: 'Markdown Translator: OpenRouter API Key',
+          title: 'MarkLingo: OpenRouter API Key',
           prompt: 'API Key is stored in VS Code SecretStorage for the currently configured endpoint.',
           password: true,
           ignoreFocusOut: true,
@@ -776,7 +786,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
       if (message?.type === 'resetApiKey') {
         const confirm = await vscode.window.showWarningMessage(
-          'Markdown Translator: Reset the API key for the currently configured endpoint?',
+          'MarkLingo: Reset the API key for the currently configured endpoint?',
           { modal: true },
           'Reset',
         );
@@ -786,16 +796,9 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         panel.webview.postMessage({ type: 'toast', message: `Reset API key for ${origin}` });
         return;
       }
-      if (message?.type === 'resetAll') {
-        const confirm = await vscode.window.showWarningMessage(
-          'Markdown Translator: Reset all settings and delete all saved API keys?',
-          { modal: true },
-          'Reset All',
-        );
-        if (confirm !== 'Reset All') return;
-        await resetAllSettings(context);
-        await refreshPanel(context, panel);
-        panel.webview.postMessage({ type: 'toast', message: 'Reset all settings' });
+      if (message?.type === 'clearData') {
+        const didClear = await clearExtensionData(context);
+        if (didClear) await refreshPanel(context, panel);
         return;
       }
       if (message?.type === 'openKeyboardShortcuts') {
@@ -812,7 +815,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
-      await vscode.window.showErrorMessage(`Markdown Translator: ${messageText}`);
+      await vscode.window.showErrorMessage(`MarkLingo: ${messageText}`);
     }
   });
 
