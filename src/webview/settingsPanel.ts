@@ -1,17 +1,15 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import {
-  deleteOpenRouterApiKeyForCurrentEndpoint,
-  getCurrentOpenRouterEndpoint,
-  hasOpenRouterApiKeyForCurrentEndpoint,
-  storeOpenRouterApiKeyForCurrentEndpoint,
+  deleteOpenRouterApiKey,
+  hasOpenRouterApiKey,
+  storeOpenRouterApiKey,
   DEFAULT_OPENROUTER_MODEL_ID,
 } from '../services/openRouterClient.js';
-import { clearExtensionData } from '../commands/clearExtensionData.js';
+import { clearExtensionDataScopes } from '../commands/clearExtensionData.js';
 import { getOutputLocation, getProjectsStorageRoot, type OutputLocation } from '../storage/paths.js';
-import { DEFAULT_SYSTEM_PROMPT } from '../translation/prompts.js';
-import { clampContextUsageRatio } from '../translation/requestPlanner.js';
 
+const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 const TARGET_LANGUAGE_OPTIONS = [
   '简体中文',
   '繁体中文',
@@ -21,29 +19,34 @@ const TARGET_LANGUAGE_OPTIONS = [
   'Français',
   'Español',
   'Deutsch',
-  'Custom...',
+  CUSTOM_TARGET_LANGUAGE_LABEL,
 ];
 const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
 const TRANSLATE_COMMAND = 'marklingo.translateCurrentMarkdown';
 const DEFAULT_TRANSLATE_KEY = 'ctrl+alt+cmd+t';
-const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
-const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
+const API_KEY_MASK = '•'.repeat(16);
+
+// Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
+// dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
+// remain configurable via settings.json but are intentionally not surfaced here.
+const UPDATABLE_SETTING_KEYS = new Set<string>([
+  'openrouter.baseUrl',
+  'openrouter.modelId',
+  'translation.targetLanguage',
+  'translation.targetLanguageCustom',
+  'translation.customPrompt',
+  'storage.outputLocation',
+]);
 
 type SettingsState = {
   shortcutLabel: string;
   shortcutStatus: string;
   shortcutWarning: string;
   baseUrl: string;
-  endpointOrigin: string;
   hasApiKey: boolean;
   modelId: string;
   targetLanguage: string;
   targetLanguageCustom: string;
-  maxBlocksPerRequest: number;
-  maxContextUsageRatio: number;
-  deletionFallback: boolean;
-  similarityThreshold: number;
-  systemPrompt: string;
   customPrompt: string;
   outputLocation: OutputLocation;
   storageRoot: string;
@@ -71,11 +74,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function readNumber(cfg: vscode.WorkspaceConfiguration, key: string, fallback: number): number {
-  const value = cfg.get<number>(key);
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function stripJsonComments(text: string): string {
@@ -246,47 +244,38 @@ async function getShortcutState(context: vscode.ExtensionContext): Promise<Pick<
 
 async function readSettingsState(context: vscode.ExtensionContext): Promise<SettingsState> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
-  const endpoint = await getCurrentOpenRouterEndpoint(context);
   const shortcutState = await getShortcutState(context);
   return {
     ...shortcutState,
     baseUrl: cfg.get<string>('openrouter.baseUrl', 'https://openrouter.ai/api/v1'),
-    endpointOrigin: endpoint.origin,
-    hasApiKey: await hasOpenRouterApiKeyForCurrentEndpoint(context),
+    hasApiKey: await hasOpenRouterApiKey(context),
     modelId: (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID,
     targetLanguage: cfg.get<string>('translation.targetLanguage', '简体中文'),
     targetLanguageCustom: cfg.get<string>('translation.targetLanguageCustom', ''),
-    maxBlocksPerRequest: readNumber(cfg, 'translation.maxBlocksPerRequest', DEFAULT_MAX_BLOCKS_PER_REQUEST),
-    maxContextUsageRatio: clampContextUsageRatio(readNumber(cfg, 'translation.maxContextUsageRatio', DEFAULT_MAX_CONTEXT_USAGE_RATIO)),
-    deletionFallback: cfg.get<boolean>('translation.deletionFallback', false),
-    similarityThreshold: readNumber(cfg, 'translation.similarityThreshold', 0.6),
-    systemPrompt: cfg.get<string>('translation.systemPrompt', '').trim() || DEFAULT_SYSTEM_PROMPT,
     customPrompt: cfg.get<string>('translation.customPrompt', ''),
     outputLocation: getOutputLocation(),
     storageRoot: getProjectsStorageRoot(context).fsPath,
   };
 }
 
-async function updateSettings(context: vscode.ExtensionContext, payload: Record<string, unknown>): Promise<void> {
-  const cfg = vscode.workspace.getConfiguration('marklingo');
-  const updates: Array<[string, unknown]> = [
-    ['openrouter.baseUrl', String(payload.baseUrl ?? '').trim()],
-    ['openrouter.modelId', String(payload.modelId ?? '').trim()],
-    ['translation.targetLanguage', String(payload.targetLanguage ?? '简体中文').trim() || '简体中文'],
-    ['translation.targetLanguageCustom', String(payload.targetLanguageCustom ?? '').trim()],
-    ['translation.maxBlocksPerRequest', Math.max(1, Number(payload.maxBlocksPerRequest) || DEFAULT_MAX_BLOCKS_PER_REQUEST)],
-    ['translation.maxContextUsageRatio', clampContextUsageRatio(Number(payload.maxContextUsageRatio) || DEFAULT_MAX_CONTEXT_USAGE_RATIO)],
-    ['translation.deletionFallback', Boolean(payload.deletionFallback)],
-    ['translation.similarityThreshold', Math.max(0, Math.min(1, Number(payload.similarityThreshold) || 0))],
-    ['translation.systemPrompt', String(payload.systemPrompt ?? '').trim()],
-    ['translation.customPrompt', String(payload.customPrompt ?? '').trim()],
-    ['storage.outputLocation', payload.outputLocation === 'privateStorage' ? 'privateStorage' : 'sourceFolder'],
-  ];
-
-  for (const [key, value] of updates) {
-    await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+function coerceSettingValue(key: string, raw: unknown): unknown {
+  if (key === 'storage.outputLocation') {
+    return raw === 'privateStorage' ? 'privateStorage' : 'sourceFolder';
   }
-  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+  const value = String(raw ?? '').trim();
+  if (key === 'translation.targetLanguage') return value || '简体中文';
+  return value;
+}
+
+async function updateSingleSetting(context: vscode.ExtensionContext, key: string, raw: unknown): Promise<void> {
+  if (!UPDATABLE_SETTING_KEYS.has(key)) {
+    throw new Error(`MarkLingo: Unsupported setting "${key}".`);
+  }
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  await cfg.update(key, coerceSettingValue(key, raw), vscode.ConfigurationTarget.Global);
+  if (key === 'translation.targetLanguage' || key === 'translation.targetLanguageCustom') {
+    await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+  }
 }
 
 function renderOptions(selected: string): string {
@@ -300,9 +289,10 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
   const nonce = getNonce();
   const outputPrivateSelected = state.outputLocation === 'privateStorage' ? ' selected' : '';
   const outputSourceSelected = state.outputLocation === 'sourceFolder' ? ' selected' : '';
-  const fallbackChecked = state.deletionFallback ? ' checked' : '';
   const apiKeyStatus = state.hasApiKey ? 'Saved' : 'Not saved';
-  const defaultSystemPromptJson = JSON.stringify(DEFAULT_SYSTEM_PROMPT);
+  const apiKeyPlaceholder = state.hasApiKey ? API_KEY_MASK : 'Enter API key';
+  const clearDisabled = state.hasApiKey ? '' : ' disabled';
+  const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningHtml = state.shortcutWarning
     ? `<div class="notice warning">${escapeHtml(state.shortcutWarning)}</div>`
     : '';
@@ -355,6 +345,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       font-weight: 650;
       letter-spacing: 0;
     }
+    h2.danger-title { color: var(--danger); }
     p {
       margin: 0 0 14px;
       color: var(--muted);
@@ -366,6 +357,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       overflow: hidden;
       background: color-mix(in srgb, var(--panel) 80%, transparent);
     }
+    .card.danger { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
     .row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(220px, 1.15fr);
@@ -382,6 +374,11 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     .help {
       color: var(--muted);
       overflow-wrap: anywhere;
+    }
+    .help.path {
+      margin-top: 6px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
     }
     input, select, textarea {
       width: 100%;
@@ -401,11 +398,6 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       resize: vertical;
       font-family: var(--vscode-editor-font-family);
     }
-    input[type="range"] {
-      padding: 0;
-      border: 0;
-      background: transparent;
-    }
     .inline {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -419,13 +411,8 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     .field-actions {
       display: flex;
       justify-content: flex-end;
+      align-items: center;
       gap: 10px;
-    }
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 18px;
     }
     button {
       min-height: 34px;
@@ -446,27 +433,45 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       background: color-mix(in srgb, var(--danger) 16%, transparent);
       color: var(--danger);
     }
-    .switch {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
+    button:disabled { cursor: default; }
+    button.save-btn { min-width: 68px; }
+    button.save-btn:disabled {
+      background: color-mix(in srgb, var(--fg) 12%, transparent);
+      color: var(--muted);
     }
-    .switch input {
+    button.save-btn.saved {
+      background: color-mix(in srgb, var(--fg) 12%, transparent);
+      color: var(--fg);
+    }
+    button.danger:disabled {
+      background: color-mix(in srgb, var(--fg) 12%, transparent);
+      color: var(--muted);
+    }
+    .saved-hint {
+      color: var(--muted);
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 120ms ease;
+      white-space: nowrap;
+    }
+    .saved-hint.visible { opacity: 1; }
+    .status-text { color: var(--muted); }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .check-input {
       width: 16px;
       height: 16px;
       min-height: 16px;
       accent-color: var(--accent);
     }
-    .status {
-      display: inline-flex;
+    .switch {
+      display: flex;
+      justify-content: flex-end;
       align-items: center;
-      width: 100%;
-      min-height: 34px;
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--input);
-      color: var(--fg);
     }
     .notice {
       padding: 10px 12px;
@@ -480,10 +485,6 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
       color: var(--fg);
       background: color-mix(in srgb, var(--danger) 10%, transparent);
     }
-    .toast {
-      min-height: 22px;
-      color: var(--muted);
-    }
     @media (max-width: 760px) {
       main { padding: 28px 18px 54px; }
       .row { grid-template-columns: 1fr; gap: 10px; }
@@ -494,17 +495,17 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
   <div class="shell">
     <main>
       <h1>Settings</h1>
-      <form id="settings-form">
+      <div id="settings">
         <h2>General</h2>
         <section class="card">
           <div class="row">
             <div>
               <div class="label">Translate Shortcut</div>
-              <div class="help">${escapeHtml(state.shortcutStatus)}</div>
+              <div class="help" id="shortcut-status">${escapeHtml(state.shortcutStatus)}</div>
             </div>
             <div class="stack">
-              <span class="status">${escapeHtml(state.shortcutLabel)}</span>
-              ${shortcutWarningHtml}
+              <span class="status-text" id="shortcut-label">${escapeHtml(state.shortcutLabel)}</span>
+              <div id="shortcut-warning">${shortcutWarningHtml}</div>
               <div class="field-actions">
                 <button class="secondary" id="open-keyboard-shortcuts" type="button">Open Keyboard Shortcuts</button>
               </div>
@@ -513,25 +514,31 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
         </section>
 
         <h2>Provider</h2>
-        <p>OpenRouter-compatible endpoints are confirmed before use. API keys are stored separately per endpoint.</p>
+        <p>The API key is stored once in VS Code SecretStorage and sent to whatever Base URL is configured.</p>
         <section class="card">
           <div class="row">
             <div>
               <div class="label">Base URL</div>
               <div class="help">Official endpoint is used by default.</div>
             </div>
-            <input id="baseUrl" name="baseUrl" value="${escapeHtml(state.baseUrl)}">
+            <div class="inline">
+              <input id="baseUrl" value="${escapeHtml(state.baseUrl)}">
+              <button class="save-btn" type="button" data-field="baseUrl" data-key="openrouter.baseUrl" disabled>Save</button>
+            </div>
           </div>
           <div class="row">
             <div>
               <div class="label">API Key</div>
-              <div class="help">${escapeHtml(state.endpointOrigin)}</div>
+              <div class="help">Stored securely in VS Code SecretStorage.</div>
             </div>
-            <div class="inline">
-              <span class="status">${apiKeyStatus}</span>
-              <div>
-                <button class="secondary" id="set-key" type="button">Set</button>
-                <button class="danger" id="reset-key" type="button">Reset</button>
+            <div class="stack">
+              <div class="inline">
+                <input id="apiKey" type="password" autocomplete="off" placeholder="${escapeHtml(apiKeyPlaceholder)}">
+                <button class="save-btn" type="button" id="save-key" disabled>Save</button>
+              </div>
+              <div class="field-actions">
+                <span class="status-text" id="apiKeyStatus">${escapeHtml(apiKeyStatus)}</span>
+                <button class="secondary" type="button" id="clear-key"${clearDisabled}>Clear</button>
               </div>
             </div>
           </div>
@@ -540,7 +547,10 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
               <div class="label">Model ID</div>
               <div class="help">Default: ${escapeHtml(DEFAULT_OPENROUTER_MODEL_ID)}</div>
             </div>
-            <input id="modelId" name="modelId" value="${escapeHtml(state.modelId)}">
+            <div class="inline">
+              <input id="modelId" value="${escapeHtml(state.modelId)}">
+              <button class="save-btn" type="button" data-field="modelId" data-key="openrouter.modelId" disabled>Save</button>
+            </div>
           </div>
         </section>
 
@@ -551,154 +561,247 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
               <div class="label">Target Language</div>
               <div class="help">Used for new translation requests.</div>
             </div>
-            <select id="targetLanguage" name="targetLanguage">${renderOptions(state.targetLanguage)}</select>
+            <div class="inline">
+              <select id="targetLanguage">${renderOptions(state.targetLanguage)}</select>
+              <span class="saved-hint" id="targetLanguage-hint"></span>
+            </div>
           </div>
-          <div class="row">
+          <div class="row" id="customLanguageRow"${customLanguageHidden}>
             <div>
               <div class="label">Custom Language</div>
-              <div class="help">Used when target language is custom.</div>
-            </div>
-            <input id="targetLanguageCustom" name="targetLanguageCustom" value="${escapeHtml(state.targetLanguageCustom)}">
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Context Usage Ratio</div>
-              <div class="help">When the model context window is available, each request prompt targets this share of it.</div>
+              <div class="help">Shown when target language is Custom.</div>
             </div>
             <div class="inline">
-              <input id="maxContextUsageRatio" name="maxContextUsageRatio" type="range" min="0.1" max="0.9" step="0.05" value="${state.maxContextUsageRatio}">
-              <span id="context-ratio-value">${Math.round(state.maxContextUsageRatio * 100)}%</span>
+              <input id="targetLanguageCustom" value="${escapeHtml(state.targetLanguageCustom)}">
+              <button class="save-btn" type="button" data-field="targetLanguageCustom" data-key="translation.targetLanguageCustom" disabled>Save</button>
             </div>
           </div>
           <div class="row">
             <div>
-              <div class="label">Fallback Blocks Per Request</div>
-              <div class="help">Used only when the model context window cannot be read.</div>
-            </div>
-            <input id="maxBlocksPerRequest" name="maxBlocksPerRequest" type="number" min="1" value="${state.maxBlocksPerRequest}">
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Deletion Fallback</div>
-              <div class="help">Run full translation when block deletion is detected.</div>
-            </div>
-            <label class="switch"><input id="deletionFallback" name="deletionFallback" type="checkbox"${fallbackChecked}></label>
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Similarity Threshold</div>
-              <div class="help">Used by deletion detection.</div>
-            </div>
-            <div class="inline">
-              <input id="similarityThreshold" name="similarityThreshold" type="range" min="0" max="1" step="0.05" value="${state.similarityThreshold}">
-              <span id="threshold-value">${state.similarityThreshold.toFixed(2)}</span>
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">System Prompt</div>
-              <div class="help">Base translation instructions. Use {targetLanguage} for the selected target language.</div>
+              <div class="label">Custom Instructions</div>
+              <div class="help">Extra terminology or style rules, appended after the built-in translation prompt. The base Markdown and placeholder protection always applies.</div>
             </div>
             <div class="stack">
-              <textarea id="systemPrompt" name="systemPrompt">${escapeHtml(state.systemPrompt)}</textarea>
+              <textarea id="customPrompt" placeholder="e.g. Keep product names in English. Use a formal tone.">${escapeHtml(state.customPrompt)}</textarea>
               <div class="field-actions">
-                <button class="secondary" id="restore-system-prompt" type="button">Restore Default</button>
+                <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>Save</button>
               </div>
             </div>
           </div>
-          <div class="row">
-            <div>
-              <div class="label">Custom Prompt</div>
-              <div class="help">Optional terminology or style rules appended after the system prompt.</div>
-            </div>
-            <textarea id="customPrompt" name="customPrompt">${escapeHtml(state.customPrompt)}</textarea>
-          </div>
         </section>
 
-        <h2>Storage</h2>
+        <h2>Output</h2>
         <section class="card">
           <div class="row">
             <div>
-              <div class="label">Output Location</div>
-              <div class="help">Private output keeps generated Markdown out of the workspace; source-folder output preserves relative links.</div>
+              <div class="label">Translated File Location</div>
+              <div class="help">Where translated Markdown files are written.</div>
             </div>
-            <select id="outputLocation" name="outputLocation">
-              <option value="sourceFolder"${outputSourceSelected}>Source folder</option>
-              <option value="privateStorage"${outputPrivateSelected}>Private storage</option>
-            </select>
+            <div class="inline">
+              <select id="outputLocation">
+                <option value="sourceFolder"${outputSourceSelected}>Next to the source file (*_mdt.md)</option>
+                <option value="privateStorage"${outputPrivateSelected}>Extension storage (outside the workspace)</option>
+              </select>
+              <span class="saved-hint" id="outputLocation-hint"></span>
+            </div>
           </div>
           <div class="row">
             <div>
-              <div class="label">Private Storage</div>
-              <div class="help">${escapeHtml(state.storageRoot)}</div>
+              <div class="label">Private storage folder</div>
+              <div class="help">Always stores MarkLingo's cache and metadata. When the location above is Extension storage, translated files are saved here too.</div>
+              <div class="help path">${escapeHtml(state.storageRoot)}</div>
             </div>
-            <button class="secondary" id="reveal-storage" type="button">Reveal</button>
+            <div class="switch">
+              <button class="secondary" id="reveal-storage" type="button">Reveal</button>
+            </div>
           </div>
         </section>
 
-        <div class="actions">
-          <span id="toast" class="toast" role="status"></span>
-          <button class="danger" id="clear-data" type="button">Clear Data...</button>
-          <button class="secondary" id="reload" type="button">Reload</button>
-          <button type="submit">Save</button>
-        </div>
-      </form>
+        <h2 class="danger-title">Danger Zone</h2>
+        <section class="card danger">
+          <div class="row">
+            <div>
+              <div class="label">Clear Data</div>
+              <div class="help">Select what to delete, then type CLEAR to confirm. This cannot be undone.</div>
+            </div>
+            <div class="stack">
+              <label class="check"><input class="check-input" type="checkbox" id="clr-apiKeys" checked> Saved API key</label>
+              <label class="check"><input class="check-input" type="checkbox" id="clr-settings" checked> MarkLingo settings</label>
+              <label class="check"><input class="check-input" type="checkbox" id="clr-globalStorage" checked> Private cache &amp; metadata</label>
+              <label class="check"><input class="check-input" type="checkbox" id="clr-workspaceOutputs"> Tracked translated files (*_mdt.md)</label>
+              <div class="inline">
+                <input id="clr-confirm" autocomplete="off" placeholder="Type CLEAR to confirm">
+                <button class="danger" type="button" id="clear-data" disabled>Clear data</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const form = document.getElementById('settings-form');
-    const threshold = document.getElementById('similarityThreshold');
-    const thresholdValue = document.getElementById('threshold-value');
-    const contextRatio = document.getElementById('maxContextUsageRatio');
-    const contextRatioValue = document.getElementById('context-ratio-value');
-    const toast = document.getElementById('toast');
-    const defaultSystemPrompt = ${defaultSystemPromptJson};
+    const CUSTOM_LANGUAGE_LABEL = ${JSON.stringify(CUSTOM_TARGET_LANGUAGE_LABEL)};
+    const API_KEY_MASK = ${JSON.stringify(API_KEY_MASK)};
 
-    threshold.addEventListener('input', () => {
-      thresholdValue.textContent = Number(threshold.value).toFixed(2);
-    });
+    const textByKey = new Map();
+    const instantByKey = new Map();
+    const hintTimers = new Map();
 
-    contextRatio.addEventListener('input', () => {
-      contextRatioValue.textContent = Math.round(Number(contextRatio.value) * 100) + '%';
-    });
-
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const data = new FormData(form);
-      vscode.postMessage({
-        type: 'save',
-        payload: {
-          baseUrl: data.get('baseUrl'),
-          modelId: data.get('modelId'),
-          targetLanguage: data.get('targetLanguage'),
-          targetLanguageCustom: data.get('targetLanguageCustom'),
-          maxBlocksPerRequest: data.get('maxBlocksPerRequest'),
-          maxContextUsageRatio: data.get('maxContextUsageRatio'),
-          deletionFallback: data.has('deletionFallback'),
-          similarityThreshold: data.get('similarityThreshold'),
-          systemPrompt: data.get('systemPrompt'),
-          customPrompt: data.get('customPrompt'),
-          outputLocation: data.get('outputLocation')
-        }
+    document.querySelectorAll('.save-btn').forEach((button) => {
+      const fieldId = button.getAttribute('data-field');
+      const key = button.getAttribute('data-key');
+      const input = fieldId ? document.getElementById(fieldId) : null;
+      if (!input || !key) return;
+      const state = { input, button, baseline: input.value, timer: undefined };
+      textByKey.set(key, state);
+      input.addEventListener('input', () => {
+        if (state.timer) { clearTimeout(state.timer); state.timer = undefined; }
+        button.classList.remove('saved');
+        button.textContent = 'Save';
+        button.disabled = input.value === state.baseline;
+      });
+      button.addEventListener('click', () => {
+        if (input.value === state.baseline) return;
+        vscode.postMessage({ type: 'updateSetting', key: key, value: input.value });
       });
     });
 
-    document.getElementById('set-key').addEventListener('click', () => vscode.postMessage({ type: 'setApiKey' }));
-    document.getElementById('reset-key').addEventListener('click', () => vscode.postMessage({ type: 'resetApiKey' }));
-    document.getElementById('open-keyboard-shortcuts').addEventListener('click', () => vscode.postMessage({ type: 'openKeyboardShortcuts' }));
-    document.getElementById('restore-system-prompt').addEventListener('click', () => {
-      document.getElementById('systemPrompt').value = defaultSystemPrompt;
-      toast.textContent = 'System prompt restored locally. Save to apply.';
+    function flashHint(hintId) {
+      const hint = document.getElementById(hintId);
+      if (!hint) return;
+      hint.textContent = 'Saved';
+      hint.classList.add('visible');
+      if (hintTimers.has(hintId)) clearTimeout(hintTimers.get(hintId));
+      hintTimers.set(hintId, setTimeout(() => {
+        hint.classList.remove('visible');
+        hintTimers.delete(hintId);
+      }, 1800));
+    }
+
+    function registerInstant(id, key) {
+      const control = document.getElementById(id);
+      if (!control) return;
+      instantByKey.set(key, id + '-hint');
+      control.addEventListener('change', () => {
+        vscode.postMessage({ type: 'updateSetting', key: key, value: control.value });
+        if (id === 'targetLanguage') syncCustomLanguageVisibility(true);
+      });
+    }
+
+    const targetLanguageSelect = document.getElementById('targetLanguage');
+    const customLanguageRow = document.getElementById('customLanguageRow');
+    const customLanguageInput = document.getElementById('targetLanguageCustom');
+    function syncCustomLanguageVisibility(focus) {
+      const isCustom = targetLanguageSelect && targetLanguageSelect.value === CUSTOM_LANGUAGE_LABEL;
+      if (customLanguageRow) customLanguageRow.style.display = isCustom ? '' : 'none';
+      if (isCustom && focus && customLanguageInput) customLanguageInput.focus();
+    }
+
+    registerInstant('targetLanguage', 'translation.targetLanguage');
+    registerInstant('outputLocation', 'storage.outputLocation');
+    syncCustomLanguageVisibility(false);
+
+    function handleSaved(key) {
+      const text = textByKey.get(key);
+      if (text) {
+        text.baseline = text.input.value;
+        text.button.disabled = true;
+        text.button.textContent = 'Saved';
+        text.button.classList.add('saved');
+        if (text.timer) clearTimeout(text.timer);
+        text.timer = setTimeout(() => {
+          text.button.textContent = 'Save';
+          text.button.classList.remove('saved');
+          text.timer = undefined;
+        }, 2500);
+        return;
+      }
+      const hintId = instantByKey.get(key);
+      if (hintId) flashHint(hintId);
+    }
+
+    // API key: inline password entry. The value is posted once and never stored in webview state.
+    const apiKeyInput = document.getElementById('apiKey');
+    const saveKeyBtn = document.getElementById('save-key');
+    const clearKeyBtn = document.getElementById('clear-key');
+    const apiKeyStatusEl = document.getElementById('apiKeyStatus');
+
+    function applyApiKeyStatus(hasKey) {
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = hasKey ? API_KEY_MASK : 'Enter API key';
+      apiKeyStatusEl.textContent = hasKey ? 'Saved' : 'Not saved';
+      clearKeyBtn.disabled = !hasKey;
+      saveKeyBtn.disabled = true;
+      saveKeyBtn.textContent = 'Save';
+      saveKeyBtn.classList.remove('saved');
+    }
+
+    apiKeyInput.addEventListener('input', () => {
+      saveKeyBtn.classList.remove('saved');
+      saveKeyBtn.textContent = 'Save';
+      saveKeyBtn.disabled = apiKeyInput.value.length === 0;
     });
-    document.getElementById('clear-data').addEventListener('click', () => vscode.postMessage({ type: 'clearData' }));
-    document.getElementById('reload').addEventListener('click', () => vscode.postMessage({ type: 'reload' }));
+    saveKeyBtn.addEventListener('click', () => {
+      if (!apiKeyInput.value) return;
+      vscode.postMessage({ type: 'setApiKey', value: apiKeyInput.value });
+    });
+    clearKeyBtn.addEventListener('click', () => vscode.postMessage({ type: 'resetApiKey' }));
+
+    // Clear Data: scope selection + typed confirmation, fully in-panel.
+    const clearCheckIds = ['clr-apiKeys', 'clr-settings', 'clr-globalStorage', 'clr-workspaceOutputs'];
+    const clearConfirm = document.getElementById('clr-confirm');
+    const clearDataBtn = document.getElementById('clear-data');
+    function refreshClearButton() {
+      const anyChecked = clearCheckIds.some((id) => document.getElementById(id).checked);
+      const confirmed = clearConfirm.value.trim().toUpperCase() === 'CLEAR';
+      clearDataBtn.disabled = !(anyChecked && confirmed);
+    }
+    clearCheckIds.forEach((id) => document.getElementById(id).addEventListener('change', refreshClearButton));
+    clearConfirm.addEventListener('input', refreshClearButton);
+    clearDataBtn.addEventListener('click', () => {
+      vscode.postMessage({
+        type: 'clearData',
+        scopes: {
+          apiKeys: document.getElementById('clr-apiKeys').checked,
+          settings: document.getElementById('clr-settings').checked,
+          globalStorage: document.getElementById('clr-globalStorage').checked,
+          workspaceOutputs: document.getElementById('clr-workspaceOutputs').checked,
+        },
+      });
+    });
+    refreshClearButton();
+
+    document.getElementById('open-keyboard-shortcuts').addEventListener('click', () => vscode.postMessage({ type: 'openKeyboardShortcuts' }));
     document.getElementById('reveal-storage').addEventListener('click', () => vscode.postMessage({ type: 'revealStorage' }));
 
     window.addEventListener('message', (event) => {
-      if (event.data?.type === 'toast') {
-        toast.textContent = event.data.message;
-        window.setTimeout(() => { toast.textContent = ''; }, 2400);
+      const msg = event.data;
+      if (!msg || typeof msg.type !== 'string') return;
+      if (msg.type === 'saved') {
+        handleSaved(msg.key);
+        return;
+      }
+      if (msg.type === 'apiKeyStatus') {
+        applyApiKeyStatus(Boolean(msg.hasKey));
+        return;
+      }
+      if (msg.type === 'shortcutState') {
+        const label = document.getElementById('shortcut-label');
+        const statusEl = document.getElementById('shortcut-status');
+        const warn = document.getElementById('shortcut-warning');
+        if (label) label.textContent = msg.shortcutLabel || '';
+        if (statusEl) statusEl.textContent = msg.shortcutStatus || '';
+        if (warn) {
+          warn.textContent = '';
+          if (msg.shortcutWarning) {
+            const div = document.createElement('div');
+            div.className = 'notice warning';
+            div.textContent = msg.shortcutWarning;
+            warn.appendChild(div);
+          }
+        }
+        return;
       }
     });
   </script>
@@ -708,6 +811,11 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
 
 async function refreshPanel(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
   panel.webview.html = getHtml(panel.webview, await readSettingsState(context));
+}
+
+async function postShortcutState(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
+  const shortcut = await getShortcutState(context);
+  await panel.webview.postMessage({ type: 'shortcutState', ...shortcut });
 }
 
 function watchUserKeybindings(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): vscode.Disposable {
@@ -721,7 +829,8 @@ function watchUserKeybindings(context: vscode.ExtensionContext, panel: vscode.We
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       refreshTimer = undefined;
-      if (currentPanel === panel) void refreshPanel(context, panel);
+      // Update only the shortcut row so in-progress, unsaved text edits are preserved.
+      if (currentPanel === panel) void postShortcutState(context, panel);
     }, 250);
   };
 
@@ -765,39 +874,31 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
 
   panel.webview.onDidReceiveMessage(async (message) => {
     try {
-      if (message?.type === 'save') {
-        await updateSettings(context, message.payload ?? {});
-        await refreshPanel(context, panel);
-        panel.webview.postMessage({ type: 'toast', message: 'Saved' });
+      if (message?.type === 'updateSetting' && typeof message.key === 'string') {
+        await updateSingleSetting(context, message.key, message.value);
+        await panel.webview.postMessage({ type: 'saved', key: message.key });
         return;
       }
       if (message?.type === 'setApiKey') {
-        const input = await vscode.window.showInputBox({
-          title: 'MarkLingo: OpenRouter API Key',
-          prompt: 'API Key is stored in VS Code SecretStorage for the currently configured endpoint.',
-          password: true,
-          ignoreFocusOut: true,
-        });
-        if (!input?.trim()) return;
-        const origin = await storeOpenRouterApiKeyForCurrentEndpoint(context, input.trim());
-        await refreshPanel(context, panel);
-        panel.webview.postMessage({ type: 'toast', message: `Saved API key for ${origin}` });
+        const value = typeof message.value === 'string' ? message.value.trim() : '';
+        if (!value) return;
+        await storeOpenRouterApiKey(context, value);
+        await panel.webview.postMessage({ type: 'apiKeyStatus', hasKey: await hasOpenRouterApiKey(context) });
         return;
       }
       if (message?.type === 'resetApiKey') {
-        const confirm = await vscode.window.showWarningMessage(
-          'MarkLingo: Reset the API key for the currently configured endpoint?',
-          { modal: true },
-          'Reset',
-        );
-        if (confirm !== 'Reset') return;
-        const origin = await deleteOpenRouterApiKeyForCurrentEndpoint(context);
-        await refreshPanel(context, panel);
-        panel.webview.postMessage({ type: 'toast', message: `Reset API key for ${origin}` });
+        await deleteOpenRouterApiKey(context);
+        await panel.webview.postMessage({ type: 'apiKeyStatus', hasKey: await hasOpenRouterApiKey(context) });
         return;
       }
       if (message?.type === 'clearData') {
-        const didClear = await clearExtensionData(context);
+        const scopes = (message.scopes ?? {}) as Record<string, unknown>;
+        const didClear = await clearExtensionDataScopes(context, {
+          apiKeys: Boolean(scopes.apiKeys),
+          settings: Boolean(scopes.settings),
+          globalStorage: Boolean(scopes.globalStorage),
+          workspaceOutputs: Boolean(scopes.workspaceOutputs),
+        });
         if (didClear) await refreshPanel(context, panel);
         return;
       }
@@ -808,10 +909,6 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       if (message?.type === 'revealStorage') {
         await vscode.workspace.fs.createDirectory(getProjectsStorageRoot(context));
         await vscode.commands.executeCommand('revealFileInOS', getProjectsStorageRoot(context));
-        return;
-      }
-      if (message?.type === 'reload') {
-        await refreshPanel(context, panel);
       }
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
