@@ -72,6 +72,7 @@ The custom settings page saves dropdown changes immediately. Free-text fields ha
 ## Output Files
 
 - `sourceFolder` output: `xxx_zh-CN_mdt.md`, `xxx_en_mdt.md`, or another target-language suffixed file is written next to `xxx.md`.
+- Custom target languages use a safe suffix derived from the language name when possible, or a stable `custom-<hash>` suffix when the name cannot be represented as an ASCII slug.
 - `privateStorage` output: translated Markdown is written under the extension private storage directory.
 - Metadata is written under VS Code private global storage. It includes cached source/translation blocks plus a structured `debug` section with run status, extension/environment versions, non-secret settings, request planning details, warnings, and errors.
 - The visible `xxx_<language>_mdt.md` file is output, not the translation cache. If a source-folder output file is deleted manually but its private metadata still exists, the next normal translation can rebuild the output from cached block translations instead of retranslating every unchanged block.

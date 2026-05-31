@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const TARGET_LANGUAGE_SUFFIXES = new Map<string, string>([
   ['简体中文', 'zh-CN'],
   ['繁体中文', 'zh-TW'],
@@ -22,7 +24,11 @@ export function getTargetLanguageSuffix(targetLanguage: string): string {
     .toLowerCase()
     .slice(0, 32)
     .replace(/^-+|-+$/g, '');
-  return slug || 'custom';
+  if (slug) return slug;
+  if (!normalized) return 'custom';
+
+  const hash = createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 8);
+  return `custom-${hash}`;
 }
 
 export function getTranslatedMarkdownFileName(sourceName: string, targetLanguage: string): string {

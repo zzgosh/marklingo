@@ -68,12 +68,15 @@ type TrackedWorkspaceOutputScan = {
   outputs: TrackedWorkspaceOutput[];
 };
 
-type CleanupScopeOptions = {
+type CleanupStorageOptions = {
   projectUri?: vscode.Uri;
+};
+
+type DeleteTrackedWorkspaceOutputOptions = CleanupStorageOptions & {
   skipModified?: boolean;
 };
 
-function getCleanupStorageRoot(context: vscode.ExtensionContext, options: CleanupScopeOptions = {}): vscode.Uri {
+function getCleanupStorageRoot(context: vscode.ExtensionContext, options: CleanupStorageOptions = {}): vscode.Uri {
   return options.projectUri
     ? getProjectStorageRoot(context, options.projectUri)
     : getProjectsStorageRoot(context);
@@ -90,7 +93,7 @@ function getCurrentProjectUri(): vscode.Uri | undefined {
 
 export async function scanTrackedWorkspaceOutputs(
   context: vscode.ExtensionContext,
-  options: CleanupScopeOptions = {},
+  options: CleanupStorageOptions = {},
 ): Promise<TrackedWorkspaceOutputScan> {
   const storageRoot = getCleanupStorageRoot(context, options);
   const storageFiles = await collectFiles(storageRoot);
@@ -111,7 +114,7 @@ export async function scanTrackedWorkspaceOutputs(
 export async function deleteTrackedWorkspaceOutputs(
   context: vscode.ExtensionContext,
   progress?: vscode.Progress<{ message?: string }>,
-  options: CleanupScopeOptions = {},
+  options: DeleteTrackedWorkspaceOutputOptions = {},
 ): Promise<WorkspaceOutputDeleteSummary> {
   const { outputs } = await scanTrackedWorkspaceOutputs(context, options);
   const skipModified = options.skipModified ?? true;
@@ -154,6 +157,23 @@ export async function deletePrivateTranslationCache(
   }
 }
 
+export async function deleteProjectTranslationData(
+  context: vscode.ExtensionContext,
+  projectUri: vscode.Uri,
+  progress?: vscode.Progress<{ message?: string }>,
+): Promise<WorkspaceOutputDeleteSummary> {
+  const { storageRoot } = await scanTrackedWorkspaceOutputs(context, { projectUri });
+  const summary = await deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false });
+
+  progress?.report({ message: 'Clearing private cache' });
+  const cacheError = await deletePrivateTranslationCache(context, projectUri);
+  if (cacheError) {
+    summary.errors.push(`${storageRoot.fsPath}: ${cacheError}`);
+  }
+
+  return summary;
+}
+
 export async function deleteCurrentProjectTranslatedFiles(context: vscode.ExtensionContext) {
   const projectUri = getCurrentProjectUri();
   if (!projectUri) {
@@ -182,15 +202,7 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
       cancellable: false,
     },
     async (progress) => {
-      const workspaceSummary = await deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false });
-
-      progress.report({ message: 'Clearing private cache' });
-      const cacheError = await deletePrivateTranslationCache(context, projectUri);
-      if (cacheError) {
-        workspaceSummary.errors.push(`${storageRoot.fsPath}: ${cacheError}`);
-      }
-
-      return workspaceSummary;
+      return deleteProjectTranslationData(context, projectUri, progress);
     },
   );
 

@@ -17,6 +17,8 @@ test('uses stable suffixes for built-in target languages', () => {
 test('derives safe suffixes for custom target languages', () => {
   assert.equal(getTargetLanguageSuffix('Portuguese (Brazil)'), 'portuguese-brazil');
   assert.equal(getTargetLanguageSuffix('  Italiano  '), 'italiano');
+  assert.equal(getTargetLanguageSuffix('中文'), 'custom-72726d88');
+  assert.equal(getTargetLanguageSuffix('粤语'), 'custom-3b0aa680');
   assert.equal(getTargetLanguageSuffix(''), 'custom');
 });
 

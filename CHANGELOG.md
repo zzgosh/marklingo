@@ -12,4 +12,5 @@ All notable changes to MarkLingo are documented in this file.
 - Store translation metadata in VS Code private global storage, with source-folder or private-storage output options.
 - Provide a custom settings webview for provider, translation, storage, target-language, and shortcut status controls.
 - Include the target-language suffix in translated Markdown and metadata file names.
+- Use stable custom hash suffixes when a custom target language name cannot be represented as an ASCII slug.
 - Replace the global Command Palette cleanup with `MarkLingo: Delete Current Project Translated Files`; cross-project cleanup remains in the settings Danger Zone.
