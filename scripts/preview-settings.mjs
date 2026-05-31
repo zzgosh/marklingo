@@ -80,7 +80,8 @@ function getPreviewBridgeScript(nonce) {
           return;
         }
         if (message.type === 'setApiKey') {
-          reply({ type: 'apiKeyStatus', hasKey: Boolean(message.value), saveId: message.saveId });
+          const value = typeof message.value === 'string' ? message.value : '';
+          reply({ type: 'apiKeyStatus', hasKey: Boolean(value), keyLength: value.length, saveId: message.saveId });
           return;
         }
         if (message.type === 'clearData') {
@@ -111,7 +112,7 @@ function buildState(url) {
     targetLanguage: usesCustomLanguage ? 'Custom...' : '简体中文',
     targetLanguageCustom: usesCustomLanguage ? 'Brazilian Portuguese' : '',
     systemPrompt: resolveSystemPrompt('', usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文'),
-    customPrompt: 'Keep product names in English. Use concise headings.',
+    customPrompt: '',
     outputLocation,
     storageRoot: path.join(root, '.vscode-test', 'marklingo-preview', 'globalStorage', 'projects'),
   };

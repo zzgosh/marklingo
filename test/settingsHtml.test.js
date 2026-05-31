@@ -42,9 +42,15 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);
   assert.match(html, /API key saved · type to replace/);
+  assert.match(html, /showApiKeyMask\(savedLength\)/);
+  assert.match(html, /letter-spacing: 1\.6px;/);
+  assert.match(html, /msg\.keyLength/);
   assert.ok(!html.includes('Default shortcut for Markdown editors.'));
   assert.ok(!html.includes('Official endpoint is used by default.'));
   assert.ok(!html.includes('Where translated Markdown files are written.'));
+  assert.ok(!html.includes('e.g. Keep product names'));
+  assert.ok(!html.includes('targetLanguage-hint'));
+  assert.ok(!html.includes('outputLocation-hint'));
   assert.ok(!html.includes('Type CLEAR to confirm'));
   assert.ok(!html.includes('Can delete saved API key'));
 });
