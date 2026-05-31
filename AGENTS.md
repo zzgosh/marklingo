@@ -21,6 +21,7 @@ Do not edit generated `out/` or `dist/` files manually. Use the package scripts.
 - `npm run test:vscode`: build the extension, launch an isolated VS Code Extension Host, and run integration tests under `test/integration/`.
 - `npm run check:integration`: run `npm run check`, then `npm run test:vscode`.
 - `npm run benchmark:postprocessing`: run the local Markdown postprocessing benchmark.
+- `npm run preview:settings`: compile, then serve a mocked Settings webview preview for browser-based UI iteration.
 - `npm run package`: compile and bundle `dist/extension.js`.
 - `npm run package:dry`: build the extension and list VSIX contents.
 - `npm run vsix`: run checks, then create the `.vsix` package.
@@ -39,7 +40,8 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 - `src/translation/blockResults.ts` restores placeholders and falls back to the source block if one block is malformed, so one damaged model output does not fail the whole document.
 - `src/translation/cache.ts` defines metadata, hashing, deletion detection, and debug metadata.
 - `src/storage/paths.ts` chooses source-folder output or VS Code private global storage output.
-- `src/webview/settingsPanel.ts` renders the custom settings webview.
+- `src/webview/settingsHtml.ts` renders the custom settings webview HTML.
+- `src/webview/settingsPanel.ts` hosts the settings webview inside VS Code and wires VS Code messages, settings, SecretStorage, and cleanup actions.
 
 ## Storage And Privacy
 
@@ -67,9 +69,9 @@ On translation failure, preserve existing cache metadata when possible and updat
 
 ## Prompt And Token Estimation
 
-The notification label uses `estimated prompt tokens` intentionally. This is a rough local estimate for request planning, not a model-specific tokenizer result.
+Keep translation progress notifications user-facing: show the current stage and batch progress, not estimated prompt token counts.
 
-The estimate includes the system prompt, user prompt wrapper, JSON block payload, placeholder-protected Markdown, and fixed chat overhead. It only covers blocks being sent in the current request, so it will not match an external tokenizer run over the raw Markdown file.
+Token estimates belong in debug metadata. The estimate includes the system prompt, user prompt wrapper, JSON block payload, placeholder-protected Markdown, and fixed chat overhead. It only covers blocks being sent in the current request, so it will not match an external tokenizer run over the raw Markdown file.
 
 ## User-Facing Copy
 
