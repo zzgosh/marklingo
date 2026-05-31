@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getDefaultTranslateKeybindingSearchQuery,
   getDefaultTranslateKeys,
   getShortcutStateFromKeybindings,
   MAC_TRANSLATE_KEY,
@@ -12,6 +13,10 @@ test('uses macOS default shortcut on local darwin extension hosts', () => {
     getDefaultTranslateKeys({ extensionHostPlatform: 'darwin' }),
     [MAC_TRANSLATE_KEY],
   );
+  assert.equal(
+    getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'darwin' }),
+    '@keybinding:alt+cmd+t',
+  );
 });
 
 test('uses Windows/Linux default shortcut on local non-darwin extension hosts', () => {
@@ -19,12 +24,20 @@ test('uses Windows/Linux default shortcut on local non-darwin extension hosts', 
     getDefaultTranslateKeys({ extensionHostPlatform: 'linux' }),
     [NON_MAC_TRANSLATE_KEY],
   );
+  assert.equal(
+    getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'linux' }),
+    '@keybinding:ctrl+alt+t',
+  );
 });
 
 test('keeps all platform defaults when the UI platform may differ from the remote extension host', () => {
   assert.deepEqual(
     getDefaultTranslateKeys({ extensionHostPlatform: 'linux', remoteName: 'ssh-remote' }),
     [MAC_TRANSLATE_KEY, NON_MAC_TRANSLATE_KEY],
+  );
+  assert.equal(
+    getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'linux', remoteName: 'ssh-remote' }),
+    '@keybinding:alt+cmd+t',
   );
 
   const state = getShortcutStateFromKeybindings([], [MAC_TRANSLATE_KEY, NON_MAC_TRANSLATE_KEY]);
