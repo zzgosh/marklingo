@@ -82,8 +82,10 @@
     "keybindings": [
       {
         "command": "marklingo.translateCurrentMarkdown",
-        "key": "ctrl+alt+cmd+t",
-        "mac": "ctrl+alt+cmd+t",
+        "key": "ctrl+alt+t",
+        "mac": "alt+cmd+t",
+        "win": "ctrl+alt+t",
+        "linux": "ctrl+alt+t",
         "when": "editorTextFocus && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)"
       }
     ],

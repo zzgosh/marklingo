@@ -4,12 +4,12 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 
 ## Features
 
-- Translate the active Markdown file with `Control + Option + Command + T`.
-- Generate a translated `*_mdt.md` file, open the translated Markdown tab, and show its locked Markdown Preview to the side.
+- Translate the active Markdown file with `Option + Command + T` on macOS or `Control + Alt + T` on Windows/Linux.
+- Generate a translated `*_mdt.md` file, open the translated Markdown tab, and show its Markdown Preview to the side.
 - Reuse prior translations by hashing Markdown AST blocks.
 - Force a full retranslation with `MarkLingo: Translate Current Markdown (Full)`.
 - Configure provider, translation, storage, and SecretStorage API keys from `MarkLingo: Open Settings`.
-- View the current translate shortcut and jump directly to VS Code Keyboard Shortcuts from the settings page.
+- View translate shortcut status and jump directly to VS Code Keyboard Shortcuts from the settings page.
 - Store translation metadata in VS Code private global storage instead of the workspace.
 - Delete only extension-tracked translated files and private metadata with `MarkLingo: Delete all translated files`.
 - Clear saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs from the settings page.
@@ -23,6 +23,10 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 5. Run `MarkLingo: Translate Current Markdown`.
 
 The first translation also asks for a target language if one has not been selected yet.
+
+## Keyboard Shortcut
+
+MarkLingo contributes a default keybinding for `marklingo.translateCurrentMarkdown`: `Option + Command + T` on macOS and `Control + Alt + T` on Windows/Linux. This is an extension-provided default shortcut, not an entry written to User `keybindings.json`; use VS Code Keyboard Shortcuts to override or remove it.
 
 ## Settings
 
