@@ -41,10 +41,11 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /\.section-warning \{\s+margin-top: 8px;\s+color: var\(--danger\);/);
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);
-  assert.match(html, /API key saved · type to replace/);
-  assert.match(html, /showApiKeyMask\(savedLength\)/);
-  assert.match(html, /letter-spacing: 1\.6px;/);
-  assert.match(html, /msg\.keyLength/);
+  assert.match(html, /id="apiKey" type="password" autocomplete="off" value="•{32}" data-masked="true"/);
+  assert.match(html, /showApiKeyMask\(\)/);
+  assert.ok(!html.includes('API key saved · type to replace'));
+  assert.ok(!html.includes('Enter API key'));
+  assert.ok(!html.includes('masked-secret'));
   assert.ok(!html.includes('Default shortcut for Markdown editors.'));
   assert.ok(!html.includes('Official endpoint is used by default.'));
   assert.ok(!html.includes('Where translated Markdown files are written.'));
@@ -53,6 +54,19 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('outputLocation-hint'));
   assert.ok(!html.includes('Type CLEAR to confirm'));
   assert.ok(!html.includes('Can delete saved API key'));
+});
+
+test('renders empty API key input when no key is on file', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({ hasApiKey: false }),
+  });
+
+  assert.match(html, /<input id="apiKey" type="password" autocomplete="off">/);
+  assert.ok(!html.includes('data-masked="true"'));
+  assert.ok(!html.includes('API key saved · type to replace'));
+  assert.ok(!html.includes('Enter API key'));
 });
 
 test('escapes settings state before rendering into HTML', () => {

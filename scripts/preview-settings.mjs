@@ -81,7 +81,7 @@ function getPreviewBridgeScript(nonce) {
         }
         if (message.type === 'setApiKey') {
           const value = typeof message.value === 'string' ? message.value : '';
-          reply({ type: 'apiKeyStatus', hasKey: Boolean(value), keyLength: value.length, saveId: message.saveId });
+          reply({ type: 'apiKeyStatus', hasKey: Boolean(value), saveId: message.saveId });
           return;
         }
         if (message.type === 'clearData') {

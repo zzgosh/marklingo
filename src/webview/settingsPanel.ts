@@ -302,7 +302,6 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({
             type: 'apiKeyStatus',
             hasKey: await hasOpenRouterApiKey(context),
-            keyLength: value.length,
             saveId,
           });
         } catch (error) {
