@@ -69,9 +69,9 @@ On translation failure, preserve existing cache metadata when possible and updat
 
 ## Prompt And Token Estimation
 
-The notification label uses `estimated prompt tokens` intentionally. This is a rough local estimate for request planning, not a model-specific tokenizer result.
+Keep translation progress notifications user-facing: show the current stage and batch progress, not estimated prompt token counts.
 
-The estimate includes the system prompt, user prompt wrapper, JSON block payload, placeholder-protected Markdown, and fixed chat overhead. It only covers blocks being sent in the current request, so it will not match an external tokenizer run over the raw Markdown file.
+Token estimates belong in debug metadata. The estimate includes the system prompt, user prompt wrapper, JSON block payload, placeholder-protected Markdown, and fixed chat overhead. It only covers blocks being sent in the current request, so it will not match an external tokenizer run over the raw Markdown file.
 
 ## User-Facing Copy
 
