@@ -169,7 +169,7 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    "MarkLingo: Delete this project's translated files and private translation cache?",
+    "MarkLingo: Delete this project's tracked translated files, including files edited after generation, and private translation cache?",
     { modal: true },
     'Delete',
   );
