@@ -250,7 +250,7 @@ async function openTranslatedMarkdown(translatedUri: vscode.Uri): Promise<void> 
     viewColumn: vscode.ViewColumn.Active,
     preview: false,
   });
-  await vscode.commands.executeCommand('markdown.showLockedPreviewToSide', translatedUri);
+  await vscode.commands.executeCommand('markdown.showPreviewToSide', translatedUri);
 }
 
 export async function translateCurrentMarkdown(context: vscode.ExtensionContext, options: { mode?: TranslateMode } = {}) {
