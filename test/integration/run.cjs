@@ -144,9 +144,9 @@ async function translate(uri, languageId) {
   await vscode.commands.executeCommand('marklingo.translateCurrentMarkdown');
 }
 
-function translatedPath(sourceUri) {
+function translatedPath(sourceUri, suffix = 'en') {
   const parsed = path.parse(sourceUri.fsPath);
-  return path.join(parsed.dir, `${parsed.name}_mdt.md`);
+  return path.join(parsed.dir, `${parsed.name}_${suffix}_mdt.md`);
 }
 
 function readText(filePath) {
@@ -185,6 +185,7 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   const output = readText(translatedPath(source));
   assert.match(output, /MOCK:# Title/);
   assert.match(output, /MOCK:See \[docs\]\(https:\/\/example\.com\)\./);
+  assert.ok(fs.existsSync(translatedPath(source)), 'expected language-suffixed translated file');
   assert.ok(
     vscode.window.visibleTextEditors.some((editor) => editor.document.uri.fsPath === translatedPath(source)),
     'expected translated Markdown file to be open as a visible editor',
@@ -197,7 +198,8 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.equal(request.body.messages[0].role, 'system');
   assert.equal(request.body.messages[1].role, 'user');
 
-  const { meta } = findMetaForSource(context.seeded.globalStorageUri, source);
+  const { path: metaPath, meta } = findMetaForSource(context.seeded.globalStorageUri, source);
+  assert.match(path.basename(metaPath), /_en_[a-f0-9]+_mdt\.meta\.json$/);
   assert.equal(meta.debug.status, 'success');
   assert.equal(meta.debug.settings.request.stream, false);
   assert.equal(meta.debug.settings.request.reasoning.effort, 'none');

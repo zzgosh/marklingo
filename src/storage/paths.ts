@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import {
+  getPrivateTranslatedMarkdownFileName,
+  getTranslatedMarkdownFileName,
+  getTranslationMetaFileName,
+} from './outputNames.js';
 
 export type OutputLocation = 'sourceFolder' | 'privateStorage';
 
@@ -38,21 +43,21 @@ export function getProjectStorageRoot(context: vscode.ExtensionContext, sourceUr
   return vscode.Uri.joinPath(getProjectsStorageRoot(context), getProjectStorageName(sourceUri));
 }
 
-export function getMetaFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri): vscode.Uri {
+export function getMetaFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
   const parsed = path.parse(sourceUri.fsPath);
   const id = sha256(sourceUri.toString()).slice(0, 16);
-  return vscode.Uri.joinPath(getProjectStorageRoot(context, sourceUri), 'meta', `${parsed.name}_${id}_mdt.meta.json`);
+  return vscode.Uri.joinPath(getProjectStorageRoot(context, sourceUri), 'meta', getTranslationMetaFileName(parsed.name, id, targetLanguage));
 }
 
-export function getSourceFolderTranslatedFileUri(sourceUri: vscode.Uri): vscode.Uri {
+export function getSourceFolderTranslatedFileUri(sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
   const parsed = path.parse(sourceUri.fsPath);
-  return vscode.Uri.file(path.join(parsed.dir, `${parsed.name}_mdt.md`));
+  return vscode.Uri.file(path.join(parsed.dir, getTranslatedMarkdownFileName(parsed.name, targetLanguage)));
 }
 
-export function getPrivateTranslatedFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri): vscode.Uri {
+export function getPrivateTranslatedFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
   const parsed = path.parse(sourceUri.fsPath);
   const id = sha256(sourceUri.toString()).slice(0, 8);
-  return vscode.Uri.joinPath(getProjectStorageRoot(context, sourceUri), 'translated', `${parsed.name}_${id}_mdt.md`);
+  return vscode.Uri.joinPath(getProjectStorageRoot(context, sourceUri), 'translated', getPrivateTranslatedMarkdownFileName(parsed.name, id, targetLanguage));
 }
 
 export function getOutputLocation(): OutputLocation {
@@ -62,8 +67,8 @@ export function getOutputLocation(): OutputLocation {
   return configured === 'privateStorage' ? 'privateStorage' : 'sourceFolder';
 }
 
-export function getTranslatedFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri): vscode.Uri {
+export function getTranslatedFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
   return getOutputLocation() === 'privateStorage'
-    ? getPrivateTranslatedFileUri(context, sourceUri)
-    : getSourceFolderTranslatedFileUri(sourceUri);
+    ? getPrivateTranslatedFileUri(context, sourceUri, targetLanguage)
+    : getSourceFolderTranslatedFileUri(sourceUri, targetLanguage);
 }

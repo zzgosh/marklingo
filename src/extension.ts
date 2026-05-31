@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { seedTargetLanguageSelectionForTest, translateCurrentMarkdown } from './commands/translateCurrentMarkdown.js';
-import { deleteAllTranslatedFiles } from './commands/deleteAllTranslatedFiles.js';
+import { deleteCurrentProjectTranslatedFiles } from './commands/deleteTranslatedFiles.js';
 import { setOpenRouterApiKey } from './commands/openRouterApiKey.js';
 import { setOpenRouterModelId } from './commands/openRouterModelId.js';
 import { setTargetLanguage } from './commands/targetLanguage.js';
@@ -21,8 +21,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('marklingo.deleteAllTranslatedFiles', () => {
-      return deleteAllTranslatedFiles(context);
+    vscode.commands.registerCommand('marklingo.deleteCurrentProjectTranslatedFiles', () => {
+      return deleteCurrentProjectTranslatedFiles(context);
     }),
   );
 
