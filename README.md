@@ -76,7 +76,8 @@ The custom settings page saves dropdown changes immediately. Free-text fields ha
 - Metadata is written under VS Code private global storage. It includes cached source/translation blocks plus a structured `debug` section with run status, extension/environment versions, non-secret settings, request planning details, warnings, and errors.
 - The visible `xxx_<language>_mdt.md` file is output, not the translation cache. If a source-folder output file is deleted manually but its private metadata still exists, the next normal translation can rebuild the output from cached block translations instead of retranslating every unchanged block.
 - Running translation again rebuilds the translated file from the current source Markdown and private metadata/cache. Manual edits made directly in the translated output file are not merged or preserved, so copy or rename the file first if you need to keep those edits.
-- `MarkLingo: Delete Current Project Translated Files` removes the current project's extension-tracked outputs and clears that project's private metadata/cache. After that, the next translation for that project has no cache to reuse and will translate the document again.
+- `MarkLingo: Delete Current Project Translated Files` removes the current project's extension-tracked outputs, including outputs edited after generation, and clears that project's private metadata/cache. After that, the next translation for that project has no cache to reuse and will translate the document again.
+- Existing outputs from earlier versions named `xxx_mdt.md` are not renamed automatically; retranslate the source file to generate `xxx_<language>_mdt.md`, then remove the old output manually if it is no longer needed.
 
 ## Uninstall / Cleanup
 
@@ -98,7 +99,7 @@ If MarkLingo has already been uninstalled, reinstall it, run `MarkLingo: Open Se
 
 Debug token counts are rough prompt estimates used only for request planning. They include the system prompt, the user prompt wrapper, JSON block payload, placeholder-expanded Markdown, and a small chat-message overhead. They do not use the exact tokenizer for the selected model, so they will not match external token counters exactly.
 
-The Command Palette delete command removes the current project's extension-tracked outputs and private metadata. Cross-project cleanup is available only from the Settings page Danger Zone.
+The Command Palette delete command removes the current project's extension-tracked outputs and private metadata, including edited generated outputs. Cross-project cleanup is available only from the Settings page Danger Zone.
 
 ## Development
 

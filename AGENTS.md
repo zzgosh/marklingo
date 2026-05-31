@@ -49,7 +49,7 @@ API keys must only use VS Code `SecretStorage`. Keys are separated by endpoint o
 
 Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, source blocks, cached translated blocks, output hashes, and structured debug metadata. Source-folder output may still write a visible `*_<language>_mdt.md` next to the source Markdown when `marklingo.storage.outputLocation` is `sourceFolder`.
 
-The Command Palette delete command should delete only the current project's extension-tracked outputs and project private metadata/cache. The Settings Danger Zone is the only user-facing entry point for cross-project cleanup.
+The Command Palette delete command should delete only the current project's extension-tracked outputs and project private metadata/cache. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation. The Settings Danger Zone is the only user-facing entry point for cross-project cleanup.
 
 ## Metadata Debug Field
 
