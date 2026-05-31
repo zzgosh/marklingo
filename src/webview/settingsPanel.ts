@@ -165,7 +165,7 @@ async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
     },
     {
       label: 'Tracked translated files',
-      description: '*_mdt.md generated outputs',
+      description: '*_<language>_mdt.md generated outputs',
       picked: false,
       scope: 'workspaceOutputs',
     },

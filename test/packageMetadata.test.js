@@ -27,6 +27,8 @@ test('settings-only cleanup actions are not command palette contributions', () =
 
   assert.ok(!commandIds.has('marklingo.clearExtensionData'));
   assert.ok(!commandIds.has('marklingo.openrouter.resetApiKey'));
+  assert.ok(!commandIds.has('marklingo.deleteAllTranslatedFiles'));
+  assert.ok(commandIds.has('marklingo.deleteCurrentProjectTranslatedFiles'));
 });
 
 test('cleanup configuration keys match package configuration contributions', () => {

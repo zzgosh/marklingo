@@ -513,7 +513,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             <div class="control-full">
               <span class="select-wrap">
                 <select id="outputLocation">
-                  <option value="sourceFolder"${outputSourceSelected}>Source folder (*_mdt.md)</option>
+                  <option value="sourceFolder"${outputSourceSelected}>Source folder</option>
                   <option value="privateStorage"${outputPrivateSelected}>Private extension storage</option>
                 </select>
               </span>
@@ -521,7 +521,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           </div>
           <div class="row">
             <div>
-              <div class="label">Private storage folder</div>
+              <div class="label">Private Storage Folder</div>
               <div class="help">Stores cache, metadata, and private translated files.</div>
             </div>
             <div class="inline">

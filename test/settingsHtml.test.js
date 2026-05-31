@@ -36,7 +36,8 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /System Instructions/);
   assert.match(html, /Copy system instructions/);
   assert.match(html, /You are a precise Markdown translation assistant\./);
-  assert.match(html, /Source folder \(\*_mdt\.md\)/);
+  assert.match(html, /Source folder/);
+  assert.match(html, /Private Storage Folder/);
   assert.match(html, /Private extension storage/);
   assert.match(html, /\.section-warning \{\s+margin-top: 8px;\s+color: var\(--danger\);/);
   assert.match(html, /script-src 'nonce-test-nonce'/);

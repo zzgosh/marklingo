@@ -282,15 +282,19 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     return;
   }
 
-  const translatedUri = getTranslatedFileUri(context, doc.uri);
-  const metaUri = getMetaFileUri(context, doc.uri);
   const debugStartedAtMs = Date.now();
   const debugStartedAt = new Date(debugStartedAtMs).toISOString();
   const debug = createDebugInfo(context, doc, sourceText, debugStartedAt);
+  let translatedUri: vscode.Uri | undefined;
+  let metaUri: vscode.Uri | undefined;
 
   try {
     const targetLanguage = await ensureTargetLanguage(context);
     if (!targetLanguage) return;
+    const currentTranslatedUri = getTranslatedFileUri(context, doc.uri, targetLanguage);
+    const currentMetaUri = getMetaFileUri(context, doc.uri, targetLanguage);
+    translatedUri = currentTranslatedUri;
+    metaUri = currentMetaUri;
 
     const settings = await getOpenRouterSettings(context);
     const cfg = vscode.workspace.getConfiguration('marklingo');
@@ -340,7 +344,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         const translatable = translatableBase.map((s) => ({ ...s, srcHash: sha256(s.text) }));
         const hashById = new Map(translatable.map((s) => [s.id, s.srcHash]));
 
-        const prevMeta = await loadTranslationMeta(metaUri);
+        const prevMeta = await loadTranslationMeta(currentMetaUri);
         const nextMetaSegments = translatable.map((s) => ({ type: s.type, srcHash: s.srcHash, source: s.text }));
 
         const requestedMode: TranslateMode = options.mode ?? 'auto';
@@ -500,7 +504,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         const meta = createEmptyMeta(doc.uri);
         meta.targetLanguage = targetLanguage;
         meta.updatedAt = new Date().toISOString();
-        meta.outputUri = translatedUri.toString();
+        meta.outputUri = currentTranslatedUri.toString();
         meta.outputHash = sha256(out);
         meta.segments = nextMetaSegments;
         const nextTranslations: Record<string, string> = {};
@@ -522,22 +526,24 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       },
     );
 
-    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(translatedUri.fsPath)));
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(currentTranslatedUri.fsPath)));
     await Promise.all([
-      vscode.workspace.fs.writeFile(translatedUri, Buffer.from(translatedMarkdown, 'utf8')),
-      saveTranslationMeta(metaUri, nextMeta),
+      vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(translatedMarkdown, 'utf8')),
+      saveTranslationMeta(currentMetaUri, nextMeta),
     ]);
 
-    await openTranslatedMarkdown(translatedUri);
+    await openTranslatedMarkdown(currentTranslatedUri);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     addDebugEvent(debug, 'error', msg);
     try {
-      const meta = await loadTranslationMeta(metaUri) ?? createEmptyMeta(doc.uri);
-      meta.updatedAt = new Date().toISOString();
-      meta.outputUri = translatedUri.toString();
-      meta.debug = finishDebug(debug, debugStartedAtMs, 'error', err);
-      await saveTranslationMeta(metaUri, meta);
+      if (metaUri && translatedUri) {
+        const meta = await loadTranslationMeta(metaUri) ?? createEmptyMeta(doc.uri);
+        meta.updatedAt = new Date().toISOString();
+        meta.outputUri = translatedUri.toString();
+        meta.debug = finishDebug(debug, debugStartedAtMs, 'error', err);
+        await saveTranslationMeta(metaUri, meta);
+      }
     } catch (metaError) {
       const metaMessage = metaError instanceof Error ? metaError.message : String(metaError);
       outputChannel.appendLine(`[${new Date().toISOString()}] Error: failed to write translation debug metadata: ${metaMessage}`);
