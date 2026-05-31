@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import {
-  deleteOpenRouterApiKey,
   hasOpenRouterApiKey,
   storeOpenRouterApiKey,
   DEFAULT_OPENROUTER_MODEL_ID,
@@ -29,7 +28,6 @@ const TARGET_LANGUAGE_OPTIONS = [
   CUSTOM_TARGET_LANGUAGE_LABEL,
 ];
 const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
-const API_KEY_MASK = '•'.repeat(16);
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
 // dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
@@ -202,9 +200,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
   const nonce = getNonce();
   const outputPrivateSelected = state.outputLocation === 'privateStorage' ? ' selected' : '';
   const outputSourceSelected = state.outputLocation === 'sourceFolder' ? ' selected' : '';
-  const apiKeyStatus = state.hasApiKey ? 'Saved' : 'Not saved';
-  const apiKeyPlaceholder = state.hasApiKey ? API_KEY_MASK : 'Enter API key';
-  const clearDisabled = state.hasApiKey ? '' : ' disabled';
+  const apiKeyPlaceholder = state.hasApiKey ? 'API key saved · type to replace' : 'Enter API key';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningHtml = state.shortcutWarning
     ? `<div class="notice warning">${escapeHtml(state.shortcutWarning)}</div>`
@@ -444,15 +440,9 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
               <div class="label">API Key</div>
               <div class="help">Stored securely in VS Code SecretStorage.</div>
             </div>
-            <div class="stack">
-              <div class="inline">
-                <input id="apiKey" type="password" autocomplete="off" placeholder="${escapeHtml(apiKeyPlaceholder)}">
-                <button class="save-btn" type="button" id="save-key" disabled>Save</button>
-              </div>
-              <div class="field-actions">
-                <span class="status-text" id="apiKeyStatus">${escapeHtml(apiKeyStatus)}</span>
-                <button class="secondary" type="button" id="clear-key"${clearDisabled}>Clear</button>
-              </div>
+            <div class="inline">
+              <input id="apiKey" type="password" autocomplete="off" placeholder="${escapeHtml(apiKeyPlaceholder)}">
+              <button class="save-btn" type="button" id="save-key" disabled>Save</button>
             </div>
           </div>
           <div class="row">
@@ -555,7 +545,6 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const CUSTOM_LANGUAGE_LABEL = ${JSON.stringify(CUSTOM_TARGET_LANGUAGE_LABEL)};
-    const API_KEY_MASK = ${JSON.stringify(API_KEY_MASK)};
 
     const textByKey = new Map();
     const instantByKey = new Map();
@@ -666,29 +655,75 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
     // API key: inline password entry. The value is posted once and never stored in webview state.
     const apiKeyInput = document.getElementById('apiKey');
     const saveKeyBtn = document.getElementById('save-key');
-    const clearKeyBtn = document.getElementById('clear-key');
-    const apiKeyStatusEl = document.getElementById('apiKeyStatus');
+    let apiKeySavedTimer;
+    let apiKeyPending; // { saveId, raw } — raw is the input.value at click time
+    let nextApiKeySaveId = 1;
 
-    function applyApiKeyStatus(hasKey) {
-      apiKeyInput.value = '';
-      apiKeyInput.placeholder = hasKey ? API_KEY_MASK : 'Enter API key';
-      apiKeyStatusEl.textContent = hasKey ? 'Saved' : 'Not saved';
-      clearKeyBtn.disabled = !hasKey;
-      saveKeyBtn.disabled = true;
+    function clearApiKeySavedTimer() {
+      if (apiKeySavedTimer) {
+        clearTimeout(apiKeySavedTimer);
+        apiKeySavedTimer = undefined;
+      }
+    }
+
+    function resetApiKeySaveButton() {
       saveKeyBtn.textContent = 'Save';
       saveKeyBtn.classList.remove('saved');
+      saveKeyBtn.disabled = apiKeyInput.value.trim().length === 0;
+    }
+
+    function applyApiKeyStatus(hasKey, saveId) {
+      // Stale-ack guard: ignore replies for a save the user has since superseded.
+      if (saveId !== undefined && (!apiKeyPending || apiKeyPending.saveId !== saveId)) return;
+      const pending = apiKeyPending;
+      apiKeyPending = undefined;
+      clearApiKeySavedTimer();
+      // If the user kept typing after clicking Save, do not wipe their in-progress entry.
+      const userKeptTyping = pending && apiKeyInput.value !== '' && apiKeyInput.value !== pending.raw;
+      if (userKeptTyping) {
+        apiKeyInput.placeholder = hasKey ? 'API key saved · type to replace' : 'Enter API key';
+        resetApiKeySaveButton();
+        return;
+      }
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = hasKey ? 'API key saved · type to replace' : 'Enter API key';
+      saveKeyBtn.disabled = true;
+      if (hasKey) {
+        saveKeyBtn.textContent = 'Saved';
+        saveKeyBtn.classList.add('saved');
+        apiKeySavedTimer = setTimeout(() => {
+          saveKeyBtn.textContent = 'Save';
+          saveKeyBtn.classList.remove('saved');
+          apiKeySavedTimer = undefined;
+        }, 2500);
+      } else {
+        saveKeyBtn.textContent = 'Save';
+        saveKeyBtn.classList.remove('saved');
+      }
+    }
+
+    function handleApiKeySaveFailed(saveId) {
+      if (saveId !== undefined && (!apiKeyPending || apiKeyPending.saveId !== saveId)) return;
+      apiKeyPending = undefined;
+      clearApiKeySavedTimer();
+      resetApiKeySaveButton();
     }
 
     apiKeyInput.addEventListener('input', () => {
+      clearApiKeySavedTimer();
       saveKeyBtn.classList.remove('saved');
       saveKeyBtn.textContent = 'Save';
-      saveKeyBtn.disabled = apiKeyInput.value.length === 0;
+      saveKeyBtn.disabled = apiKeyInput.value.trim().length === 0;
     });
     saveKeyBtn.addEventListener('click', () => {
-      if (!apiKeyInput.value) return;
-      vscode.postMessage({ type: 'setApiKey', value: apiKeyInput.value });
+      const trimmed = apiKeyInput.value.trim();
+      if (!trimmed) return;
+      const saveId = nextApiKeySaveId++;
+      apiKeyPending = { saveId, raw: apiKeyInput.value };
+      saveKeyBtn.textContent = 'Saving...';
+      saveKeyBtn.disabled = true;
+      vscode.postMessage({ type: 'setApiKey', value: trimmed, saveId });
     });
-    clearKeyBtn.addEventListener('click', () => vscode.postMessage({ type: 'resetApiKey' }));
 
     // Clear Data: scope selection + typed confirmation, fully in-panel.
     const clearCheckIds = ['clr-apiKeys', 'clr-settings', 'clr-globalStorage', 'clr-workspaceOutputs'];
@@ -729,7 +764,11 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
         return;
       }
       if (msg.type === 'apiKeyStatus') {
-        applyApiKeyStatus(Boolean(msg.hasKey));
+        applyApiKeyStatus(Boolean(msg.hasKey), msg.saveId);
+        return;
+      }
+      if (msg.type === 'apiKeySaveFailed') {
+        handleApiKeySaveFailed(msg.saveId);
         return;
       }
       if (msg.type === 'shortcutState') {
@@ -832,14 +871,22 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
       if (message?.type === 'setApiKey') {
         const value = typeof message.value === 'string' ? message.value.trim() : '';
-        if (!value) return;
-        await storeOpenRouterApiKey(context, value);
-        await panel.webview.postMessage({ type: 'apiKeyStatus', hasKey: await hasOpenRouterApiKey(context) });
-        return;
-      }
-      if (message?.type === 'resetApiKey') {
-        await deleteOpenRouterApiKey(context);
-        await panel.webview.postMessage({ type: 'apiKeyStatus', hasKey: await hasOpenRouterApiKey(context) });
+        const saveId = message.saveId;
+        if (!value) {
+          await panel.webview.postMessage({ type: 'apiKeySaveFailed', saveId });
+          return;
+        }
+        try {
+          await storeOpenRouterApiKey(context, value);
+          await panel.webview.postMessage({
+            type: 'apiKeyStatus',
+            hasKey: await hasOpenRouterApiKey(context),
+            saveId,
+          });
+        } catch (error) {
+          await panel.webview.postMessage({ type: 'apiKeySaveFailed', saveId });
+          throw error;
+        }
         return;
       }
       if (message?.type === 'clearData') {

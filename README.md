@@ -64,7 +64,7 @@ The custom settings page saves dropdown changes immediately. Free-text fields ha
 - The official OpenRouter endpoint is used by default. Custom endpoints must use HTTPS, except for localhost debugging.
 - API keys are stored in VS Code `SecretStorage`, not in workspace files, VS Code settings, translation metadata, or logs. VS Code owns the underlying OS credential storage, so the raw secret is not exposed as a normal file to browse in this repository.
 - The API key is stored once and sent to whatever Base URL is configured. Changing the Base URL changes where future requests send the saved key.
-- Delete the saved API key from `MarkLingo: Open Settings` with the API Key `Clear` button.
+- Delete the saved API key from `MarkLingo: Open Settings` using the `Danger Zone` section: keep `Saved API key` checked, type `CLEAR` to confirm, then click `Clear data`. Replacing a key does not require deletion — type a new key into the API Key field and click `Save`.
 - Use `Clear Data` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
 - Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`.
 - Writing translated Markdown to `privateStorage` keeps generated files out of the workspace, but Markdown Preview resolves relative links and images from the private storage directory. Use `sourceFolder` when relative links or local images must keep working.
