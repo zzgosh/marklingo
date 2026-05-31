@@ -147,8 +147,8 @@ async function runCleanup(context: vscode.ExtensionContext, ids: Set<CleanupOpti
 }
 
 /**
- * Clears the selected categories of extension data. The webview owns the scope selection and the
- * destructive confirmation, so this runs the deletion directly without any native picker or modal.
+ * Clears the selected categories of extension data after the caller has collected explicit scope
+ * confirmation.
  */
 export async function clearExtensionDataScopes(context: vscode.ExtensionContext, scopes: CleanupScopes): Promise<boolean> {
   const ids = new Set<CleanupOptionId>();
