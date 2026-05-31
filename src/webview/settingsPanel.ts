@@ -8,6 +8,13 @@ import {
 } from '../services/openRouterClient.js';
 import { clearExtensionDataScopes } from '../commands/clearExtensionData.js';
 import { getOutputLocation, getProjectsStorageRoot, type OutputLocation } from '../storage/paths.js';
+import {
+  getDefaultTranslateKeys,
+  getShortcutStateFromKeybindings,
+  TRANSLATE_COMMAND,
+  type ShortcutState,
+  type UserKeybinding,
+} from './shortcutState.js';
 
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 const TARGET_LANGUAGE_OPTIONS = [
@@ -22,8 +29,6 @@ const TARGET_LANGUAGE_OPTIONS = [
   CUSTOM_TARGET_LANGUAGE_LABEL,
 ];
 const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
-const TRANSLATE_COMMAND = 'marklingo.translateCurrentMarkdown';
-const DEFAULT_TRANSLATE_KEY = 'ctrl+alt+cmd+t';
 const API_KEY_MASK = '•'.repeat(16);
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
@@ -50,12 +55,6 @@ type SettingsState = {
   customPrompt: string;
   outputLocation: OutputLocation;
   storageRoot: string;
-};
-
-type UserKeybinding = {
-  key?: string;
-  command?: string;
-  when?: string;
 };
 
 let currentPanel: vscode.WebviewPanel | undefined;
@@ -121,43 +120,6 @@ function stripJsonComments(text: string): string {
   return output.replace(/,\s*([}\]])/g, '$1');
 }
 
-function normalizeKeybinding(key: string): string {
-  const modifierOrder = ['ctrl', 'shift', 'alt', 'cmd'];
-  return key
-    .toLowerCase()
-    .replace(/\boption\b/g, 'alt')
-    .replace(/\bcommand\b/g, 'cmd')
-    .replace(/\bmeta\b/g, 'cmd')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => {
-      const pieces = part.split('+').filter(Boolean);
-      const modifiers = pieces
-        .filter((piece) => modifierOrder.includes(piece))
-        .sort((a, b) => modifierOrder.indexOf(a) - modifierOrder.indexOf(b));
-      const keys = pieces.filter((piece) => !modifierOrder.includes(piece));
-      return [...modifiers, ...keys].join('+');
-    })
-    .join(' ');
-}
-
-function formatKeybinding(key: string): string {
-  return key
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((chord) => chord
-      .split('+')
-      .map((part) => {
-        if (part === 'alt') return 'Option';
-        if (part === 'cmd') return 'Command';
-        if (part === 'ctrl') return 'Control';
-        if (part === 'shift') return 'Shift';
-        return part.length === 1 ? part.toUpperCase() : part;
-      })
-      .join(' + '))
-    .join(' ');
-}
-
 function isUserKeybinding(item: unknown): item is UserKeybinding {
   if (!item || typeof item !== 'object') return false;
   const value = item as Record<string, unknown>;
@@ -166,24 +128,6 @@ function isUserKeybinding(item: unknown): item is UserKeybinding {
     (value.command === undefined || typeof value.command === 'string') &&
     (value.when === undefined || typeof value.when === 'string')
   );
-}
-
-function getKeybindingCommand(binding: UserKeybinding): string {
-  return typeof binding.command === 'string' ? binding.command : '';
-}
-
-function getKeybindingKey(binding: UserKeybinding): string {
-  return typeof binding.key === 'string' ? binding.key : '';
-}
-
-function describeConflicts(bindings: UserKeybinding[]): string {
-  return bindings
-    .map((binding) => {
-      const command = getKeybindingCommand(binding);
-      return binding.when ? `${command} (${binding.when})` : command;
-    })
-    .slice(0, 3)
-    .join(', ');
 }
 
 function getUserKeybindingsUri(context: vscode.ExtensionContext): vscode.Uri {
@@ -200,46 +144,13 @@ async function readUserKeybindings(context: vscode.ExtensionContext): Promise<Us
   }
 }
 
-async function getShortcutState(context: vscode.ExtensionContext): Promise<Pick<SettingsState, 'shortcutLabel' | 'shortcutStatus' | 'shortcutWarning'>> {
+async function getShortcutState(context: vscode.ExtensionContext): Promise<ShortcutState> {
   const keybindings = await readUserKeybindings(context);
-  const commandBindings = keybindings.filter(
-    (binding) => getKeybindingCommand(binding) === TRANSLATE_COMMAND && getKeybindingKey(binding),
-  );
-  const assignedBinding = commandBindings.at(-1);
-  const disabledDefault = keybindings.some(
-    (binding) => getKeybindingCommand(binding) === `-${TRANSLATE_COMMAND}` && normalizeKeybinding(getKeybindingKey(binding)) === DEFAULT_TRANSLATE_KEY,
-  );
-  const displayedKey = assignedBinding ? getKeybindingKey(assignedBinding) : DEFAULT_TRANSLATE_KEY;
-  const normalizedDisplayedKey = normalizeKeybinding(displayedKey);
-  const conflictingBindings = keybindings.filter((binding) => {
-    const key = getKeybindingKey(binding);
-    const command = getKeybindingCommand(binding);
-    if (!key || !command || command.startsWith('-') || command === TRANSLATE_COMMAND) return false;
-    return normalizeKeybinding(key) === normalizedDisplayedKey;
+  const defaultKeys = getDefaultTranslateKeys({
+    extensionHostPlatform: process.platform,
+    remoteName: vscode.env.remoteName,
   });
-
-  if (disabledDefault && !assignedBinding) {
-    return {
-      shortcutLabel: 'Not assigned',
-      shortcutStatus: 'Default shortcut has been removed in user keybindings.',
-      shortcutWarning: 'Open Keyboard Shortcuts to assign a new shortcut.',
-    };
-  }
-
-  if (conflictingBindings.length > 0) {
-    const commands = describeConflicts(conflictingBindings);
-    return {
-      shortcutLabel: formatKeybinding(displayedKey),
-      shortcutStatus: `Potential user keybinding conflict: ${commands}`,
-      shortcutWarning: 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.',
-    };
-  }
-
-  return {
-    shortcutLabel: formatKeybinding(displayedKey),
-    shortcutStatus: assignedBinding ? 'Assigned in user keybindings.' : 'Default shortcut for Markdown editors.',
-    shortcutWarning: '',
-  };
+  return getShortcutStateFromKeybindings(keybindings, defaultKeys);
 }
 
 async function readSettingsState(context: vscode.ExtensionContext): Promise<SettingsState> {

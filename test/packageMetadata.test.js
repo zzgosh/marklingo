@@ -12,6 +12,10 @@ test('translation keybinding is available for markdown file extensions', () => {
   const binding = pkg.contributes.keybindings.find((item) => item.command === 'marklingo.translateCurrentMarkdown');
 
   assert.ok(binding, 'expected translate command keybinding');
+  assert.equal(binding.key, 'ctrl+alt+t');
+  assert.equal(binding.mac, 'alt+cmd+t');
+  assert.equal(binding.win, 'ctrl+alt+t');
+  assert.equal(binding.linux, 'ctrl+alt+t');
   assert.match(binding.when, /editorLangId == markdown/);
   assert.match(binding.when, /resourceExtname == \.md/);
   assert.match(binding.when, /resourceExtname == \.markdown/);
