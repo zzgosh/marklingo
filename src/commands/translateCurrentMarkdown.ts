@@ -330,7 +330,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     const { markdown: translatedMarkdown, meta: nextMeta } = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'MarkLingo: Translating...',
+        title: 'MarkLingo: Translating Markdown',
         cancellable: false,
       },
       async (progress) => {
@@ -372,7 +372,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
           placeholdersById.set(seg.id, protectedResult);
         }
 
-        progress.report({ message: 'Checking model context window...' });
+        progress.report({ message: 'Preparing translation' });
         const modelContextLength = await getOpenRouterModelContextLength(settings);
         const buildPrompt = (blocks: TranslationRequestBlock[]) => buildBlocksTranslatePrompt({ blocks }, { systemPrompt, customPrompt, targetLanguage });
         const plan = planTranslationRequests(protectedBlocks, {
@@ -407,12 +407,12 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         );
 
         if (plan.chunks.length === 0) {
-          progress.report({ message: 'Using cached translations...' });
+          progress.report({ message: 'Using cached translations' });
         }
 
         for (const [chunkIndex, plannedChunk] of plan.chunks.entries()) {
           progress.report({
-            message: `Request ${chunkIndex + 1}/${plan.chunks.length} (${plannedChunk.blocks.length} blocks, ~${plannedChunk.estimatedPromptTokens} estimated prompt tokens)...`,
+            message: `Processing batch ${chunkIndex + 1} of ${plan.chunks.length} · ${plannedChunk.blocks.length} blocks`,
           });
           const prompt = buildPrompt(plannedChunk.blocks);
           const requestStartedAt = Date.now();
@@ -483,7 +483,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
           );
         }
         debug.warnings = warnings;
-        progress.report({ message: 'Writing translated Markdown...' });
+        progress.report({ message: 'Writing translated file' });
 
         const parts: string[] = [];
         let cursor = 0;

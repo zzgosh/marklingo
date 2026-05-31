@@ -172,6 +172,7 @@
     "check:integration": "npm run check && npm run test:vscode",
     "check": "npm run compile && npm test",
     "benchmark:postprocessing": "npm run compile && node scripts/benchmark-postprocessing.mjs",
+    "preview:settings": "node scripts/preview-settings.mjs",
     "package": "npm run compile && npm run bundle",
     "package:dry": "npm run package && vsce ls --tree",
     "vsix": "npm run check && vsce package",

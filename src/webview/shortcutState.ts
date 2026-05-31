@@ -20,6 +20,14 @@ export function getDefaultTranslateKeys(options: { extensionHostPlatform: NodeJS
   return options.extensionHostPlatform === 'darwin' ? [MAC_TRANSLATE_KEY] : [NON_MAC_TRANSLATE_KEY];
 }
 
+export function getDefaultTranslateKeybindingSearchQuery(options: {
+  extensionHostPlatform: NodeJS.Platform;
+  remoteName?: string;
+}): string {
+  const [defaultKey] = getDefaultTranslateKeys(options);
+  return defaultKey ? `@keybinding:${defaultKey}` : `@command:${TRANSLATE_COMMAND}`;
+}
+
 export function normalizeKeybinding(key: string): string {
   const modifierOrder = ['ctrl', 'shift', 'alt', 'cmd'];
   return key
