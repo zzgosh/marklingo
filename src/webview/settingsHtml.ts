@@ -245,9 +245,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       grid-template-columns: 1fr auto;
       gap: 10px;
       align-items: center;
+      min-width: 0;
+    }
+    .control-full {
+      min-width: 0;
     }
     .select-wrap {
+      display: block;
       position: relative;
+      width: 100%;
       min-width: 0;
     }
     .select-wrap select {
@@ -309,14 +315,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       background: color-mix(in srgb, var(--fg) 12%, transparent);
       color: var(--muted);
     }
-    .saved-hint {
-      color: var(--muted);
-      font-size: 12px;
-      opacity: 0;
-      transition: opacity 120ms ease;
-      white-space: nowrap;
-    }
-    .saved-hint.visible { opacity: 1; }
     .status-text { color: var(--muted); }
     .shortcut-row {
       align-items: center;
@@ -356,6 +354,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       font-family: var(--vscode-editor-font-family);
       font-size: 12px;
       color: var(--muted);
+    }
+    .masked-secret {
+      color: var(--muted);
+      font-family: var(--vscode-editor-font-family);
+      letter-spacing: 1.6px;
+      text-overflow: clip;
     }
     .check {
       display: flex;
@@ -459,9 +463,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             <div>
               <div class="label">Target Language</div>
             </div>
-            <div class="inline">
+            <div class="control-full">
               <span class="select-wrap"><select id="targetLanguage">${renderOptions(state.targetLanguage)}</select></span>
-              <span class="saved-hint" id="targetLanguage-hint"></span>
             </div>
           </div>
           <div class="row" id="customLanguageRow"${customLanguageHidden}>
@@ -495,7 +498,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <div class="label">Custom Instructions</div>
             </div>
             <div class="stack">
-              <textarea id="customPrompt" placeholder="e.g. Keep product names in English. Use a formal tone.">${escapeHtml(state.customPrompt)}</textarea>
+              <textarea id="customPrompt">${escapeHtml(state.customPrompt)}</textarea>
               <div class="field-actions">
                 <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>Save</button>
               </div>
@@ -509,14 +512,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             <div>
               <div class="label">Translated File Location</div>
             </div>
-            <div class="inline">
+            <div class="control-full">
               <span class="select-wrap">
                 <select id="outputLocation">
                   <option value="sourceFolder"${outputSourceSelected}>Source folder (*_mdt.md)</option>
                   <option value="privateStorage"${outputPrivateSelected}>Private extension storage</option>
                 </select>
               </span>
-              <span class="saved-hint" id="outputLocation-hint"></span>
             </div>
           </div>
           <div class="row">
@@ -564,8 +566,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     const textByKey = new Map();
-    const instantByKey = new Map();
-    const hintTimers = new Map();
     let nextSaveId = 1;
 
     document.querySelectorAll('.save-btn').forEach((button) => {
@@ -592,22 +592,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       });
     });
 
-    function flashHint(hintId) {
-      const hint = document.getElementById(hintId);
-      if (!hint) return;
-      hint.textContent = 'Saved';
-      hint.classList.add('visible');
-      if (hintTimers.has(hintId)) clearTimeout(hintTimers.get(hintId));
-      hintTimers.set(hintId, setTimeout(() => {
-        hint.classList.remove('visible');
-        hintTimers.delete(hintId);
-      }, 1800));
-    }
-
     function registerInstant(id, key) {
       const control = document.getElementById(id);
       if (!control) return;
-      instantByKey.set(key, id + '-hint');
       control.addEventListener('change', () => {
         vscode.postMessage({ type: 'updateSetting', key: key, value: control.value });
         if (id === 'targetLanguage') syncCustomLanguageVisibility(true);
@@ -655,8 +642,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         }
         return;
       }
-      const hintId = instantByKey.get(key);
-      if (hintId) flashHint(hintId);
     }
 
     function handleSaveFailed(key, saveId) {
@@ -683,13 +668,41 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       }
     }
 
+    function isApiKeyMasked() {
+      return apiKeyInput.dataset.masked === 'true';
+    }
+
+    function showApiKeyMask(length) {
+      const maskLength = Number.isFinite(length) ? Math.max(0, Math.floor(length)) : 0;
+      apiKeyInput.type = 'text';
+      apiKeyInput.value = '*'.repeat(maskLength);
+      apiKeyInput.placeholder = '';
+      apiKeyInput.dataset.masked = 'true';
+      apiKeyInput.classList.add('masked-secret');
+      apiKeyInput.scrollLeft = 0;
+      saveKeyBtn.disabled = true;
+    }
+
+    function clearApiKeyMaskForEntry() {
+      if (!isApiKeyMasked()) return;
+      clearApiKeySavedTimer();
+      apiKeyInput.dataset.masked = 'false';
+      apiKeyInput.classList.remove('masked-secret');
+      apiKeyInput.type = 'password';
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = 'Enter API key';
+      saveKeyBtn.textContent = 'Save';
+      saveKeyBtn.classList.remove('saved');
+      saveKeyBtn.disabled = true;
+    }
+
     function resetApiKeySaveButton() {
       saveKeyBtn.textContent = 'Save';
       saveKeyBtn.classList.remove('saved');
-      saveKeyBtn.disabled = apiKeyInput.value.trim().length === 0;
+      saveKeyBtn.disabled = isApiKeyMasked() || apiKeyInput.value.trim().length === 0;
     }
 
-    function applyApiKeyStatus(hasKey, saveId) {
+    function applyApiKeyStatus(hasKey, saveId, keyLength) {
       // Stale-ack guard: ignore replies for a save the user has since superseded.
       if (saveId !== undefined && (!apiKeyPending || apiKeyPending.saveId !== saveId)) return;
       const pending = apiKeyPending;
@@ -702,10 +715,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         resetApiKeySaveButton();
         return;
       }
-      apiKeyInput.value = '';
-      apiKeyInput.placeholder = hasKey ? 'API key saved · type to replace' : 'Enter API key';
       saveKeyBtn.disabled = true;
       if (hasKey) {
+        const savedLength = Number.isFinite(keyLength) ? keyLength : (pending ? pending.raw.trim().length : 0);
+        showApiKeyMask(savedLength);
         saveKeyBtn.textContent = 'Saved';
         saveKeyBtn.classList.add('saved');
         apiKeySavedTimer = setTimeout(() => {
@@ -714,6 +727,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           apiKeySavedTimer = undefined;
         }, 2500);
       } else {
+        clearApiKeyMaskForEntry();
+        apiKeyInput.placeholder = 'Enter API key';
         saveKeyBtn.textContent = 'Save';
         saveKeyBtn.classList.remove('saved');
       }
@@ -726,13 +741,23 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       resetApiKeySaveButton();
     }
 
+    apiKeyInput.addEventListener('beforeinput', clearApiKeyMaskForEntry);
+    apiKeyInput.addEventListener('paste', clearApiKeyMaskForEntry);
+    apiKeyInput.addEventListener('keydown', (event) => {
+      if (!isApiKeyMasked()) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+        clearApiKeyMaskForEntry();
+      }
+    });
     apiKeyInput.addEventListener('input', () => {
       clearApiKeySavedTimer();
       saveKeyBtn.classList.remove('saved');
       saveKeyBtn.textContent = 'Save';
-      saveKeyBtn.disabled = apiKeyInput.value.trim().length === 0;
+      saveKeyBtn.disabled = isApiKeyMasked() || apiKeyInput.value.trim().length === 0;
     });
     saveKeyBtn.addEventListener('click', () => {
+      if (isApiKeyMasked()) return;
       const trimmed = apiKeyInput.value.trim();
       if (!trimmed) return;
       const saveId = nextApiKeySaveId++;
@@ -778,7 +803,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         return;
       }
       if (msg.type === 'apiKeyStatus') {
-        applyApiKeyStatus(Boolean(msg.hasKey), msg.saveId);
+        applyApiKeyStatus(Boolean(msg.hasKey), msg.saveId, msg.keyLength);
         return;
       }
       if (msg.type === 'apiKeySaveFailed') {
