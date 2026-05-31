@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
+const os = require('node:os');
 const path = require('node:path');
 const vscode = require('vscode');
 
@@ -153,7 +154,7 @@ function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-function findMetaForSource(globalStorageUri, sourceUri) {
+function findMetasForSource(globalStorageUri, sourceUri) {
   const root = vscode.Uri.parse(globalStorageUri).fsPath;
   const matches = [];
   const visit = (dir) => {
@@ -171,6 +172,11 @@ function findMetaForSource(globalStorageUri, sourceUri) {
     }
   };
   visit(root);
+  return matches;
+}
+
+function findMetaForSource(globalStorageUri, sourceUri) {
+  const matches = findMetasForSource(globalStorageUri, sourceUri);
   assert.equal(matches.length, 1, `expected one meta file for ${sourceUri.toString()}`);
   return matches[0];
 }
@@ -260,6 +266,45 @@ async function testRetriesFallbackBlocks(context) {
   assert.match(secondOutput, /MOCK:See \[docs\]\(https:\/\/example\.com\)\./);
 }
 
+async function testDeletesCurrentProjectTranslations(context) {
+  await cleanWorkspace();
+  await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
+    projectUri: vscode.Uri.file(workspaceRoot()).toString(),
+  });
+  const source = await writeMarkdown('cleanup.md', '# Cleanup\n\nWorkspace paragraph.\n');
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+  const output = translatedPath(source);
+  assert.ok(fs.existsSync(output), 'expected current project output before cleanup');
+  fs.appendFileSync(output, '\nManual edit before cleanup.\n', 'utf8');
+
+  const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'marklingo-other-project-'));
+  try {
+    const external = vscode.Uri.file(path.join(externalRoot, 'outside.md'));
+    await vscode.workspace.fs.writeFile(external, Buffer.from('# Outside\n\nOther project paragraph.\n', 'utf8'));
+    await translate(external);
+    const externalOutput = translatedPath(external);
+    assert.ok(fs.existsSync(externalOutput), 'expected other project output before cleanup');
+    fs.appendFileSync(externalOutput, '\nOther project manual edit.\n', 'utf8');
+
+    const summary = await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
+      projectUri: source.toString(),
+    });
+
+    assert.equal(summary.deleted, 1);
+    assert.equal(summary.skipped, 0);
+    assert.equal(summary.missing, 0);
+    assert.equal(summary.errors.length, 0);
+    assert.equal(fs.existsSync(output), false, 'expected edited current project output to be deleted');
+    assert.equal(fs.existsSync(externalOutput), true, 'expected other project output to remain');
+    assert.equal(findMetasForSource(context.seeded.globalStorageUri, source).length, 0);
+    assert.equal(findMetasForSource(context.seeded.globalStorageUri, external).length, 1);
+  } finally {
+    fs.rmSync(externalRoot, { recursive: true, force: true });
+  }
+}
+
 async function runTest(name, fn, context) {
   try {
     context.server.state.chatRequests = [];
@@ -281,6 +326,7 @@ async function run() {
     await runTest('reuses cached translations on incremental runs', testReusesCachedTranslations, context);
     await runTest('translates .md files even when VS Code uses a different language mode', testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode, context);
     await runTest('retries fallback blocks instead of caching source fallback', testRetriesFallbackBlocks, context);
+    await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
   } finally {
     await server.close();
   }
