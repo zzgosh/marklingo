@@ -71,11 +71,15 @@ function getShortcutWarningText(warning: string): string {
   return warning;
 }
 
+const API_KEY_MASK_VALUE = '•'.repeat(32);
+
 export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const { beforeMainScript = '', cspSource, extraHead = '', nonce, state } = options;
   const outputPrivateSelected = state.outputLocation === 'privateStorage' ? ' selected' : '';
   const outputSourceSelected = state.outputLocation === 'sourceFolder' ? ' selected' : '';
-  const apiKeyPlaceholder = state.hasApiKey ? 'API key saved · type to replace' : 'Enter API key';
+  const apiKeyInitialAttrs = state.hasApiKey
+    ? ` value="${escapeHtml(API_KEY_MASK_VALUE)}" data-masked="true"`
+    : '';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
 
@@ -355,12 +359,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       font-size: 12px;
       color: var(--muted);
     }
-    .masked-secret {
-      color: var(--muted);
-      font-family: var(--vscode-editor-font-family);
-      letter-spacing: 1.6px;
-      text-overflow: clip;
-    }
     .check {
       display: flex;
       align-items: center;
@@ -442,7 +440,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <div class="label">API Key</div>
             </div>
             <div class="inline">
-              <input id="apiKey" type="password" autocomplete="off" placeholder="${escapeHtml(apiKeyPlaceholder)}">
+              <input id="apiKey" type="password" autocomplete="off"${apiKeyInitialAttrs}>
               <button class="save-btn" type="button" id="save-key" disabled>Save</button>
             </div>
           </div>
@@ -655,6 +653,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     // API key: inline password entry. The value is posted once and never stored in webview state.
+    // When a key is on file the input shows fixed-length dots (type="password" masks each char).
+    const API_KEY_MASK_VALUE = ${JSON.stringify(API_KEY_MASK_VALUE)};
     const apiKeyInput = document.getElementById('apiKey');
     const saveKeyBtn = document.getElementById('save-key');
     let apiKeySavedTimer;
@@ -672,13 +672,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       return apiKeyInput.dataset.masked === 'true';
     }
 
-    function showApiKeyMask(length) {
-      const maskLength = Number.isFinite(length) ? Math.max(0, Math.floor(length)) : 0;
-      apiKeyInput.type = 'text';
-      apiKeyInput.value = '*'.repeat(maskLength);
-      apiKeyInput.placeholder = '';
+    function showApiKeyMask() {
+      apiKeyInput.value = API_KEY_MASK_VALUE;
       apiKeyInput.dataset.masked = 'true';
-      apiKeyInput.classList.add('masked-secret');
       apiKeyInput.scrollLeft = 0;
       saveKeyBtn.disabled = true;
     }
@@ -687,10 +683,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       if (!isApiKeyMasked()) return;
       clearApiKeySavedTimer();
       apiKeyInput.dataset.masked = 'false';
-      apiKeyInput.classList.remove('masked-secret');
-      apiKeyInput.type = 'password';
       apiKeyInput.value = '';
-      apiKeyInput.placeholder = 'Enter API key';
       saveKeyBtn.textContent = 'Save';
       saveKeyBtn.classList.remove('saved');
       saveKeyBtn.disabled = true;
@@ -702,7 +695,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       saveKeyBtn.disabled = isApiKeyMasked() || apiKeyInput.value.trim().length === 0;
     }
 
-    function applyApiKeyStatus(hasKey, saveId, keyLength) {
+    function applyApiKeyStatus(hasKey, saveId) {
       // Stale-ack guard: ignore replies for a save the user has since superseded.
       if (saveId !== undefined && (!apiKeyPending || apiKeyPending.saveId !== saveId)) return;
       const pending = apiKeyPending;
@@ -711,14 +704,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       // If the user kept typing after clicking Save, do not wipe their in-progress entry.
       const userKeptTyping = pending && apiKeyInput.value !== '' && apiKeyInput.value !== pending.raw;
       if (userKeptTyping) {
-        apiKeyInput.placeholder = hasKey ? 'API key saved · type to replace' : 'Enter API key';
         resetApiKeySaveButton();
         return;
       }
       saveKeyBtn.disabled = true;
       if (hasKey) {
-        const savedLength = Number.isFinite(keyLength) ? keyLength : (pending ? pending.raw.trim().length : 0);
-        showApiKeyMask(savedLength);
+        showApiKeyMask();
         saveKeyBtn.textContent = 'Saved';
         saveKeyBtn.classList.add('saved');
         apiKeySavedTimer = setTimeout(() => {
@@ -728,7 +719,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         }, 2500);
       } else {
         clearApiKeyMaskForEntry();
-        apiKeyInput.placeholder = 'Enter API key';
         saveKeyBtn.textContent = 'Save';
         saveKeyBtn.classList.remove('saved');
       }
@@ -803,7 +793,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         return;
       }
       if (msg.type === 'apiKeyStatus') {
-        applyApiKeyStatus(Boolean(msg.hasKey), msg.saveId, msg.keyLength);
+        applyApiKeyStatus(Boolean(msg.hasKey), msg.saveId);
         return;
       }
       if (msg.type === 'apiKeySaveFailed') {
