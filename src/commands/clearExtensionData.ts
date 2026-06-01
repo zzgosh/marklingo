@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import {
   deleteTrackedWorkspaceOutputs,
   type WorkspaceOutputDeleteSummary,
-} from './deleteAllTranslatedFiles.js';
+} from './deleteTranslatedFiles.js';
 import { MARKLINGO_CONFIGURATION_KEYS } from '../configurationKeys.js';
 import { resetOpenRouterSecretsAndState } from '../services/openRouterClient.js';
 
