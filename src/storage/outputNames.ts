@@ -35,10 +35,6 @@ export function getTranslatedMarkdownFileName(sourceName: string, targetLanguage
   return `${sourceName}_${getTargetLanguageSuffix(targetLanguage)}_mdt.md`;
 }
 
-export function getPrivateTranslatedMarkdownFileName(sourceName: string, sourceId: string, targetLanguage: string): string {
-  return `${sourceName}_${getTargetLanguageSuffix(targetLanguage)}_${sourceId}_mdt.md`;
-}
-
 export function getTranslationMetaFileName(sourceName: string, sourceId: string, targetLanguage: string): string {
   return `${sourceName}_${getTargetLanguageSuffix(targetLanguage)}_${sourceId}_mdt.meta.json`;
 }

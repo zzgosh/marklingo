@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { hasOpenRouterModelAccepted, markOpenRouterModelAccepted } from '../onboardingState.js';
 
 export type OpenRouterSettings = {
   baseUrl: string;
@@ -93,30 +94,37 @@ async function resolveApiKey(context: vscode.ExtensionContext): Promise<string> 
     ignoreFocusOut: true,
   });
   if (!input?.trim()) {
-    throw new Error('Missing OpenRouter API key. Save it from MarkLingo settings or the API key command.');
+    throw new Error('Missing OpenRouter API key. Save it from MarkLingo settings or run translation again.');
   }
   const apiKey = input.trim();
   await context.secrets.store(OPENROUTER_API_KEY_SECRET, apiKey);
   return apiKey;
 }
 
+function hasExplicitModelConfiguration(cfg: vscode.WorkspaceConfiguration): boolean {
+  const inspected = cfg.inspect<string>('openrouter.modelId');
+  return [inspected?.globalValue, inspected?.workspaceValue, inspected?.workspaceFolderValue]
+    .some((value) => typeof value === 'string' && value.trim().length > 0);
+}
+
 async function resolveModelId(context: vscode.ExtensionContext): Promise<string> {
   const cfg = getConfiguration();
-  const modelId = (cfg.get<string>('openrouter.modelId') ?? '').trim();
-  if (modelId) {
+  const modelId = (cfg.get<string>('openrouter.modelId') ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID;
+  if (hasExplicitModelConfiguration(cfg) || hasOpenRouterModelAccepted(context)) {
     await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, modelId);
+    await markOpenRouterModelAccepted(context);
     return modelId;
   }
 
   const lastUsed = (context.globalState.get<string>(OPENROUTER_MODEL_ID_LAST_USED) ?? '').trim();
-  if (lastUsed) return lastUsed;
+  const defaultModelId = lastUsed || modelId || DEFAULT_OPENROUTER_MODEL_ID;
 
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: OpenRouter Model ID',
-    prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}. It will be remembered for later translations.`,
+    prompt: `Enter the OpenRouter model ID. Press Enter to use ${defaultModelId}.`,
     password: false,
-    value: DEFAULT_OPENROUTER_MODEL_ID,
-    placeHolder: `Default: ${DEFAULT_OPENROUTER_MODEL_ID}`,
+    value: defaultModelId,
+    placeHolder: `Default: ${defaultModelId}`,
     ignoreFocusOut: true,
   });
 
@@ -125,19 +133,18 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
     throw new Error('Missing OpenRouter modelId. Configure marklingo.openrouter.modelId in settings or enter it in the prompt.');
   }
 
-  const finalModelId = input.trim();
-  if (!finalModelId) {
-    throw new Error('Missing OpenRouter modelId. Configure marklingo.openrouter.modelId in settings or enter it in the prompt.');
-  }
+  const finalModelId = input.trim() || defaultModelId;
 
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, finalModelId);
+  await cfg.update('openrouter.modelId', finalModelId, vscode.ConfigurationTarget.Global);
+  await markOpenRouterModelAccepted(context);
   return finalModelId;
 }
 
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
   const { baseUrl } = resolveBaseUrl();
-  const modelId = await resolveModelId(context);
   const apiKey = await resolveApiKey(context);
+  const modelId = await resolveModelId(context);
 
   return { baseUrl, modelId, apiKey };
 }

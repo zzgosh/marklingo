@@ -5,8 +5,7 @@ import {
 } from './deleteTranslatedFiles.js';
 import { MARKLINGO_CONFIGURATION_KEYS } from '../configurationKeys.js';
 import { resetOpenRouterSecretsAndState } from '../services/openRouterClient.js';
-
-const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
+import { clearOnboardingState } from '../onboardingState.js';
 
 export type CleanupScopes = {
   apiKeys?: boolean;
@@ -44,7 +43,7 @@ async function clearUserSettings(context: vscode.ExtensionContext): Promise<numb
     await cfg.update(key, undefined, vscode.ConfigurationTarget.Global);
   }
 
-  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, undefined);
+  await clearOnboardingState(context);
   return cleared;
 }
 

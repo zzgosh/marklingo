@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
+import { markTargetLanguageSelected } from '../onboardingState.js';
 
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
-const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
 
 const TARGET_LANGUAGE_OPTIONS = [
   '简体中文',
@@ -49,12 +49,12 @@ export async function setTargetLanguage(context: vscode.ExtensionContext) {
     }
     await cfg.update('translation.targetLanguage', CUSTOM_TARGET_LANGUAGE_LABEL, vscode.ConfigurationTarget.Global);
     await cfg.update('translation.targetLanguageCustom', customValue, vscode.ConfigurationTarget.Global);
-    await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+    await markTargetLanguageSelected(context);
     await vscode.window.showInformationMessage(`MarkLingo: Target language set to "${customValue}".`);
     return;
   }
 
   await cfg.update('translation.targetLanguage', picked, vscode.ConfigurationTarget.Global);
-  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+  await markTargetLanguageSelected(context);
   await vscode.window.showInformationMessage(`MarkLingo: Target language set to "${picked}".`);
 }

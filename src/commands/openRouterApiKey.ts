@@ -3,6 +3,7 @@ import {
   hasOpenRouterApiKey,
   storeOpenRouterApiKey,
 } from '../services/openRouterClient.js';
+import { acceptVisibleOnboardingDefaults } from '../onboardingState.js';
 
 export async function setOpenRouterApiKey(context: vscode.ExtensionContext) {
   const hasExisting = await hasOpenRouterApiKey(context);
@@ -23,5 +24,6 @@ export async function setOpenRouterApiKey(context: vscode.ExtensionContext) {
   }
 
   await storeOpenRouterApiKey(context, input.trim());
+  await acceptVisibleOnboardingDefaults(context);
   await vscode.window.showInformationMessage('MarkLingo: Saved API key in SecretStorage.');
 }

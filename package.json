@@ -56,23 +56,15 @@
       },
       {
         "command": "marklingo.translateCurrentMarkdownFull",
-        "title": "MarkLingo: Translate Current Markdown (Full)"
-      },
-      {
-        "command": "marklingo.openrouter.setApiKey",
-        "title": "MarkLingo: Set OpenRouter API Key"
-      },
-      {
-        "command": "marklingo.openrouter.setModelId",
-        "title": "MarkLingo: Set OpenRouter Model ID"
+        "title": "MarkLingo: Retranslate Current Markdown"
       },
       {
         "command": "marklingo.deleteCurrentProjectTranslatedFiles",
         "title": "MarkLingo: Delete Current Project Translated Files"
       },
       {
-        "command": "marklingo.setTargetLanguage",
-        "title": "MarkLingo: Set Target Language"
+        "command": "marklingo.ignoreTranslatedFilesInGit",
+        "title": "MarkLingo: Add Translated Files to .git/info/exclude"
       },
       {
         "command": "marklingo.openSettings",
@@ -146,19 +138,6 @@
           "type": "string",
           "default": "",
           "description": "Custom instructions appended after the built-in translation prompt, such as terminology or style rules. The base Markdown and placeholder protection always applies."
-        },
-        "marklingo.storage.outputLocation": {
-          "type": "string",
-          "default": "sourceFolder",
-          "enum": [
-            "sourceFolder",
-            "privateStorage"
-          ],
-          "enumDescriptions": [
-            "Write the visible translated Markdown file next to the source Markdown file.",
-            "Write translated Markdown files under the extension private storage directory."
-          ],
-          "description": "Where translated Markdown output files are written. Private storage keeps generated files out of the workspace, but relative Markdown links are resolved from that private directory."
         }
       }
     }
