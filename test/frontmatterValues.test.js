@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findYamlFrontmatterValueRanges } from '../out/translation/frontmatterValues.js';
+import { findYamlFrontmatterValueRanges, formatYamlScalarReplacement } from '../out/translation/frontmatterValues.js';
 
 function valuesFor(frontmatter) {
   return findYamlFrontmatterValueRanges(frontmatter).map((range) => frontmatter.slice(range.start, range.end));
@@ -29,6 +29,7 @@ test('preserves unlisted fields, field names, quotes, comments, and non-language
     'seoTitle: Screen recording workflow',
     'seo-description: Capture repeatable UI evidence',
     'draft: false',
+    'featured: yes',
     'count: 3',
     'published: 2026-06-02',
     'tags: [macos, recording]',
@@ -40,4 +41,27 @@ test('preserves unlisted fields, field names, quotes, comments, and non-language
     'Screen recording workflow',
     'Capture repeatable UI evidence',
   ]);
+});
+
+test('ignores nested mappings and block scalar bodies', () => {
+  const source = [
+    '---',
+    'name: |',
+    '  title: codex-screen-recording',
+    '  description: internal description',
+    'build:',
+    '  title: internal-build-name',
+    'description: Public description',
+    '---',
+  ].join('\n');
+
+  assert.deepEqual(valuesFor(source), ['Public description']);
+});
+
+test('formats translated YAML scalar replacements safely', () => {
+  assert.equal(formatYamlScalarReplacement('Bonjour: monde', 'plain'), '"Bonjour: monde"');
+  assert.equal(formatYamlScalarReplacement('Bonjour # monde', 'plain'), '"Bonjour # monde"');
+  assert.equal(formatYamlScalarReplacement('Line one\nLine two', 'plain'), 'Line one Line two');
+  assert.equal(formatYamlScalarReplacement('He said "hello"', 'double'), 'He said \\"hello\\"');
+  assert.equal(formatYamlScalarReplacement("l'équipe", 'single'), "l''équipe");
 });
