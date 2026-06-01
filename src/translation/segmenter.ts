@@ -3,7 +3,7 @@ import { unified } from 'unified';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
-import { findYamlFrontmatterValueRanges } from './frontmatterValues.js';
+import { findYamlFrontmatterValueRanges, type YamlScalarQuote } from './frontmatterValues.js';
 
 export const SEGMENTER_VERSION = '2';
 
@@ -14,6 +14,7 @@ export type Segment = {
   endOffset: number;
   text: string;
   translatable: boolean;
+  yamlQuote?: YamlScalarQuote;
 };
 
 function pointToOffset(doc: vscode.TextDocument, point: any): number {
@@ -62,6 +63,7 @@ export function segmentMarkdownDocument(doc: vscode.TextDocument): Segment[] {
         endOffset: range.start + valueRange.end,
         text: yamlText.slice(valueRange.start, valueRange.end),
         translatable: true,
+        yamlQuote: valueRange.quote,
       });
     }
   };

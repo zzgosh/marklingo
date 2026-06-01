@@ -3,6 +3,12 @@ export type TextRange = {
   end: number;
 };
 
+export type YamlScalarQuote = 'plain' | 'single' | 'double';
+
+export type YamlValueRange = TextRange & {
+  quote: YamlScalarQuote;
+};
+
 type Line = {
   start: number;
   end: number;
@@ -104,13 +110,14 @@ function findQuotedInnerRange(line: string, start: number, end: number): TextRan
   return null;
 }
 
-function shouldSkipScalarValue(value: string): boolean {
+function shouldSkipScalarValue(value: string, quote: YamlScalarQuote): boolean {
   const trimmed = value.trim();
   return (
     trimmed === '' ||
-    /^(?:[|>][+-]?|true|false|null|~)$/i.test(trimmed) ||
-    /^[+-]?(?:\d+|\d*\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}(?:$|[T\s])/.test(trimmed) ||
+    /^(?:[|>][+-]?|null|~)$/i.test(trimmed) ||
+    (quote === 'plain' && /^(?:true|false|yes|no|on|off)$/i.test(trimmed)) ||
+    (quote === 'plain' && /^[+-]?(?:\d+|\d*\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) ||
+    (quote === 'plain' && /^\d{4}-\d{2}-\d{2}(?:$|[T\s])/.test(trimmed)) ||
     /^[\[{]/.test(trimmed) ||
     /^[&*!]/.test(trimmed)
   );
@@ -129,7 +136,49 @@ function isTranslatableFrontmatterKey(key: string): boolean {
   return TRANSLATABLE_FRONTMATTER_KEYS.has(normalizeKeyName(key));
 }
 
-export function findYamlFrontmatterValueRanges(frontmatter: string): TextRange[] {
+function isTopLevelLine(line: string): boolean {
+  return !/^[ \t]/.test(line);
+}
+
+function normalizeTranslatedScalar(value: string): string {
+  return value
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function escapeDoubleQuotedScalar(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\t/g, '\\t');
+}
+
+function escapeSingleQuotedScalar(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function needsDoubleQuotedPlainScalar(value: string): boolean {
+  return (
+    value === '' ||
+    /^(?:true|false|yes|no|on|off|null|~)$/i.test(value) ||
+    /^[+-]?(?:\d+|\d*\.\d+)(?:[eE][+-]?\d+)?$/.test(value) ||
+    /^\d{4}-\d{2}-\d{2}(?:$|[T\s])/.test(value) ||
+    /^[\s\t\r\n]|[\s\t\r\n]$/.test(value) ||
+    /(?::\s|\s#)/.test(value) ||
+    /^[\-?:,[\]{}#&*!|>'"%@`]/.test(value)
+  );
+}
+
+export function formatYamlScalarReplacement(value: string, quote: YamlScalarQuote): string {
+  const normalized = normalizeTranslatedScalar(value);
+  if (quote === 'double') return escapeDoubleQuotedScalar(normalized);
+  if (quote === 'single') return escapeSingleQuotedScalar(normalized);
+  if (needsDoubleQuotedPlainScalar(normalized)) return `"${escapeDoubleQuotedScalar(normalized)}"`;
+  return normalized;
+}
+
+export function findYamlFrontmatterValueRanges(frontmatter: string): YamlValueRange[] {
   const lines = splitLines(frontmatter);
   if (lines.length === 0) return [];
 
@@ -146,11 +195,12 @@ export function findYamlFrontmatterValueRanges(frontmatter: string): TextRange[]
     }
   }
 
-  const ranges: TextRange[] = [];
+  const ranges: YamlValueRange[] = [];
   for (let lineIndex = bodyStart; lineIndex < bodyEnd; lineIndex++) {
     const line = lines[lineIndex];
     const trimmedLine = line.text.trim();
     if (!trimmedLine || trimmedLine.startsWith('#')) continue;
+    if (!isTopLevelLine(line.text)) continue;
 
     const colon = findMappingColon(line.text);
     if (colon === -1) continue;
@@ -165,13 +215,20 @@ export function findYamlFrontmatterValueRanges(frontmatter: string): TextRange[]
     if (rawValueRange.start >= rawValueRange.end) continue;
 
     const quotedRange = findQuotedInnerRange(line.text, rawValueRange.start, rawValueRange.end);
+    const quote =
+      quotedRange && line.text[rawValueRange.start] === '"'
+        ? 'double'
+        : quotedRange && line.text[rawValueRange.start] === "'"
+          ? 'single'
+          : 'plain';
     const valueRange = quotedRange ?? rawValueRange;
     const value = line.text.slice(valueRange.start, valueRange.end);
-    if (shouldSkipScalarValue(value)) continue;
+    if (shouldSkipScalarValue(value, quote)) continue;
 
     ranges.push({
       start: line.start + valueRange.start,
       end: line.start + valueRange.end,
+      quote,
     });
   }
 

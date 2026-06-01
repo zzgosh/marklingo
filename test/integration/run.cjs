@@ -37,6 +37,7 @@ async function createMockOpenRouterServer() {
   const state = {
     chatRequests: [],
     corruptPlaceholderOutput: false,
+    translationOverrides: new Map(),
   };
 
   const server = http.createServer(async (req, res) => {
@@ -57,7 +58,9 @@ async function createMockOpenRouterServer() {
 
         const translated = {};
         for (const block of blocks) {
-          if (state.corruptPlaceholderOutput && block.markdown.includes('__MDT_')) {
+          if (state.translationOverrides.has(block.markdown)) {
+            translated[block.id] = state.translationOverrides.get(block.markdown);
+          } else if (state.corruptPlaceholderOutput && block.markdown.includes('__MDT_')) {
             translated[block.id] = `MOCK:${block.markdown.replace(/__MDT_[A-Za-z0-9_]+__/g, 'BROKEN_PLACEHOLDER')}`;
           } else {
             translated[block.id] = `MOCK:${block.markdown}`;
@@ -219,6 +222,10 @@ async function testTranslatesFrontmatterValues(context) {
     [
       '---',
       'name: codex-screen-recording',
+      'literal: |',
+      '  title: literal-machine-name',
+      'build:',
+      '  description: internal build description',
       'description: Record precise macOS screen evidence.',
       'draft: false',
       '---',
@@ -231,11 +238,14 @@ async function testTranslatesFrontmatterValues(context) {
   );
 
   context.server.state.chatRequests = [];
+  context.server.state.translationOverrides = new Map([['Record precise macOS screen evidence.', 'MOCK: Record precise macOS screen evidence.']]);
   await translate(source);
 
   const output = readText(translatedPath(source));
   assert.match(output, /name: codex-screen-recording/);
-  assert.match(output, /description: MOCK:Record precise macOS screen evidence\./);
+  assert.match(output, /title: literal-machine-name/);
+  assert.match(output, /description: internal build description/);
+  assert.match(output, /description: "MOCK: Record precise macOS screen evidence\."/);
   assert.match(output, /draft: false/);
   assert.match(output, /MOCK:# Overview/);
   assert.match(output, /MOCK:Translate the body\./);
@@ -243,8 +253,11 @@ async function testTranslatesFrontmatterValues(context) {
   const blocks = context.server.state.chatRequests.flatMap((request) => request.blocks);
   assert.ok(blocks.some((block) => block.markdown === 'Record precise macOS screen evidence.'));
   assert.ok(!blocks.some((block) => block.markdown.includes('codex-screen-recording')));
+  assert.ok(!blocks.some((block) => block.markdown.includes('literal-machine-name')));
+  assert.ok(!blocks.some((block) => block.markdown.includes('internal build description')));
   assert.ok(!blocks.some((block) => block.markdown.includes('name:')));
   assert.ok(!blocks.some((block) => block.markdown.includes('draft: false')));
+  context.server.state.translationOverrides = new Map();
 }
 
 async function testReusesCachedTranslations(context) {
