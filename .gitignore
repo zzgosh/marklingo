@@ -9,3 +9,4 @@ local-docs/
 **/*_mdt.meta.json
 .DS_Store
 *.vsix
+.env
