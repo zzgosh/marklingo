@@ -67,8 +67,8 @@
         "title": "MarkLingo: Set OpenRouter Model ID"
       },
       {
-        "command": "marklingo.deleteAllTranslatedFiles",
-        "title": "MarkLingo: Delete all translated files"
+        "command": "marklingo.deleteCurrentProjectTranslatedFiles",
+        "title": "MarkLingo: Delete Current Project Translated Files"
       },
       {
         "command": "marklingo.setTargetLanguage",
@@ -155,7 +155,7 @@
             "privateStorage"
           ],
           "enumDescriptions": [
-            "Write the visible *_mdt.md file next to the source Markdown file.",
+            "Write the visible translated Markdown file next to the source Markdown file.",
             "Write translated Markdown files under the extension private storage directory."
           ],
           "description": "Where translated Markdown output files are written. Private storage keeps generated files out of the workspace, but relative Markdown links are resolved from that private directory."
