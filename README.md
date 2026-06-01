@@ -1,6 +1,6 @@
 # MarkLingo
 
-Translate Markdown files into any language using AI models via OpenRouter while preserving Markdown structure, code, HTML, frontmatter, links, and image paths.
+Translate Markdown files into any language using AI models via OpenRouter while preserving Markdown structure, code, HTML, frontmatter syntax, links, and image paths.
 
 ## Features
 
@@ -11,6 +11,7 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 - Configure provider, translation, and SecretStorage API keys from `MarkLingo: Open Settings`.
 - View translate shortcut status and jump directly to VS Code Keyboard Shortcuts from the settings page.
 - Store translation metadata in VS Code private global storage instead of the workspace.
+- Translate selected human-facing YAML frontmatter values, such as `title` and `description`, while preserving field names, comments, delimiters, and machine-readable values.
 - Add translated Markdown outputs to the local Git exclude file with `MarkLingo: Add Translated Files to .git/info/exclude`.
 - Delete the current project's translated files and private metadata with `MarkLingo: Delete Current Project Translated Files`.
 - Clear saved API keys, user settings, private metadata/cache, and optionally all tracked workspace outputs from the settings page.
