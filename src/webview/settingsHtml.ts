@@ -12,8 +12,6 @@ const TARGET_LANGUAGE_OPTIONS = [
   CUSTOM_TARGET_LANGUAGE_LABEL,
 ];
 
-export type SettingsOutputLocation = 'sourceFolder' | 'privateStorage';
-
 export type SettingsState = {
   shortcutLabel: string;
   shortcutStatus: string;
@@ -25,7 +23,6 @@ export type SettingsState = {
   targetLanguageCustom: string;
   systemPrompt: string;
   customPrompt: string;
-  outputLocation: SettingsOutputLocation;
   storageRoot: string;
 };
 
@@ -75,8 +72,6 @@ const API_KEY_MASK_VALUE = '•'.repeat(32);
 
 export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const { beforeMainScript = '', cspSource, extraHead = '', nonce, state } = options;
-  const outputPrivateSelected = state.outputLocation === 'privateStorage' ? ' selected' : '';
-  const outputSourceSelected = state.outputLocation === 'sourceFolder' ? ' selected' : '';
   const apiKeyInitialAttrs = state.hasApiKey
     ? ` value="${escapeHtml(API_KEY_MASK_VALUE)}" data-masked="true"`
     : '';
@@ -508,21 +503,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         <section class="card">
           <div class="row">
             <div>
-              <div class="label">Translated File Location</div>
-            </div>
-            <div class="control-full">
-              <span class="select-wrap">
-                <select id="outputLocation">
-                  <option value="sourceFolder"${outputSourceSelected}>Source folder</option>
-                  <option value="privateStorage"${outputPrivateSelected}>Private extension storage</option>
-                </select>
-              </span>
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Private Storage Folder</div>
-              <div class="help">Stores cache, metadata, and private translated files.</div>
+              <div class="label">Private Data Folder</div>
+              <div class="help">Stores cache and metadata.</div>
             </div>
             <div class="inline">
               <input class="path-field" id="storageRoot" value="${escapeHtml(state.storageRoot)}" readonly>
@@ -609,7 +591,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     registerInstant('targetLanguage', 'translation.targetLanguage');
-    registerInstant('outputLocation', 'storage.outputLocation');
     syncCustomLanguageVisibility(false);
 
     function handleSaved(key, saveId, value) {

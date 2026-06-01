@@ -7,6 +7,7 @@ import { protectMarkdown } from '../translation/placeholders.js';
 import { DEFAULT_SYSTEM_PROMPT, resolveSystemPrompt } from '../translation/prompts.js';
 import { clampContextUsageRatio, planTranslationRequests, type TranslationRequestBlock } from '../translation/requestPlanner.js';
 import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
+import { hasTargetLanguageSelected, markTargetLanguageSelected } from '../onboardingState.js';
 import {
   createEmptyMeta,
   loadTranslationMeta,
@@ -27,7 +28,6 @@ function buildBlocksTranslatePrompt(
   return { system, user };
 }
 
-const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
 const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
@@ -57,7 +57,7 @@ export async function seedTargetLanguageSelectionForTest(context: vscode.Extensi
   if (context.extensionMode !== vscode.ExtensionMode.Test) {
     throw new Error('Target language test state seeding is only available in VS Code test mode.');
   }
-  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+  await markTargetLanguageSelected(context);
 }
 
 function getExtensionVersion(context: vscode.ExtensionContext): string {
@@ -156,7 +156,7 @@ async function promptCustomTargetLanguage(current: string): Promise<string | nul
 
 async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<string | null> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
-  const selected = context.globalState.get<boolean>(TARGET_LANGUAGE_SELECTED_KEY) ?? false;
+  const selected = hasTargetLanguageSelected(context);
   const current = (cfg.get<string>('translation.targetLanguage') ?? '').trim() || '简体中文';
   const currentCustom = (cfg.get<string>('translation.targetLanguageCustom') ?? '').trim();
 
@@ -210,12 +210,12 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
     }
     await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
     await cfg.update('translation.targetLanguage', CUSTOM_TARGET_LANGUAGE_LABEL, vscode.ConfigurationTarget.Global);
-    await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+    await markTargetLanguageSelected(context);
     return input;
   }
 
   await cfg.update('translation.targetLanguage', picked, vscode.ConfigurationTarget.Global);
-  await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+  await markTargetLanguageSelected(context);
   return picked;
 }
 

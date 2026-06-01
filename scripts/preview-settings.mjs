@@ -99,7 +99,6 @@ function getPreviewBridgeScript(nonce) {
 
 function buildState(url) {
   const usesCustomLanguage = url.searchParams.get('custom') === '1';
-  const outputLocation = url.searchParams.get('output') === 'private' ? 'privateStorage' : 'sourceFolder';
   return {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
@@ -113,7 +112,6 @@ function buildState(url) {
     targetLanguageCustom: usesCustomLanguage ? 'Brazilian Portuguese' : '',
     systemPrompt: resolveSystemPrompt('', usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文'),
     customPrompt: '',
-    outputLocation,
     storageRoot: path.join(root, '.vscode-test', 'marklingo-preview', 'globalStorage', 'projects'),
   };
 }

@@ -39,7 +39,7 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 - `src/translation/modelOutput.ts` normalizes model block output. It accepts a translated block as either a string or an array of strings.
 - `src/translation/blockResults.ts` restores placeholders and falls back to the source block if one block is malformed, so one damaged model output does not fail the whole document.
 - `src/translation/cache.ts` defines metadata, hashing, deletion detection, and debug metadata.
-- `src/storage/paths.ts` chooses source-folder output or VS Code private global storage output.
+- `src/storage/paths.ts` resolves source-folder translated output paths and VS Code private global storage roots for metadata/cache.
 - `src/webview/settingsHtml.ts` renders the custom settings webview HTML.
 - `src/webview/settingsPanel.ts` hosts the settings webview inside VS Code and wires VS Code messages, settings, SecretStorage, and cleanup actions.
 
@@ -47,7 +47,7 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 
 API keys must only use VS Code `SecretStorage`. Keys are separated by endpoint origin. Do not store API keys in workspace settings, metadata, logs, or debug output.
 
-Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, source blocks, cached translated blocks, output hashes, and structured debug metadata. Source-folder output may still write a visible `*_<language>_mdt.md` next to the source Markdown when `marklingo.storage.outputLocation` is `sourceFolder`.
+Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, source blocks, cached translated blocks, output hashes, and structured debug metadata. Visible translated Markdown output is always written as `*_<language>_mdt.md` next to the source Markdown file.
 
 The Command Palette delete command should delete only the current project's extension-tracked outputs and project private metadata/cache. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation. The Settings Danger Zone is the only user-facing entry point for cross-project cleanup.
 

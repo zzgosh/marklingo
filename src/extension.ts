@@ -4,6 +4,7 @@ import { deleteCurrentProjectTranslatedFiles, deleteProjectTranslationData } fro
 import { setOpenRouterApiKey } from './commands/openRouterApiKey.js';
 import { setOpenRouterModelId } from './commands/openRouterModelId.js';
 import { setTargetLanguage } from './commands/targetLanguage.js';
+import { ignoreTranslatedFilesInGit } from './commands/ignoreTranslatedFilesInGit.js';
 import { openSettingsPanel } from './webview/settingsPanel.js';
 import { seedOpenRouterApiKeyForTest } from './services/openRouterClient.js';
 
@@ -23,6 +24,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('marklingo.deleteCurrentProjectTranslatedFiles', () => {
       return deleteCurrentProjectTranslatedFiles(context);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('marklingo.ignoreTranslatedFilesInGit', () => {
+      return ignoreTranslatedFilesInGit();
     }),
   );
 
