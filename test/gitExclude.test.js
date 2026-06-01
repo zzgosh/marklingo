@@ -47,7 +47,7 @@ test('updates .git/info/exclude idempotently', async () => {
   }
 });
 
-test('detects worktree gitdir files', async () => {
+test('detects gitdir files without a common directory override', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'marklingo-worktree-'));
   const gitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'marklingo-gitdir-'));
   try {
@@ -57,9 +57,35 @@ test('detects worktree gitdir files', async () => {
     const repo = await findGitRepository(root);
     assert.ok(repo, 'expected repository detection');
     assert.equal(repo.gitDir, gitDir);
+    assert.equal(repo.commonDir, gitDir);
     assert.equal(repo.excludeFile, path.join(gitDir, 'info', 'exclude'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(gitDir, { recursive: true, force: true });
+  }
+});
+
+test('uses the common git directory for linked worktree excludes', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'marklingo-linked-worktree-'));
+  const commonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'marklingo-common-gitdir-'));
+  const gitDir = path.join(commonDir, 'worktrees', 'linked');
+  try {
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.mkdirSync(path.join(commonDir, 'info'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.git'), `gitdir: ${gitDir}\n`, 'utf8');
+    fs.writeFileSync(path.join(gitDir, 'commondir'), '../..\n', 'utf8');
+
+    const repo = await findGitRepository(root);
+    assert.ok(repo, 'expected repository detection');
+    assert.equal(repo.gitDir, gitDir);
+    assert.equal(repo.commonDir, commonDir);
+    assert.equal(repo.excludeFile, path.join(commonDir, 'info', 'exclude'));
+
+    assert.equal(await ensureMarkLingoGitExclude(repo), 'added');
+    const content = fs.readFileSync(path.join(commonDir, 'info', 'exclude'), 'utf8');
+    assert.equal(hasMarkLingoGitExclude(content), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(commonDir, { recursive: true, force: true });
   }
 });

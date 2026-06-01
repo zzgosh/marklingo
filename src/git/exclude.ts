@@ -7,6 +7,7 @@ const MARKLINGO_GIT_EXCLUDE_HEADER = '# MarkLingo translated Markdown outputs';
 export type GitRepositoryInfo = {
   workTree: string;
   gitDir: string;
+  commonDir: string;
   excludeFile: string;
 };
 
@@ -31,6 +32,19 @@ async function resolveGitDir(gitPath: string, workTree: string): Promise<string 
   return path.isAbsolute(gitDir) ? gitDir : path.resolve(workTree, gitDir);
 }
 
+async function resolveCommonDir(gitDir: string): Promise<string> {
+  try {
+    const content = await fs.readFile(path.join(gitDir, 'commondir'), 'utf8');
+    const commonDir = content.split(/\r?\n/, 1)[0]?.trim();
+    if (commonDir) {
+      return path.isAbsolute(commonDir) ? commonDir : path.resolve(gitDir, commonDir);
+    }
+  } catch {
+    // Repositories without a commondir file use gitDir as the common directory.
+  }
+  return gitDir;
+}
+
 export async function findGitRepository(startPath: string): Promise<GitRepositoryInfo | undefined> {
   let current = path.resolve(startPath);
   const startStat = await statSafe(current);
@@ -39,10 +53,12 @@ export async function findGitRepository(startPath: string): Promise<GitRepositor
   while (true) {
     const gitDir = await resolveGitDir(path.join(current, '.git'), current);
     if (gitDir) {
+      const commonDir = await resolveCommonDir(gitDir);
       return {
         workTree: current,
         gitDir,
-        excludeFile: path.join(gitDir, 'info', 'exclude'),
+        commonDir,
+        excludeFile: path.join(commonDir, 'info', 'exclude'),
       };
     }
 
