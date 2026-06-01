@@ -7,6 +7,7 @@ import { protectMarkdown } from '../translation/placeholders.js';
 import { DEFAULT_SYSTEM_PROMPT, resolveSystemPrompt } from '../translation/prompts.js';
 import { clampContextUsageRatio, planTranslationRequests, type TranslationRequestBlock } from '../translation/requestPlanner.js';
 import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
+import { formatYamlScalarReplacement } from '../translation/frontmatterValues.js';
 import { hasTargetLanguageSelected, markTargetLanguageSelected } from '../onboardingState.js';
 import {
   createEmptyMeta,
@@ -494,7 +495,11 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         for (const seg of segments) {
           parts.push(sourceText.slice(cursor, seg.startOffset));
           const h = seg.translatable ? hashById.get(seg.id) : undefined;
-          const replacement = seg.translatable && h ? outputByHash.get(h) ?? seg.text : seg.text;
+          const translatedText = seg.translatable && h ? outputByHash.get(h) ?? seg.text : seg.text;
+          const replacement =
+            seg.type === 'yamlValue' && h && translatedByHash.has(h)
+              ? formatYamlScalarReplacement(translatedText, seg.yamlQuote ?? 'plain')
+              : translatedText;
           parts.push(replacement);
           cursor = seg.endOffset;
         }

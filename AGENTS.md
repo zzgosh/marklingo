@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This repository contains a VS Code extension named `MarkLingo`. It translates saved Markdown documents through OpenRouter-compatible chat models while preserving Markdown structure, protected syntax, links, image paths, code, HTML, and frontmatter.
+This repository contains a VS Code extension named `MarkLingo`. It translates saved Markdown documents through OpenRouter-compatible chat models while preserving Markdown structure, protected syntax, links, image paths, code, HTML, and frontmatter syntax.
 
 The extension is authored in TypeScript as native ESM:
 
@@ -33,8 +33,9 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 - `src/extension.ts` registers VS Code commands.
 - `src/commands/translateCurrentMarkdown.ts` owns the translation workflow: validation, target-language selection, segmentation, cache reuse, request planning, OpenRouter calls, output assembly, metadata writing, and Markdown preview.
 - `src/services/openRouterClient.ts` handles OpenRouter settings, endpoint validation, per-origin SecretStorage API keys, model-context lookup, and chat completions.
-- `src/translation/segmenter.ts` splits Markdown into stable translatable blocks.
-- `src/translation/placeholders.ts` protects URLs, image paths, code, HTML, YAML, and other sensitive Markdown syntax before sending text to the model.
+- `src/translation/segmenter.ts` splits Markdown into stable translatable blocks, including selected human-facing YAML frontmatter scalar values.
+- `src/translation/frontmatterValues.ts` finds translatable YAML frontmatter scalar value ranges for known human-facing fields while preserving field names, delimiters, comments, and machine-readable values.
+- `src/translation/placeholders.ts` protects URLs, image paths, code, HTML, and other sensitive Markdown syntax before sending text to the model.
 - `src/translation/requestPlanner.ts` estimates prompt size and splits requests by model context budget when available.
 - `src/translation/modelOutput.ts` normalizes model block output. It accepts a translated block as either a string or an array of strings.
 - `src/translation/blockResults.ts` restores placeholders and falls back to the source block if one block is malformed, so one damaged model output does not fail the whole document.
