@@ -7,22 +7,23 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 - Translate the active Markdown file with `Option + Command + T` on macOS or `Control + Alt + T` on Windows/Linux.
 - Generate a translated `*_<language>_mdt.md` file, open the translated Markdown tab, and show its Markdown Preview to the side.
 - Reuse prior translations by hashing Markdown AST blocks.
-- Force a full retranslation with `MarkLingo: Translate Current Markdown (Full)`.
-- Configure provider, translation, storage, and SecretStorage API keys from `MarkLingo: Open Settings`.
+- Force a full retranslation with `MarkLingo: Retranslate Current Markdown`.
+- Configure provider, translation, and SecretStorage API keys from `MarkLingo: Open Settings`.
 - View translate shortcut status and jump directly to VS Code Keyboard Shortcuts from the settings page.
 - Store translation metadata in VS Code private global storage instead of the workspace.
+- Add translated Markdown outputs to the local Git exclude file with `MarkLingo: Add Translated Files to .git/info/exclude`.
 - Delete the current project's translated files and private metadata with `MarkLingo: Delete Current Project Translated Files`.
 - Clear saved API keys, user settings, private metadata/cache, and optionally all tracked workspace outputs from the settings page.
 
 ## Usage
 
 1. Open a saved Markdown file.
-2. Run `MarkLingo: Open Settings`.
-3. Set an OpenRouter model ID, such as `google/gemini-3.1-flash-lite`.
-4. Save an API key. The API key is stored once in VS Code `SecretStorage` and is used for the configured Base URL.
-5. Run `MarkLingo: Translate Current Markdown`.
+2. Run `MarkLingo: Translate Current Markdown`.
+3. Select the target language.
+4. Enter an OpenRouter API key. The API key is stored once in VS Code `SecretStorage` and is used for the configured Base URL.
+5. Confirm an OpenRouter model ID, or press Enter to use the default model.
 
-The first translation also asks for a target language if one has not been selected yet.
+You can also run `MarkLingo: Open Settings` first. Saving an API key from the settings page accepts the visible default target language and model, so the next translation starts without repeating those prompts.
 
 ## Keyboard Shortcut
 
@@ -51,9 +52,6 @@ Search for `MarkLingo` in VS Code Settings, or use `MarkLingo: Open Settings`.
   - Advanced base system prompt override, not shown in the MarkLingo settings panel. Leave empty to use the extension default. Use `{targetLanguage}` as the target language placeholder.
 - `marklingo.translation.customPrompt`
   - Custom instructions appended after the built-in translation prompt, such as terminology or style rules.
-- `marklingo.storage.outputLocation`
-  - `sourceFolder`: write the visible translated Markdown file next to the source file.
-  - `privateStorage`: write translated Markdown under the extension private storage directory.
 
 The custom settings page saves dropdown changes immediately. Free-text fields have their own inline `Save` button. API key actions and Clear Data actions take effect immediately after their in-panel confirmation.
 
@@ -67,17 +65,16 @@ The custom settings page saves dropdown changes immediately. Free-text fields ha
 - Delete the saved API key from `MarkLingo: Open Settings` using the `Danger Zone` section. Replacing a key does not require deletion — type a new key into the API Key field and click `Save`.
 - Use `Clear Data` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
 - Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`.
-- Writing translated Markdown to `privateStorage` keeps generated files out of the workspace, but Markdown Preview resolves relative links and images from the private storage directory. Use `sourceFolder` when relative links or local images must keep working.
 
 ## Output Files
 
-- `sourceFolder` output: `xxx_zh-CN_mdt.md`, `xxx_en_mdt.md`, or another target-language suffixed file is written next to `xxx.md`.
+- Translated output is always written next to the source Markdown file, for example `xxx_zh-CN_mdt.md`, `xxx_en_mdt.md`, or another target-language suffixed file next to `xxx.md`.
 - Custom target languages use a safe suffix derived from the language name when possible, or a stable `custom-<hash>` suffix when the name cannot be represented as an ASCII slug.
-- `privateStorage` output: translated Markdown is written under the extension private storage directory.
 - Metadata is written under VS Code private global storage. It includes cached source/translation blocks plus a structured `debug` section with run status, extension/environment versions, non-secret settings, request planning details, warnings, and errors.
-- The visible `xxx_<language>_mdt.md` file is output, not the translation cache. If a source-folder output file is deleted manually but its private metadata still exists, the next normal translation can rebuild the output from cached block translations instead of retranslating every unchanged block.
+- The visible `xxx_<language>_mdt.md` file is output, not the translation cache. If an output file is deleted manually but its private metadata still exists, the next normal translation can rebuild the output from cached block translations instead of retranslating every unchanged block.
 - Running translation again rebuilds the translated file from the current source Markdown and private metadata/cache. Manual edits made directly in the translated output file are not merged or preserved, so copy or rename the file first if you need to keep those edits.
 - `MarkLingo: Delete Current Project Translated Files` removes the current project's extension-tracked outputs, including outputs edited after generation, and clears that project's private metadata/cache. After that, the next translation for that project has no cache to reuse and will translate the document again.
+- `MarkLingo: Add Translated Files to .git/info/exclude` adds `*_mdt.md` to the current repository's local `.git/info/exclude`. This does not modify the repository `.gitignore`.
 - Existing outputs from earlier versions named `xxx_mdt.md` are not renamed automatically; retranslate the source file to generate `xxx_<language>_mdt.md`, then remove the old output manually if it is no longer needed.
 
 ## Uninstall / Cleanup

@@ -112,7 +112,6 @@ async function configureExtension(mockServer) {
   await cfg.update('openrouter.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
   await cfg.update('translation.targetLanguage', 'English', vscode.ConfigurationTarget.Global);
-  await cfg.update('storage.outputLocation', 'sourceFolder', vscode.ConfigurationTarget.Global);
 
   const seeded = await vscode.commands.executeCommand('marklingo.test.seedState', { apiKey: 'test-key' });
   assert.equal(seeded.origin, new URL(mockServer.baseUrl).origin);

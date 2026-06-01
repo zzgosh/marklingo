@@ -6,8 +6,13 @@ import {
   DEFAULT_OPENROUTER_MODEL_ID,
 } from '../services/openRouterClient.js';
 import { clearExtensionDataScopes, type CleanupScopes } from '../commands/clearExtensionData.js';
-import { getOutputLocation, getProjectsStorageRoot } from '../storage/paths.js';
+import { getProjectsStorageRoot } from '../storage/paths.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
+import {
+  acceptVisibleOnboardingDefaults,
+  markOpenRouterModelAccepted,
+  markTargetLanguageSelected,
+} from '../onboardingState.js';
 import {
   getDefaultTranslateKeybindingSearchQuery,
   getDefaultTranslateKeys,
@@ -16,8 +21,6 @@ import {
   type UserKeybinding,
 } from './shortcutState.js';
 import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, renderSettingsHtml, type SettingsState } from './settingsHtml.js';
-
-const TARGET_LANGUAGE_SELECTED_KEY = 'marklingo.translation.targetLanguageSelected';
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
 // dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
@@ -28,7 +31,6 @@ const UPDATABLE_SETTING_KEYS = new Set<string>([
   'translation.targetLanguage',
   'translation.targetLanguageCustom',
   'translation.customPrompt',
-  'storage.outputLocation',
 ]);
 
 let currentPanel: vscode.WebviewPanel | undefined;
@@ -137,7 +139,6 @@ async function readSettingsState(context: vscode.ExtensionContext): Promise<Sett
     targetLanguageCustom,
     systemPrompt: resolveSystemPrompt(systemPrompt, resolvedTargetLanguage),
     customPrompt: cfg.get<string>('translation.customPrompt', ''),
-    outputLocation: getOutputLocation(),
     storageRoot: getProjectsStorageRoot(context).fsPath,
   };
 }
@@ -186,11 +187,9 @@ async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
 }
 
 function coerceSettingValue(key: string, raw: unknown): unknown {
-  if (key === 'storage.outputLocation') {
-    return raw === 'privateStorage' ? 'privateStorage' : 'sourceFolder';
-  }
   const value = String(raw ?? '').trim();
   if (key === 'translation.targetLanguage') return value || '简体中文';
+  if (key === 'openrouter.modelId') return value || DEFAULT_OPENROUTER_MODEL_ID;
   return value;
 }
 
@@ -202,7 +201,10 @@ async function updateSingleSetting(context: vscode.ExtensionContext, key: string
   const value = coerceSettingValue(key, raw);
   await cfg.update(key, value, vscode.ConfigurationTarget.Global);
   if (key === 'translation.targetLanguage' || key === 'translation.targetLanguageCustom') {
-    await context.globalState.update(TARGET_LANGUAGE_SELECTED_KEY, true);
+    await markTargetLanguageSelected(context);
+  }
+  if (key === 'openrouter.modelId') {
+    await markOpenRouterModelAccepted(context);
   }
   return value;
 }
@@ -299,6 +301,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         }
         try {
           await storeOpenRouterApiKey(context, value);
+          await acceptVisibleOnboardingDefaults(context);
           await panel.webview.postMessage({
             type: 'apiKeyStatus',
             hasKey: await hasOpenRouterApiKey(context),

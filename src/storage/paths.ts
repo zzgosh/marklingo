@@ -2,12 +2,11 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import {
-  getPrivateTranslatedMarkdownFileName,
   getTranslatedMarkdownFileName,
   getTranslationMetaFileName,
 } from './outputNames.js';
 
-export type OutputLocation = 'sourceFolder' | 'privateStorage';
+export type OutputLocation = 'sourceFolder';
 
 function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
@@ -54,21 +53,10 @@ export function getSourceFolderTranslatedFileUri(sourceUri: vscode.Uri, targetLa
   return vscode.Uri.file(path.join(parsed.dir, getTranslatedMarkdownFileName(parsed.name, targetLanguage)));
 }
 
-export function getPrivateTranslatedFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
-  const parsed = path.parse(sourceUri.fsPath);
-  const id = sha256(sourceUri.toString()).slice(0, 8);
-  return vscode.Uri.joinPath(getProjectStorageRoot(context, sourceUri), 'translated', getPrivateTranslatedMarkdownFileName(parsed.name, id, targetLanguage));
-}
-
 export function getOutputLocation(): OutputLocation {
-  const configured = vscode.workspace
-    .getConfiguration('marklingo')
-    .get<string>('storage.outputLocation', 'sourceFolder');
-  return configured === 'privateStorage' ? 'privateStorage' : 'sourceFolder';
+  return 'sourceFolder';
 }
 
-export function getTranslatedFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
-  return getOutputLocation() === 'privateStorage'
-    ? getPrivateTranslatedFileUri(context, sourceUri, targetLanguage)
-    : getSourceFolderTranslatedFileUri(sourceUri, targetLanguage);
+export function getTranslatedFileUri(_context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
+  return getSourceFolderTranslatedFileUri(sourceUri, targetLanguage);
 }
