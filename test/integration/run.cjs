@@ -212,6 +212,41 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.ok(!JSON.stringify(meta.debug).includes('test-key'), 'debug metadata must not include the API key');
 }
 
+async function testTranslatesFrontmatterValues(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown(
+    'frontmatter.md',
+    [
+      '---',
+      'name: codex-screen-recording',
+      'description: Record precise macOS screen evidence.',
+      'draft: false',
+      '---',
+      '',
+      '# Overview',
+      '',
+      'Translate the body.',
+      '',
+    ].join('\n'),
+  );
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+
+  const output = readText(translatedPath(source));
+  assert.match(output, /name: codex-screen-recording/);
+  assert.match(output, /description: MOCK:Record precise macOS screen evidence\./);
+  assert.match(output, /draft: false/);
+  assert.match(output, /MOCK:# Overview/);
+  assert.match(output, /MOCK:Translate the body\./);
+
+  const blocks = context.server.state.chatRequests.flatMap((request) => request.blocks);
+  assert.ok(blocks.some((block) => block.markdown === 'Record precise macOS screen evidence.'));
+  assert.ok(!blocks.some((block) => block.markdown.includes('codex-screen-recording')));
+  assert.ok(!blocks.some((block) => block.markdown.includes('name:')));
+  assert.ok(!blocks.some((block) => block.markdown.includes('draft: false')));
+}
+
 async function testReusesCachedTranslations(context) {
   await cleanWorkspace();
   const source = await writeMarkdown('cache.md', '# Title\n\nFirst paragraph.\n');
@@ -322,6 +357,7 @@ async function run() {
     const seeded = await configureExtension(server);
     const context = { server, seeded };
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
+    await runTest('translates selected YAML frontmatter values only', testTranslatesFrontmatterValues, context);
     await runTest('reuses cached translations on incremental runs', testReusesCachedTranslations, context);
     await runTest('translates .md files even when VS Code uses a different language mode', testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode, context);
     await runTest('retries fallback blocks instead of caching source fallback', testRetriesFallbackBlocks, context);

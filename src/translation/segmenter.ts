@@ -3,8 +3,9 @@ import { unified } from 'unified';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
+import { findYamlFrontmatterValueRanges } from './frontmatterValues.js';
 
-export const SEGMENTER_VERSION = '1';
+export const SEGMENTER_VERSION = '2';
 
 export type Segment = {
   id: string;
@@ -50,12 +51,32 @@ export function segmentMarkdownDocument(doc: vscode.TextDocument): Segment[] {
     });
   };
 
+  const addYamlValueSegments = (node: any) => {
+    const range = nodeToRange(doc, node);
+    if (!range) return;
+    const yamlText = text.slice(range.start, range.end);
+    for (const valueRange of findYamlFrontmatterValueRanges(yamlText)) {
+      segments.push({
+        type: 'yamlValue',
+        startOffset: range.start + valueRange.start,
+        endOffset: range.start + valueRange.end,
+        text: yamlText.slice(valueRange.start, valueRange.end),
+        translatable: true,
+      });
+    }
+  };
+
   const collect = (node: any) => {
     if (!node) return;
     const type = String(node.type ?? '');
 
     // Non-translatable blocks.
-    if (type === 'yaml' || type === 'code' || type === 'html' || type === 'definition' || type === 'thematicBreak') {
+    if (type === 'yaml') {
+      addYamlValueSegments(node);
+      return;
+    }
+
+    if (type === 'code' || type === 'html' || type === 'definition' || type === 'thematicBreak') {
       add(node, false);
       return;
     }
@@ -106,4 +127,3 @@ export function segmentMarkdownDocument(doc: vscode.TextDocument): Segment[] {
 
   return deduped.map((seg, i) => ({ ...seg, id: `b${i}` }));
 }
-

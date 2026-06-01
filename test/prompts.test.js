@@ -18,4 +18,7 @@ test('resolves a custom system prompt template', () => {
 test('keeps the default prompt visible for settings UI', () => {
   assert.match(DEFAULT_SYSTEM_PROMPT, /__MDT_xxx__/);
   assert.match(DEFAULT_SYSTEM_PROMPT, /valid JSON object/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /YAML frontmatter/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /selected human-facing fields/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /machine-readable values/);
 });
