@@ -7,5 +7,4 @@ export const MARKLINGO_CONFIGURATION_KEYS = [
   'translation.maxContextUsageRatio',
   'translation.systemPrompt',
   'translation.customPrompt',
-  'storage.outputLocation',
 ] as const;

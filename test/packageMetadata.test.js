@@ -21,14 +21,23 @@ test('translation keybinding is available for markdown file extensions', () => {
   assert.match(binding.when, /resourceExtname == \.markdown/);
 });
 
-test('settings-only cleanup actions are not command palette contributions', () => {
+test('command palette contributions expose only main user actions', () => {
   const pkg = readPackageJson();
   const commandIds = new Set(pkg.contributes.commands.map((item) => item.command));
 
+  assert.deepEqual([...commandIds].sort(), [
+    'marklingo.deleteCurrentProjectTranslatedFiles',
+    'marklingo.ignoreTranslatedFilesInGit',
+    'marklingo.openSettings',
+    'marklingo.translateCurrentMarkdown',
+    'marklingo.translateCurrentMarkdownFull',
+  ]);
   assert.ok(!commandIds.has('marklingo.clearExtensionData'));
   assert.ok(!commandIds.has('marklingo.openrouter.resetApiKey'));
   assert.ok(!commandIds.has('marklingo.deleteAllTranslatedFiles'));
-  assert.ok(commandIds.has('marklingo.deleteCurrentProjectTranslatedFiles'));
+  assert.ok(!commandIds.has('marklingo.openrouter.setApiKey'));
+  assert.ok(!commandIds.has('marklingo.openrouter.setModelId'));
+  assert.ok(!commandIds.has('marklingo.setTargetLanguage'));
 });
 
 test('cleanup configuration keys match package configuration contributions', () => {
