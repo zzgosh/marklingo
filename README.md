@@ -49,14 +49,35 @@ You can also run `MarkLingo: Open Settings` first to save your API key, target l
 
 Use `MarkLingo: Open Settings` for the settings most users need.
 
-| Field | Backing setting | Default | Notes |
-| --- | --- | --- | --- |
-| Base URL | `marklingo.openrouter.baseUrl` | `https://openrouter.ai/api/v1` | Custom endpoints must use HTTPS, except localhost debugging. |
-| API Key | VS Code `SecretStorage` | none | Enter your OpenRouter API key. It is not stored in VS Code settings or workspace files. |
-| Model ID | `marklingo.openrouter.modelId` | `google/gemini-3.1-flash-lite` | Use an OpenRouter model ID. |
-| Target Language | `marklingo.translation.targetLanguage` | `简体中文` | Built-in options include `简体中文`, `繁体中文`, `English`, `日本語`, `한국어`, `Français`, `Español`, `Deutsch`, and `Custom...`. |
-| Custom Language | `marklingo.translation.targetLanguageCustom` | empty | Used when target language is `Custom...`. |
-| Custom Instructions | `marklingo.translation.customPrompt` | empty | Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt. |
+- **Base URL**
+  - Setting: `marklingo.openrouter.baseUrl`
+  - Default: `https://openrouter.ai/api/v1`
+  - Custom endpoints must use HTTPS, except localhost debugging.
+
+- **API Key**
+  - Storage: VS Code `SecretStorage`
+  - Default: none
+  - Enter your OpenRouter API key. MarkLingo does not store it in VS Code settings or workspace files.
+
+- **Model ID**
+  - Setting: `marklingo.openrouter.modelId`
+  - Default: `google/gemini-3.1-flash-lite`
+  - Use an OpenRouter model ID.
+
+- **Target Language**
+  - Setting: `marklingo.translation.targetLanguage`
+  - Default: `简体中文`
+  - Built-in options include `简体中文`, `繁体中文`, `English`, `日本語`, `한국어`, `Français`, `Español`, `Deutsch`, and `Custom...`.
+
+- **Custom Language**
+  - Setting: `marklingo.translation.targetLanguageCustom`
+  - Default: empty
+  - Used when target language is `Custom...`.
+
+- **Custom Instructions**
+  - Setting: `marklingo.translation.customPrompt`
+  - Default: empty
+  - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt.
 
 The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and Clear Data actions take effect immediately after confirmation.
 
