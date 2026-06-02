@@ -4,8 +4,6 @@ Translate Markdown through OpenRouter, without breaking Markdown.
 
 MarkLingo turns the active saved Markdown file into a translated copy through OpenRouter while preserving the parts that should not be touched: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths. It is built for writers, maintainers, and documentation teams who want fast multilingual Markdown drafts inside VS Code using their own OpenRouter API key.
 
-![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/main/resources/Screenshot-1.jpg)
-
 ## Why MarkLingo
 
 - Translate a saved Markdown document from VS Code with one command.
@@ -16,7 +14,7 @@ MarkLingo turns the active saved Markdown file into a translated copy through Op
 - Configure the OpenRouter endpoint, model, API key, target language, and custom instructions from a dedicated settings page.
 - Store API keys in VS Code `SecretStorage`; do not store them in workspace files or extension metadata.
 
-![Translated Markdown opens beside its preview](https://raw.githubusercontent.com/zzgosh/marklingo/main/resources/Screenshot-2.jpg)
+![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## Quick Start
 
@@ -33,8 +31,6 @@ Default shortcut:
 
 You can also run `MarkLingo: Open Settings` first to save your API key, target language, model, and custom instructions before translating.
 
-![Configure OpenRouter, API key, target language, and custom instructions](https://raw.githubusercontent.com/zzgosh/marklingo/main/resources/Screenshot-3.jpg)
-
 ## Commands
 
 | Command | What it does |
@@ -49,14 +45,35 @@ You can also run `MarkLingo: Open Settings` first to save your API key, target l
 
 Use `MarkLingo: Open Settings` for the settings most users need.
 
-| Field | Backing setting | Default | Notes |
-| --- | --- | --- | --- |
-| Base URL | `marklingo.openrouter.baseUrl` | `https://openrouter.ai/api/v1` | Custom endpoints must use HTTPS, except localhost debugging. |
-| API Key | VS Code `SecretStorage` | none | Enter your OpenRouter API key. It is not stored in VS Code settings or workspace files. |
-| Model ID | `marklingo.openrouter.modelId` | `google/gemini-3.1-flash-lite` | Use an OpenRouter model ID. |
-| Target Language | `marklingo.translation.targetLanguage` | `简体中文` | Built-in options include `简体中文`, `繁体中文`, `English`, `日本語`, `한국어`, `Français`, `Español`, `Deutsch`, and `Custom...`. |
-| Custom Language | `marklingo.translation.targetLanguageCustom` | empty | Used when target language is `Custom...`. |
-| Custom Instructions | `marklingo.translation.customPrompt` | empty | Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt. |
+- **Base URL**
+  - Setting: `marklingo.openrouter.baseUrl`
+  - Default: `https://openrouter.ai/api/v1`
+  - Custom endpoints must use HTTPS, except localhost debugging.
+
+- **API Key**
+  - Storage: VS Code `SecretStorage`
+  - Default: none
+  - Enter your OpenRouter API key. MarkLingo does not store it in VS Code settings or workspace files.
+
+- **Model ID**
+  - Setting: `marklingo.openrouter.modelId`
+  - Default: `google/gemini-3.1-flash-lite`
+  - Use an OpenRouter model ID.
+
+- **Target Language**
+  - Setting: `marklingo.translation.targetLanguage`
+  - Default: `简体中文`
+  - Built-in options include `简体中文`, `繁体中文`, `English`, `日本語`, `한국어`, `Français`, `Español`, `Deutsch`, and `Custom...`.
+
+- **Custom Language**
+  - Setting: `marklingo.translation.targetLanguageCustom`
+  - Default: empty
+  - Used when target language is `Custom...`.
+
+- **Custom Instructions**
+  - Setting: `marklingo.translation.customPrompt`
+  - Default: empty
+  - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt.
 
 The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and Clear Data actions take effect immediately after confirmation.
 

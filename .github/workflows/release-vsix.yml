@@ -1,0 +1,89 @@
+name: Release VSIX
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish VSIX
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release tag matches package version
+        run: |
+          set -euo pipefail
+          package_version="$(node -p "require('./package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $package_version"
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+          echo "VSIX_NAME=marklingo-${GITHUB_REF_NAME}.vsix" >> "$GITHUB_ENV"
+
+      - name: Run checks
+        run: npm run check
+
+      - name: Package VSIX
+        run: npx --no-install vsce package --out "$VSIX_NAME"
+
+      - name: Verify VSIX archive
+        run: |
+          set -euo pipefail
+          unzip -t "$VSIX_NAME"
+          if unzip -Z1 "$VSIX_NAME" | grep -E '(^|/)resources/.*\.(gif|mp4|mov)$'; then
+            echo "::error::Release media should be referenced remotely, not packaged in the VSIX."
+            exit 1
+          fi
+
+      - name: Prepare release notes
+        run: |
+          set -euo pipefail
+          awk -v version="$PACKAGE_VERSION" '
+            $0 ~ "^##[[:space:]]+\\[?" version "\\]?" {
+              found = 1
+              next
+            }
+            found && /^##[[:space:]]+/ {
+              exit
+            }
+            found {
+              print
+            }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            printf 'See CHANGELOG.md for release notes.\\n' > release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" "$VSIX_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "MarkLingo $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
