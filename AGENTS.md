@@ -82,6 +82,8 @@ Use English for extension UI, notifications, command prompts, Output Channel mes
 
 The custom language option label is `Custom...`.
 
+The English `README.md` is packaged into the VSIX and used by Visual Studio Marketplace and Open VSX listings. Keep its language-switch links as absolute GitHub `main` URLs so they remain valid outside the repository context. Localized README files may use relative links for GitHub browsing.
+
 ## VSIX Testing Notes
 
 After installing a VSIX into an already-open VS Code window, reload the window with `Developer: Reload Window` before retesting. The extension host may keep running the previous extension code until reload.
