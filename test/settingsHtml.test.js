@@ -15,6 +15,15 @@ function getState(overrides = {}) {
     systemPrompt: 'You are a precise Markdown translation assistant.',
     customPrompt: '',
     storageRoot: '/tmp/marklingo/projects',
+    storageStats: {
+      totalBytes: 42 * 1024 * 1024,
+      quotaBytes: 300 * 1024 * 1024,
+      projectCount: 2,
+      metaFileCount: 7,
+      activeCacheCount: 6,
+      evictedCacheCount: 1,
+      cachePayloadBytes: 35 * 1024 * 1024,
+    },
     ...overrides,
   };
 }
@@ -35,8 +44,15 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /System Instructions/);
   assert.match(html, /Copy system instructions/);
   assert.match(html, /You are a precise Markdown translation assistant\./);
-  assert.match(html, /Private Data Folder/);
-  assert.match(html, /Stores cache and metadata\./);
+  assert.match(html, /Translation Metadata Folder/);
+  assert.match(html, /Stores translation metadata and cached translations\./);
+  assert.match(html, /Metadata Storage/);
+  assert.match(html, /42 MB used · 300 MB automatic cleanup limit/);
+  assert.match(html, /35 MB cached translations/);
+  assert.match(html, /6 active cache record\(s\)/);
+  assert.match(html, /1 small tracking record\(s\)/);
+  assert.match(html, /Optimize removes the oldest cached translations first/);
+  assert.match(html, />Optimize<\/button>/);
   assert.match(html, /\.section-warning \{\s+margin-top: 8px;\s+color: var\(--danger\);/);
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);

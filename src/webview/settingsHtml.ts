@@ -24,6 +24,15 @@ export type SettingsState = {
   systemPrompt: string;
   customPrompt: string;
   storageRoot: string;
+  storageStats: {
+    totalBytes: number;
+    quotaBytes: number;
+    projectCount: number;
+    metaFileCount: number;
+    activeCacheCount: number;
+    evictedCacheCount: number;
+    cachePayloadBytes: number;
+  };
 };
 
 export type RenderSettingsHtmlOptions = {
@@ -70,6 +79,19 @@ function getShortcutWarningText(warning: string): string {
 
 const API_KEY_MASK_VALUE = '•'.repeat(32);
 
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  const digits = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
 export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const { beforeMainScript = '', cspSource, extraHead = '', nonce, state } = options;
   const apiKeyInitialAttrs = state.hasApiKey
@@ -77,6 +99,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     : '';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
+  const cacheRecordText = [
+    `${state.storageStats.activeCacheCount} active cache record(s)`,
+    `${state.storageStats.evictedCacheCount} small tracking record(s)`,
+  ].join(' · ');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -381,6 +407,19 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    .storage-panel {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+    .storage-lines {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+    }
+    .storage-primary {
+      color: var(--fg);
+    }
     .notice {
       padding: 10px 12px;
       border-radius: 6px;
@@ -503,12 +542,28 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         <section class="card">
           <div class="row">
             <div>
-              <div class="label">Private Data Folder</div>
-              <div class="help">Stores cache and metadata.</div>
+              <div class="label">Translation Metadata Folder</div>
+              <div class="help">Stores translation metadata and cached translations.</div>
             </div>
             <div class="inline">
               <input class="path-field" id="storageRoot" value="${escapeHtml(state.storageRoot)}" readonly>
               <button class="secondary" id="reveal-storage" type="button">Reveal</button>
+            </div>
+          </div>
+          <div class="row top-align">
+            <div>
+              <div class="label">Metadata Storage</div>
+              <div class="help">Optimize removes the oldest cached translations first. Generated Markdown files stay in place.</div>
+            </div>
+            <div class="storage-panel">
+              <div class="storage-lines">
+                <div class="storage-primary">${escapeHtml(formatBytes(state.storageStats.totalBytes))} used · ${escapeHtml(formatBytes(state.storageStats.quotaBytes))} automatic cleanup limit</div>
+                <div>${escapeHtml(formatBytes(state.storageStats.cachePayloadBytes))} cached translations · ${escapeHtml(String(state.storageStats.projectCount))} project(s) · ${escapeHtml(String(state.storageStats.metaFileCount))} metadata file(s)</div>
+                <div>${escapeHtml(cacheRecordText)}</div>
+              </div>
+              <div class="field-actions">
+                <button class="secondary" id="optimize-storage" type="button">Optimize</button>
+              </div>
             </div>
           </div>
         </section>
@@ -518,7 +573,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           <div class="row top-align">
             <div>
               <div class="label">Clear Data</div>
-              <div class="danger-list">Delete saved API key, MarkLingo settings, private cache and metadata, and tracked translated files.</div>
+              <div class="danger-list">Delete saved API key, MarkLingo settings, translation metadata/cache, and tracked translated files.</div>
             </div>
             <div class="danger-action">
               <button class="danger" type="button" id="clear-data">Clear data</button>
@@ -761,6 +816,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     document.getElementById('open-keyboard-shortcuts').addEventListener('click', () => vscode.postMessage({ type: 'openKeyboardShortcuts' }));
     document.getElementById('reveal-storage').addEventListener('click', () => vscode.postMessage({ type: 'revealStorage' }));
+    document.getElementById('optimize-storage').addEventListener('click', () => vscode.postMessage({ type: 'optimizeStorage' }));
 
     window.addEventListener('message', (event) => {
       const msg = event.data;

@@ -14,7 +14,7 @@ Translate Markdown files into any language using AI models via OpenRouter while 
 - Translate selected human-facing YAML frontmatter values, such as `title` and `description`, while preserving field names, comments, delimiters, and machine-readable values.
 - Add translated Markdown outputs to the local Git exclude file with `MarkLingo: Add Translated Files to .git/info/exclude`.
 - Delete the current project's translated files and private metadata with `MarkLingo: Delete Current Project Translated Files`.
-- Clear saved API keys, user settings, private metadata/cache, and optionally all tracked workspace outputs from the settings page.
+- Clear saved API keys, user settings, translation metadata/cache, and optionally all tracked workspace outputs from the settings page.
 
 ## Usage
 
@@ -64,17 +64,18 @@ The custom settings page saves dropdown changes immediately. Free-text fields ha
 - API keys are stored in VS Code `SecretStorage`, not in workspace files, VS Code settings, translation metadata, or logs. VS Code owns the underlying OS credential storage, so the raw secret is not exposed as a normal file to browse in this repository.
 - The API key is stored once and sent to whatever Base URL is configured. Changing the Base URL changes where future requests send the saved key.
 - Delete the saved API key from `MarkLingo: Open Settings` using the `Danger Zone` section. Replacing a key does not require deletion — type a new key into the API Key field and click `Save`.
-- Use `Clear Data` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, private metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
-- Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`.
+- Use `Clear Data` in `MarkLingo: Open Settings` before uninstalling if you want MarkLingo to delete saved API keys, user settings, translation metadata/cache, and optionally tracked workspace outputs. It does not modify User keybindings.
+- Translation metadata, including source block hashes and cached translations, is stored under VS Code `globalStorageUri`. MarkLingo automatically keeps this metadata storage within a 300 MB quota by removing the oldest cached translations first.
 
 ## Output Files
 
 - Translated output is always written next to the source Markdown file, for example `xxx_zh-CN_mdt.md`, `xxx_en_mdt.md`, or another target-language suffixed file next to `xxx.md`.
 - Custom target languages use a safe suffix derived from the language name when possible, or a stable `custom-<hash>` suffix when the name cannot be represented as an ASCII slug.
-- Metadata is written under VS Code private global storage. It includes cached source/translation blocks plus a structured `debug` section with run status, extension/environment versions, non-secret settings, request planning details, warnings, and errors.
+- Metadata is written under VS Code private global storage. It includes source block hashes, cached translation blocks, output tracking, and a structured `debug` section with run status, extension/environment versions, non-secret settings, request planning details, warnings, and errors.
 - The visible `xxx_<language>_mdt.md` file is output, not the translation cache. If an output file is deleted manually but its private metadata still exists, the next normal translation can rebuild the output from cached block translations instead of retranslating every unchanged block.
-- Running translation again rebuilds the translated file from the current source Markdown and private metadata/cache. Manual edits made directly in the translated output file are not merged or preserved, so copy or rename the file first if you need to keep those edits.
-- `MarkLingo: Delete Current Project Translated Files` removes the current project's extension-tracked outputs, including outputs edited after generation, and clears that project's private metadata/cache. After that, the next translation for that project has no cache to reuse and will translate the document again.
+- Running translation again rebuilds the translated file from the current source Markdown and translation metadata/cache. Manual edits made directly in the translated output file are not merged or preserved, so copy or rename the file first if you need to keep those edits.
+- `MarkLingo: Delete Current Project Translated Files` removes the current project's extension-tracked outputs, including outputs edited after generation, and clears that project's translation metadata/cache. After that, the next translation for that project has no cache to reuse and will translate the document again.
+- `MarkLingo: Open Settings` shows metadata storage usage. `Optimize` removes the oldest cached translations while keeping small tracking records, so MarkLingo can still identify extension-tracked output files but must retranslate content whose cache was removed.
 - `MarkLingo: Add Translated Files to .git/info/exclude` adds `*_mdt.md` to the current repository's local `.git/info/exclude`. This does not modify the repository `.gitignore`.
 - Existing outputs from earlier versions named `xxx_mdt.md` are not renamed automatically; retranslate the source file to generate `xxx_<language>_mdt.md`, then remove the old output manually if it is no longer needed.
 
@@ -84,7 +85,7 @@ Before uninstalling MarkLingo, run `MarkLingo: Open Settings`, select the data t
 
 - `Saved API key`: selected by default. Removes the saved MarkLingo API key.
 - `MarkLingo settings`: selected by default. Removes current MarkLingo User settings.
-- `Private cache & metadata`: selected by default. Deletes the extension `globalStorage` folder.
+- `Translation metadata & cache`: selected by default. Deletes the extension `globalStorage` folder.
 - `Tracked translated files (*_mdt.md)`: not selected by default. Deletes tracked source-folder `*_<language>_mdt.md` outputs only when they were not edited after generation.
 
 If MarkLingo has already been uninstalled, reinstall it, run `MarkLingo: Open Settings`, and use `Clear Data`; or remove the leftovers manually:
@@ -92,7 +93,7 @@ If MarkLingo has already been uninstalled, reinstall it, run `MarkLingo: Open Se
 - Open `Preferences: Open User Settings (JSON)` and remove keys that start with `marklingo.`.
 - Open `Preferences: Open Keyboard Shortcuts (JSON)` and remove entries whose `command` starts with `marklingo.` or `-marklingo.`.
 - Delete MarkLingo's extension global storage folder from VS Code's User `globalStorage` directory. The folder name is based on the extension identifier, for example `zzgosh.marklingo`.
-- Delete workspace `*_<language>_mdt.md` translated files manually if you no longer need them. After private metadata/cache is deleted, MarkLingo can no longer tell which workspace outputs were extension-tracked.
+- Delete workspace `*_<language>_mdt.md` translated files manually if you no longer need them. After translation metadata/cache is deleted, MarkLingo can no longer tell which workspace outputs were extension-tracked.
 
 ## Token Estimates
 

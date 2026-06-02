@@ -6,6 +6,11 @@ import {
   DEFAULT_OPENROUTER_MODEL_ID,
 } from '../services/openRouterClient.js';
 import { clearExtensionDataScopes, type CleanupScopes } from '../commands/clearExtensionData.js';
+import {
+  compactPrivateStorage,
+  PRIVATE_STORAGE_COMPACT_TARGET_BYTES,
+  readPrivateStorageStats,
+} from '../storage/privateStorage.js';
 import { getProjectsStorageRoot } from '../storage/paths.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
 import {
@@ -20,7 +25,7 @@ import {
   type ShortcutState,
   type UserKeybinding,
 } from './shortcutState.js';
-import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, renderSettingsHtml, type SettingsState } from './settingsHtml.js';
+import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, renderSettingsHtml, type SettingsState } from './settingsHtml.js';
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
 // dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
@@ -140,6 +145,7 @@ async function readSettingsState(context: vscode.ExtensionContext): Promise<Sett
     systemPrompt: resolveSystemPrompt(systemPrompt, resolvedTargetLanguage),
     customPrompt: cfg.get<string>('translation.customPrompt', ''),
     storageRoot: getProjectsStorageRoot(context).fsPath,
+    storageStats: await readPrivateStorageStats(context),
   };
 }
 
@@ -159,7 +165,7 @@ async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
       scope: 'settings',
     },
     {
-      label: 'Private cache and metadata',
+      label: 'Translation metadata and cache',
       description: 'Extension global storage',
       picked: true,
       scope: 'globalStorage',
@@ -219,6 +225,36 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
 
 async function refreshPanel(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
   panel.webview.html = getHtml(panel.webview, await readSettingsState(context));
+}
+
+async function optimizePrivateStorage(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
+  const summary = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'MarkLingo: Optimizing translation metadata...',
+      cancellable: false,
+    },
+    () => compactPrivateStorage(context, { targetBytes: PRIVATE_STORAGE_COMPACT_TARGET_BYTES }),
+  );
+
+  await refreshPanel(context, panel);
+
+  if (summary.errors.length > 0) {
+    console.warn('[marklingo] translation metadata optimization errors:', summary.errors.slice(0, 20));
+    await vscode.window.showWarningMessage(
+      `MarkLingo: Removed ${formatBytes(summary.reclaimedBytes)} from ${summary.evictedEntries} old cache record(s), with ${summary.errors.length} issue(s).`,
+    );
+    return;
+  }
+
+  if (summary.evictedEntries === 0) {
+    await vscode.window.showInformationMessage('MarkLingo: Translation metadata storage is already optimized.');
+    return;
+  }
+
+  await vscode.window.showInformationMessage(
+    `MarkLingo: Removed ${formatBytes(summary.reclaimedBytes)} from ${summary.evictedEntries} old cache record(s).`,
+  );
 }
 
 async function postShortcutState(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
@@ -318,6 +354,10 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         if (!scopes) return;
         const didClear = await clearExtensionDataScopes(context, scopes);
         if (didClear) await refreshPanel(context, panel);
+        return;
+      }
+      if (message?.type === 'optimizeStorage') {
+        await optimizePrivateStorage(context, panel);
         return;
       }
       if (message?.type === 'copySystemPrompt' && typeof message.value === 'string') {

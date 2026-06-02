@@ -7,6 +7,7 @@ import { setTargetLanguage } from './commands/targetLanguage.js';
 import { ignoreTranslatedFilesInGit } from './commands/ignoreTranslatedFilesInGit.js';
 import { openSettingsPanel } from './webview/settingsPanel.js';
 import { seedOpenRouterApiKeyForTest } from './services/openRouterClient.js';
+import { compactPrivateStorage, readPrivateStorageStats } from './storage/privateStorage.js';
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -71,6 +72,16 @@ export function activate(context: vscode.ExtensionContext) {
         const projectUri = options?.projectUri ? vscode.Uri.parse(options.projectUri) : vscode.window.activeTextEditor?.document.uri;
         if (!projectUri) throw new Error('Missing projectUri for test cleanup command.');
         return deleteProjectTranslationData(context, projectUri);
+      }),
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('marklingo.test.compactPrivateStorage', (options?: { targetBytes?: number; quotaBytes?: number }) => {
+        return compactPrivateStorage(context, options);
+      }),
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('marklingo.test.readPrivateStorageStats', () => {
+        return readPrivateStorageStats(context);
       }),
     );
   }

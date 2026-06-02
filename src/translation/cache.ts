@@ -6,7 +6,13 @@ import { SEGMENTER_VERSION } from "./segmenter.js";
 export type MetaSegment = {
   type: string;
   srcHash: string;
-  source: string;
+  source?: string;
+};
+
+export type TranslationCacheState = {
+  payloadStatus: "active" | "evicted";
+  lastAccessedAt?: string;
+  evictedAt?: string;
 };
 
 export type TranslationDebugEvent = {
@@ -107,6 +113,7 @@ export type TranslationMetaV1 = {
   updatedAt: string;
   segments: MetaSegment[];
   translations: Record<string, string>;
+  cache?: TranslationCacheState;
   debug?: TranslationMetaDebug;
 };
 
@@ -138,6 +145,17 @@ export async function loadTranslationMeta(
       return null;
     if (typeof json.targetLanguage !== "undefined" && typeof json.targetLanguage !== "string")
       return null;
+    const cache = (json as { cache?: unknown }).cache;
+    if (typeof cache !== "undefined") {
+      if (!cache || Array.isArray(cache) || typeof cache !== "object") return null;
+      const value = cache as Record<string, unknown>;
+      if (value.payloadStatus !== "active" && value.payloadStatus !== "evicted")
+        return null;
+      if (typeof value.lastAccessedAt !== "undefined" && typeof value.lastAccessedAt !== "string")
+        return null;
+      if (typeof value.evictedAt !== "undefined" && typeof value.evictedAt !== "string")
+        return null;
+    }
     return json;
   } catch {
     return null;
@@ -162,4 +180,38 @@ export function createEmptyMeta(sourceUri: vscode.Uri): TranslationMetaV1 {
     segments: [],
     translations: {},
   };
+}
+
+export function markTranslationMetaCacheActive(
+  meta: TranslationMetaV1,
+  accessedAt = new Date().toISOString()
+): void {
+  meta.cache = {
+    payloadStatus: "active",
+    lastAccessedAt: accessedAt,
+  };
+}
+
+export function evictTranslationMetaCachePayload(
+  meta: TranslationMetaV1,
+  evictedAt = new Date().toISOString()
+): TranslationMetaV1 {
+  const lastAccessedAt = meta.cache?.lastAccessedAt ?? meta.updatedAt;
+  const evicted: TranslationMetaV1 = {
+    version: meta.version,
+    segmenterVersion: meta.segmenterVersion,
+    sourceUri: meta.sourceUri,
+    outputUri: meta.outputUri,
+    outputHash: meta.outputHash,
+    targetLanguage: meta.targetLanguage,
+    updatedAt: meta.updatedAt,
+    segments: [],
+    translations: {},
+    cache: {
+      payloadStatus: "evicted",
+      lastAccessedAt,
+      evictedAt,
+    },
+  };
+  return evicted;
 }
