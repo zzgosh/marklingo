@@ -165,7 +165,7 @@ export async function deleteProjectTranslationData(
   const { storageRoot } = await scanTrackedWorkspaceOutputs(context, { projectUri });
   const summary = await deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false });
 
-  progress?.report({ message: 'Clearing private cache' });
+  progress?.report({ message: 'Clearing translation metadata/cache' });
   const cacheError = await deletePrivateTranslationCache(context, projectUri);
   if (cacheError) {
     summary.errors.push(`${storageRoot.fsPath}: ${cacheError}`);
@@ -184,12 +184,12 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   const { storageRoot, storageFiles, outputs } = await scanTrackedWorkspaceOutputs(context, { projectUri });
 
   if (storageFiles.length === 0 && outputs.length === 0) {
-    await vscode.window.showInformationMessage('MarkLingo: No translated files or private cache were found for the current project.');
+    await vscode.window.showInformationMessage('MarkLingo: No translated files or translation metadata/cache were found for the current project.');
     return;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    "MarkLingo: Delete this project's tracked translated files, including files edited after generation, and private translation cache?",
+    "MarkLingo: Delete this project's tracked translated files, including files edited after generation, and translation metadata/cache?",
     { modal: true },
     'Delete',
   );
@@ -215,6 +215,6 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   }
 
   await vscode.window.showInformationMessage(
-    `MarkLingo: Cleared current project cache and deleted ${summary.deleted} tracked translated file(s).`,
+    `MarkLingo: Cleared current project metadata/cache and deleted ${summary.deleted} tracked translated file(s).`,
   );
 }
