@@ -1,4 +1,4 @@
-name: Release VSIX
+name: Release Extension
 
 on:
   push:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish VSIX
+    name: Build, publish, and release
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -43,6 +43,28 @@ jobs:
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
           echo "VSIX_NAME=marklingo-${GITHUB_REF_NAME}.vsix" >> "$GITHUB_ENV"
 
+      - name: Verify publish secrets are configured
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set -euo pipefail
+          for secret_name in OVSX_PAT VSCE_PAT; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "::error::Missing repository secret ${secret_name}"
+              exit 1
+            fi
+          done
+
+      - name: Verify publish credentials
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set -euo pipefail
+          npx --no-install vsce verify-pat zzgosh
+          npx --no-install ovsx verify-pat zzgosh
+
       - name: Run checks
         run: npm run check
 
@@ -57,6 +79,11 @@ jobs:
             echo "::error::Release media should be referenced remotely, not packaged in the VSIX."
             exit 1
           fi
+          if unzip -Z1 "$VSIX_NAME" | grep -E '(^|/)\.env$'; then
+            echo "::error::.env must not be packaged in the VSIX."
+            exit 1
+          fi
+          sha256sum "$VSIX_NAME" > "$VSIX_NAME.sha256"
 
       - name: Prepare release notes
         run: |
@@ -77,12 +104,26 @@ jobs:
             printf 'See CHANGELOG.md for release notes.\\n' > release-notes.md
           fi
 
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set -euo pipefail
+          npx --no-install vsce publish --packagePath "$VSIX_NAME"
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          set -euo pipefail
+          npx --no-install ovsx publish "$VSIX_NAME"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" "$VSIX_NAME" \
+          gh release create "$GITHUB_REF_NAME" "$VSIX_NAME" "$VSIX_NAME.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --title "MarkLingo $GITHUB_REF_NAME" \
             --notes-file release-notes.md \

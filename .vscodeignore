@@ -22,3 +22,6 @@ node_modules/**
 tsconfig.json
 package-lock.json
 dist/**/*.map
+
+# Localized READMEs ship on GitHub only; keep the English README.md in the VSIX.
+README.*.md

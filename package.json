@@ -2,7 +2,7 @@
   "name": "marklingo",
   "displayName": "MarkLingo - Translate Markdown with AI",
   "description": "Translate Markdown through OpenRouter while preserving structure, links, code, and frontmatter.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "zzgosh",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
@@ -163,6 +163,7 @@
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.2",
     "esbuild": "^0.25.0",
+    "ovsx": "^1.0.0",
     "typescript": "^5.6.3"
   },
   "dependencies": {

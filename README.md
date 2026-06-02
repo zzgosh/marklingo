@@ -1,8 +1,14 @@
 # MarkLingo
 
-Translate Markdown through OpenRouter, without breaking Markdown.
+English | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md)
 
-MarkLingo turns the active saved Markdown file into a translated copy through OpenRouter while preserving the parts that should not be touched: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths. It is built for writers, maintainers, and documentation teams who want fast multilingual Markdown drafts inside VS Code using their own OpenRouter API key.
+Translate Markdown with AI, without breaking it.
+
+MarkLingo turns the active saved Markdown file into a translated copy while preserving the parts that should not be touched: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths. It is built for writers, maintainers, and documentation teams who want fast multilingual Markdown drafts inside VS Code.
+
+Translation runs through [OpenRouter](https://openrouter.ai) with your own API key, so you pick the model and pay only for what you use.
+
+![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## Why MarkLingo
 
@@ -14,15 +20,23 @@ MarkLingo turns the active saved Markdown file into a translated copy through Op
 - Configure the OpenRouter endpoint, model, API key, target language, and custom instructions from a dedicated settings page.
 - Store API keys in VS Code `SecretStorage`; do not store them in workspace files or extension metadata.
 
-![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+## Install
+
+Install **MarkLingo** from the VS Code Extensions view (search for `MarkLingo`) or from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo).
+
+For VS Code-compatible editors that use Open VSX, install MarkLingo from the [Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo).
+
+You can also install a packaged `.vsix` from the [releases page](https://github.com/zzgosh/marklingo/releases).
 
 ## Quick Start
+
+First, get an OpenRouter API key: sign in at [openrouter.ai/keys](https://openrouter.ai/keys) and create a key. Usage is billed by OpenRouter per request, based on the model you choose.
 
 1. Open a saved Markdown file.
 2. Run `MarkLingo: Translate Current Markdown` from the Command Palette.
 3. Select the target language.
-4. Enter an OpenRouter API key when prompted.
-5. Confirm the model ID, or press Enter to use the default model.
+4. Paste your OpenRouter API key when prompted. It is stored in VS Code `SecretStorage`, never in workspace files.
+5. Confirm the model ID, or press Enter to use the default (`google/gemini-3.1-flash-lite`).
 
 Default shortcut:
 

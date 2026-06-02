@@ -2,6 +2,13 @@
 
 All notable changes to MarkLingo are documented in this file.
 
+## 0.0.2
+
+- Add multilingual README files for Simplified Chinese, Traditional Chinese, and Japanese.
+- Document installation from Visual Studio Marketplace, Open VSX, and GitHub Releases.
+- Add tag-driven GitHub Actions publishing to Visual Studio Marketplace and Open VSX.
+- Include release VSIX checksums in GitHub Releases.
+
 ## 0.0.1
 
 - Initial release.
