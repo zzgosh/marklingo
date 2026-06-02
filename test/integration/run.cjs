@@ -277,6 +277,66 @@ async function testReusesCachedTranslations(context) {
   assert.match(context.server.state.chatRequests[0].blocks[0].markdown, /Second paragraph/);
 }
 
+async function testCompactsPrivateCacheIntoTrackingStubs(context) {
+  await cleanWorkspace();
+  await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
+    projectUri: vscode.Uri.file(workspaceRoot()).toString(),
+  });
+  const olderSource = await writeMarkdown('storage-old.md', '# Storage\n\nKeep this older cached paragraph.\n');
+
+  context.server.state.chatRequests = [];
+  await translate(olderSource);
+  assert.equal(context.server.state.chatRequests.length, 1);
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const newerSource = await writeMarkdown('storage-new.md', '# Storage\n\nKeep this newer cached paragraph.\n');
+  context.server.state.chatRequests = [];
+  await translate(newerSource);
+  assert.equal(context.server.state.chatRequests.length, 1);
+
+  const olderOutput = translatedPath(olderSource);
+  const newerOutput = translatedPath(newerSource);
+  const { meta: olderActiveMeta } = findMetaForSource(context.seeded.globalStorageUri, olderSource);
+  const { meta: newerActiveMeta } = findMetaForSource(context.seeded.globalStorageUri, newerSource);
+  assert.equal(olderActiveMeta.cache.payloadStatus, 'active');
+  assert.equal(newerActiveMeta.cache.payloadStatus, 'active');
+  assert.ok(olderActiveMeta.outputHash, 'expected active meta to track output hash');
+  assert.ok(Object.keys(olderActiveMeta.translations).length > 0, 'expected active meta to cache translations');
+  assert.ok(olderActiveMeta.segments.length > 0, 'expected active meta to track translated segment hashes');
+  assert.equal(olderActiveMeta.segments.some((segment) => Object.hasOwn(segment, 'source')), false, 'expected slim meta segments to omit source text');
+
+  const statsBefore = await vscode.commands.executeCommand('marklingo.test.readPrivateStorageStats');
+  assert.ok(statsBefore.activeCacheCount >= 2, 'expected active cache entries before compaction');
+
+  const lruSummary = await vscode.commands.executeCommand('marklingo.test.compactPrivateStorage', { targetBytes: statsBefore.totalBytes - 1 });
+  assert.equal(lruSummary.evictedEntries, 1, 'expected quota compaction to evict only the least recently used cache payload');
+  assert.equal(findMetaForSource(context.seeded.globalStorageUri, olderSource).meta.cache.payloadStatus, 'evicted');
+  assert.equal(findMetaForSource(context.seeded.globalStorageUri, newerSource).meta.cache.payloadStatus, 'active');
+
+  const summary = await vscode.commands.executeCommand('marklingo.test.compactPrivateStorage', { targetBytes: 0 });
+  assert.ok(summary.evictedEntries >= 1, 'expected compaction to evict at least one cache payload');
+  assert.ok(summary.reclaimedBytes > 0, 'expected compaction to reclaim bytes');
+
+  const { meta: stubMeta } = findMetaForSource(context.seeded.globalStorageUri, olderSource);
+  assert.equal(stubMeta.cache.payloadStatus, 'evicted');
+  assert.equal(stubMeta.outputUri, vscode.Uri.file(olderOutput).toString());
+  assert.equal(stubMeta.outputHash, olderActiveMeta.outputHash);
+  assert.deepEqual(stubMeta.segments, []);
+  assert.deepEqual(stubMeta.translations, {});
+  assert.equal(stubMeta.debug, undefined);
+  assert.ok(fs.existsSync(olderOutput), 'expected visible translated output to remain after cache compaction');
+  assert.ok(fs.existsSync(newerOutput), 'expected newer visible translated output to remain after cache compaction');
+
+  context.server.state.chatRequests = [];
+  await translate(olderSource);
+  assert.equal(context.server.state.chatRequests.length, 1, 'expected translation to call the model after cache payload eviction');
+  assert.ok(context.server.state.chatRequests[0].blocks.length > 0);
+  const { meta: rewrittenMeta } = findMetaForSource(context.seeded.globalStorageUri, olderSource);
+  assert.equal(rewrittenMeta.cache.payloadStatus, 'active');
+  assert.ok(Object.keys(rewrittenMeta.translations).length > 0);
+  assert.equal(rewrittenMeta.segments.some((segment) => Object.hasOwn(segment, 'source')), false);
+}
+
 async function testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode(context) {
   await cleanWorkspace();
   const source = await writeMarkdown('SKILL.md', '# Skill\n\nTranslate this file.\n');
@@ -372,6 +432,7 @@ async function run() {
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
     await runTest('translates selected YAML frontmatter values only', testTranslatesFrontmatterValues, context);
     await runTest('reuses cached translations on incremental runs', testReusesCachedTranslations, context);
+    await runTest('compacts private cache into tracking stubs', testCompactsPrivateCacheIntoTrackingStubs, context);
     await runTest('translates .md files even when VS Code uses a different language mode', testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode, context);
     await runTest('retries fallback blocks instead of caching source fallback', testRetriesFallbackBlocks, context);
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);

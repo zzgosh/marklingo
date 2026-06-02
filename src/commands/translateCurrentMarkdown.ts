@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { getOpenRouterModelContextLength, getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient.js';
+import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
 import { getMetaFileUri, getOutputLocation, getTranslatedFileUri } from '../storage/paths.js';
 import { restoreTranslatedBlock } from '../translation/blockResults.js';
 import { protectMarkdown } from '../translation/placeholders.js';
@@ -12,6 +13,7 @@ import { hasTargetLanguageSelected, markTargetLanguageSelected } from '../onboar
 import {
   createEmptyMeta,
   loadTranslationMeta,
+  markTranslationMetaCacheActive,
   saveTranslationMeta,
   sha256,
   type TranslationMetaDebug,
@@ -346,7 +348,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         const hashById = new Map(translatable.map((s) => [s.id, s.srcHash]));
 
         const prevMeta = await loadTranslationMeta(currentMetaUri);
-        const nextMetaSegments = translatable.map((s) => ({ type: s.type, srcHash: s.srcHash, source: s.text }));
+        const nextMetaSegments = translatable.map((s) => ({ type: s.type, srcHash: s.srcHash }));
 
         const requestedMode: TranslateMode = options.mode ?? 'auto';
         let mode: 'full' | 'incremental' = 'full';
@@ -526,6 +528,7 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
           warningCount: warnings.length,
         };
         meta.debug = finishDebug(debug, debugStartedAtMs, 'success');
+        markTranslationMetaCacheActive(meta, meta.updatedAt);
 
         return { markdown: out, meta };
       },
@@ -536,6 +539,19 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(translatedMarkdown, 'utf8')),
       saveTranslationMeta(currentMetaUri, nextMeta),
     ]);
+    try {
+      const quotaSummary = await enforcePrivateStorageQuota(context);
+      if (quotaSummary.errors.length > 0) {
+        outputChannel.appendLine(
+          `[${new Date().toISOString()}] Warning: private cache quota cleanup reported ${quotaSummary.errors.length} issue(s).`,
+        );
+      }
+    } catch (quotaError) {
+      const quotaMessage = quotaError instanceof Error ? quotaError.message : String(quotaError);
+      outputChannel.appendLine(
+        `[${new Date().toISOString()}] Warning: private cache quota cleanup failed: ${quotaMessage}`,
+      );
+    }
 
     await openTranslatedMarkdown(currentTranslatedUri);
   } catch (err) {
