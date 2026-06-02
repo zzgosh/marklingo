@@ -47,11 +47,13 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /Translation Metadata Folder/);
   assert.match(html, /Stores translation metadata and cached translations\./);
   assert.match(html, /Metadata Storage/);
-  assert.match(html, /42 MB used · 300 MB automatic cleanup limit/);
-  assert.match(html, /35 MB cached translations/);
-  assert.match(html, /6 active cache record\(s\)/);
-  assert.match(html, /1 small tracking record\(s\)/);
-  assert.match(html, /Optimize removes the oldest cached translations first/);
+  assert.match(html, /42 MB of 300 MB used/);
+  assert.match(html, /2 projects · 7 metadata files · 1 small tracking record/);
+  assert.match(html, /class="storage-meter" data-state="normal"/);
+  assert.match(html, /class="storage-meter-fill" style="width: 14%"/);
+  assert.match(html, /Optimize removes the oldest cache\. Translated files stay\./);
+  assert.match(html, /class="info-tip"/);
+  assert.match(html, /When usage reaches 300 MB, MarkLingo automatically removes the oldest cached translations/);
   assert.match(html, />Optimize<\/button>/);
   assert.match(html, /\.section-warning \{\s+margin-top: 8px;\s+color: var\(--danger\);/);
   assert.match(html, /script-src 'nonce-test-nonce'/);
