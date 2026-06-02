@@ -92,6 +92,16 @@ When installing a VSIX from a terminal, verify the `code` binary actually target
 "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension ./marklingo-0.0.1.vsix --force
 ```
 
+If a Marketplace or VSIX reinstall still shows old extension details, inspect the local install rather than assuming the README image or Marketplace page is broken. VS Code renders the extension detail page from the installed extension directory, for example `~/.vscode/extensions/zzgosh.marklingo-<version>/readme.md`. Same-version reinstalls can leave stale local package files after repeated development installs and uninstalls. Check:
+
+```sh
+"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --list-extensions --show-versions | rg -i 'marklingo|zzgosh'
+find "$HOME/.vscode/extensions" -maxdepth 1 \( -iname '*marklingo*' -o -iname '*zzgosh*' \) -print
+rg -n 'marklingo|zzgosh' "$HOME/.vscode/extensions/.obsolete"
+```
+
+To reset only the installed extension package before reinstalling, uninstall through the VS Code CLI, then remove the exact stale install directory and `.obsolete` entry. Do not delete `~/Library/Application Support/Code/User/globalStorage/zzgosh.marklingo` unless the task explicitly asks to clear saved extension data and API-key-related state.
+
 ## Integration Testing Notes
 
 The VS Code integration test runner uses `@vscode/test-electron`, a temporary workspace under `.vscode-test/workspace`, a temporary user data directory, and a local mock OpenRouter server. It must not use the developer's real VS Code profile, installed VSIX settings, or real OpenRouter API key.
