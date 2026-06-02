@@ -1,4 +1,5 @@
 .gitignore
+.env
 AGENTS.md
 CLAUDE.md
 .vscode/**
@@ -7,6 +8,8 @@ src/**
 test/**
 scripts/**
 local-docs/**
+resources/Screenshot-*.jpg
+resources/*.mp4
 out/**
 node_modules/**
 *.vsix
