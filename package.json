@@ -146,7 +146,7 @@
     "compile": "tsc -p ./",
     "bundle": "esbuild ./out/extension.js --bundle --platform=node --format=esm --external:vscode --sourcemap --outfile=dist/extension.js",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test \"test/**/*.test.js\"",
+    "test": "npm run compile && node --test test/*.test.js",
     "test:vscode": "npm run package && node scripts/run-vscode-tests.mjs",
     "check:integration": "npm run check && npm run test:vscode",
     "check": "npm run compile && npm test",
