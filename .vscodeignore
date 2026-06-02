@@ -2,6 +2,7 @@
 .env
 AGENTS.md
 CLAUDE.md
+.github/**
 .vscode/**
 .vscode-test/**
 src/**
@@ -9,7 +10,9 @@ test/**
 scripts/**
 local-docs/**
 resources/Screenshot-*.jpg
+resources/*.gif
 resources/*.mp4
+resources/*.mov
 out/**
 node_modules/**
 *.vsix

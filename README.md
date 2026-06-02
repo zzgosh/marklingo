@@ -4,8 +4,6 @@ Translate Markdown through OpenRouter, without breaking Markdown.
 
 MarkLingo turns the active saved Markdown file into a translated copy through OpenRouter while preserving the parts that should not be touched: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths. It is built for writers, maintainers, and documentation teams who want fast multilingual Markdown drafts inside VS Code using their own OpenRouter API key.
 
-![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/main/resources/Screenshot-1.jpg)
-
 ## Why MarkLingo
 
 - Translate a saved Markdown document from VS Code with one command.
@@ -16,7 +14,7 @@ MarkLingo turns the active saved Markdown file into a translated copy through Op
 - Configure the OpenRouter endpoint, model, API key, target language, and custom instructions from a dedicated settings page.
 - Store API keys in VS Code `SecretStorage`; do not store them in workspace files or extension metadata.
 
-![Translated Markdown opens beside its preview](https://raw.githubusercontent.com/zzgosh/marklingo/main/resources/Screenshot-2.jpg)
+![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## Quick Start
 
@@ -32,8 +30,6 @@ Default shortcut:
 - Windows/Linux: `Control + Alt + T`
 
 You can also run `MarkLingo: Open Settings` first to save your API key, target language, model, and custom instructions before translating.
-
-![Configure OpenRouter, API key, target language, and custom instructions](https://raw.githubusercontent.com/zzgosh/marklingo/main/resources/Screenshot-3.jpg)
 
 ## Commands
 
