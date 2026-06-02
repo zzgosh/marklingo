@@ -8,6 +8,8 @@ MarkLingo は、現在保存されている Markdown ファイルを翻訳済み
 
 翻訳はご自身の API キーを使って [OpenRouter](https://openrouter.ai) 経由で実行されます。モデルはご自身で選択でき、使った分だけお支払いいただきます。
 
+MarkLingo 自体は無料で利用でき、完全にオープンソースで透明です。すべてのソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。お支払いは、選択したモデルに応じた OpenRouter/モデルサービスの利用料金のみです。
+
 ![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## MarkLingo の特長
@@ -18,6 +20,7 @@ MarkLingo は、現在保存されている Markdown ファイルを翻訳済み
 - 変更されていない Markdown ブロックが再び翻訳されるとき、以前の翻訳を再利用します。
 - フィールド名と機械可読の値は保持しつつ、人間向けに選択された YAML frontmatter の値（`title` や `description` など）を翻訳します。
 - 専用の設定ページから、OpenRouter エンドポイント、モデル、API キー、ターゲット言語、カスタム指示を設定できます。
+- 拡張機能自体は無料で、透明性のある完全なオープンソースです。ソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。
 - API キーは VS Code の `SecretStorage` に保存します。ワークスペースのファイルや拡張機能のメタデータには保存しません。
 
 ## インストール
