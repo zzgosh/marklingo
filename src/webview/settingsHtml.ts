@@ -24,6 +24,15 @@ export type SettingsState = {
   systemPrompt: string;
   customPrompt: string;
   storageRoot: string;
+  storageStats: {
+    totalBytes: number;
+    quotaBytes: number;
+    projectCount: number;
+    metaFileCount: number;
+    activeCacheCount: number;
+    evictedCacheCount: number;
+    cachePayloadBytes: number;
+  };
 };
 
 export type RenderSettingsHtmlOptions = {
@@ -70,6 +79,19 @@ function getShortcutWarningText(warning: string): string {
 
 const API_KEY_MASK_VALUE = '•'.repeat(32);
 
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  const digits = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
 export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const { beforeMainScript = '', cspSource, extraHead = '', nonce, state } = options;
   const apiKeyInitialAttrs = state.hasApiKey
@@ -77,6 +99,24 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     : '';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
+  const pluralize = (count: number, singular: string, plural: string): string =>
+    `${count} ${count === 1 ? singular : plural}`;
+  const storageStatsTextParts = [
+    pluralize(state.storageStats.projectCount, 'project', 'projects'),
+    pluralize(state.storageStats.metaFileCount, 'metadata file', 'metadata files'),
+  ];
+  if (state.storageStats.evictedCacheCount > 0) {
+    storageStatsTextParts.push(pluralize(
+      state.storageStats.evictedCacheCount,
+      'small tracking record',
+      'small tracking records',
+    ));
+  }
+  const storageStatsText = storageStatsTextParts.join(' · ');
+  const storagePercent = state.storageStats.quotaBytes > 0
+    ? Math.min(100, Math.max(0, Math.round((state.storageStats.totalBytes / state.storageStats.quotaBytes) * 100)))
+    : 0;
+  const storageMeterState = storagePercent >= 90 ? 'warning' : 'normal';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -111,8 +151,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       min-height: 100vh;
     }
     main {
-      width: min(100%, 800px);
-      padding: 56px 28px 72px;
+      width: min(100%, 920px);
+      padding: 48px 32px 72px;
       margin: 0 auto;
     }
     h1 {
@@ -136,16 +176,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .card {
       border: 1px solid var(--border);
       border-radius: 8px;
-      overflow: hidden;
       background: color-mix(in srgb, var(--panel) 80%, transparent);
     }
     .card.danger { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
     .row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(220px, 1.15fr);
-      gap: 22px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 24px;
       align-items: center;
-      padding: 12px 18px;
+      padding: 14px 20px;
       border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
     }
     .row:last-child { border-bottom: 0; }
@@ -206,6 +245,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       top: 8px;
       display: inline-grid;
       width: 26px;
+      min-width: 26px;
       min-height: 26px;
       place-items: center;
       border: 1px solid var(--border);
@@ -242,7 +282,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .inline {
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
       min-width: 0;
     }
@@ -282,9 +322,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     button {
       min-height: 34px;
+      min-width: 100px;
       border: 0;
       border-radius: 6px;
-      padding: 0 10px;
+      padding: 0 14px;
       background: var(--button);
       color: var(--button-fg);
       font: inherit;
@@ -301,7 +342,16 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--danger);
     }
     button:disabled { cursor: default; }
-    button.save-btn { min-width: 56px; }
+    button.save-btn:not(:disabled):hover {
+      background: var(--vscode-button-hoverBackground, color-mix(in srgb, var(--button) 86%, var(--fg)));
+    }
+    button.secondary:not(:disabled):hover {
+      background: color-mix(in srgb, var(--fg) 7%, transparent);
+      border-color: color-mix(in srgb, var(--fg) 30%, transparent);
+    }
+    button.danger:not(:disabled):hover {
+      background: color-mix(in srgb, var(--danger) 12%, transparent);
+    }
     button.save-btn:disabled {
       background: color-mix(in srgb, var(--fg) 12%, transparent);
       color: var(--muted);
@@ -320,27 +370,26 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .shortcut-controls {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 56px;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       min-width: 0;
     }
     .shortcut-pill {
-      display: flex;
-      min-height: 34px;
-      width: 100%;
+      display: inline-flex;
       align-items: center;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 7px 10px;
-      background: var(--input);
+      justify-self: start;
+      min-height: 26px;
+      max-width: 100%;
+      padding: 3px 10px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--fg) 8%, transparent);
       color: var(--muted);
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    #open-keyboard-shortcuts {
-      width: 56px;
     }
     .section-warning {
       margin-top: 8px;
@@ -381,6 +430,94 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    .storage-panel {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      min-width: 0;
+    }
+    .storage-content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .storage-primary {
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .storage-secondary {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .storage-meter {
+      height: 4px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--fg) 10%, transparent);
+      overflow: hidden;
+    }
+    .storage-meter-fill {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+      border-radius: inherit;
+      transition: width 200ms ease;
+    }
+    .storage-meter[data-state="warning"] .storage-meter-fill {
+      background: var(--danger);
+    }
+    .info-tip {
+      position: relative;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+      color: var(--muted);
+      cursor: help;
+      line-height: 0;
+    }
+    .info-tip:hover,
+    .info-tip:focus-visible {
+      color: var(--fg);
+      outline: none;
+    }
+    .info-tip > svg {
+      display: block;
+      width: 14px;
+      height: 14px;
+    }
+    .info-tip .tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: 280px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--fg);
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.5;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 120ms ease, visibility 120ms;
+      pointer-events: none;
+      z-index: 10;
+      white-space: normal;
+      text-align: left;
+    }
+    .info-tip:hover .tooltip,
+    .info-tip:focus-visible .tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+    .row .label + .help {
+      margin-top: 8px;
+    }
     .notice {
       padding: 10px 12px;
       border-radius: 6px;
@@ -395,7 +532,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     @media (max-width: 760px) {
       main { padding: 28px 18px 54px; }
-      .row { grid-template-columns: 1fr; gap: 10px; }
+      .row { grid-template-columns: 1fr; gap: 12px; padding: 14px 16px; }
       .shortcut-controls { justify-content: flex-start; }
     }
   </style>
@@ -501,14 +638,30 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
         <h2>Output</h2>
         <section class="card">
-          <div class="row">
+          <div class="row top-align">
             <div>
-              <div class="label">Private Data Folder</div>
-              <div class="help">Stores cache and metadata.</div>
+              <div class="label">Translation Metadata Folder</div>
+              <div class="help">Stores translation metadata and cached translations.</div>
             </div>
             <div class="inline">
               <input class="path-field" id="storageRoot" value="${escapeHtml(state.storageRoot)}" readonly>
               <button class="secondary" id="reveal-storage" type="button">Reveal</button>
+            </div>
+          </div>
+          <div class="row top-align">
+            <div>
+              <div class="label">Metadata Storage</div>
+              <div class="help">Optimize removes the oldest cache. Translated files stay.</div>
+            </div>
+            <div class="storage-panel">
+              <div class="storage-content">
+                <div class="storage-primary">${escapeHtml(formatBytes(state.storageStats.totalBytes))} of ${escapeHtml(formatBytes(state.storageStats.quotaBytes))} used<span class="info-tip" tabindex="0" aria-label="About the storage limit"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">When usage reaches ${escapeHtml(formatBytes(state.storageStats.quotaBytes))}, MarkLingo automatically removes the oldest cached translations to keep storage in check. Generated Markdown files are never touched.</span></span></div>
+                <div class="storage-secondary">${escapeHtml(storageStatsText)}</div>
+                <div class="storage-meter" data-state="${storageMeterState}" aria-hidden="true">
+                  <span class="storage-meter-fill" style="width: ${storagePercent}%"></span>
+                </div>
+              </div>
+              <button class="secondary" id="optimize-storage" type="button">Optimize</button>
             </div>
           </div>
         </section>
@@ -518,7 +671,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           <div class="row top-align">
             <div>
               <div class="label">Clear Data</div>
-              <div class="danger-list">Delete saved API key, MarkLingo settings, private cache and metadata, and tracked translated files.</div>
+              <div class="danger-list">Delete saved API key, MarkLingo settings, translation metadata/cache, and tracked translated files.</div>
             </div>
             <div class="danger-action">
               <button class="danger" type="button" id="clear-data">Clear data</button>
@@ -761,6 +914,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     document.getElementById('open-keyboard-shortcuts').addEventListener('click', () => vscode.postMessage({ type: 'openKeyboardShortcuts' }));
     document.getElementById('reveal-storage').addEventListener('click', () => vscode.postMessage({ type: 'revealStorage' }));
+    document.getElementById('optimize-storage').addEventListener('click', () => vscode.postMessage({ type: 'optimizeStorage' }));
 
     window.addEventListener('message', (event) => {
       const msg = event.data;

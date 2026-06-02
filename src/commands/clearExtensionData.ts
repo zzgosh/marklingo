@@ -63,7 +63,7 @@ function buildSummaryMessage(summary: ClearExtensionDataSummary): string {
   const parts: string[] = [];
   if (summary.apiKeysCleared) parts.push('API key');
   if (summary.settingsCleared > 0) parts.push(`${summary.settingsCleared} user setting(s)`);
-  if (summary.globalStorageCleared) parts.push('private metadata/cache');
+  if (summary.globalStorageCleared) parts.push('translation metadata/cache');
   if (summary.workspaceOutputs) {
     parts.push(`${summary.workspaceOutputs.deleted} workspace translated file(s)`);
     if (summary.workspaceOutputs.skipped > 0) {
@@ -132,11 +132,11 @@ async function runCleanup(context: vscode.ExtensionContext, ids: Set<CleanupOpti
       }
 
       if (ids.has('globalStorage')) {
-        progress.report({ message: 'Deleting private metadata/cache' });
+        progress.report({ message: 'Deleting translation metadata/cache' });
         try {
           result.globalStorageCleared = await clearExtensionGlobalStorage(context);
         } catch (error) {
-          addCleanupError(result, 'private metadata/cache', error);
+          addCleanupError(result, 'translation metadata/cache', error);
         }
       }
 

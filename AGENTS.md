@@ -48,7 +48,9 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 
 API keys must only use VS Code `SecretStorage`. Keys are separated by endpoint origin. Do not store API keys in workspace settings, metadata, logs, or debug output.
 
-Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, source blocks, cached translated blocks, output hashes, and structured debug metadata. Visible translated Markdown output is always written as `*_<language>_mdt.md` next to the source Markdown file.
+Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, cached translated blocks, output hashes, cache state, and structured debug metadata. Visible translated Markdown output is always written as `*_<language>_mdt.md` next to the source Markdown file.
+
+Private storage is quota-managed. Successful translation writes active cache payloads, then enforces the 300 MB private storage quota by evicting least-recently-used cache payloads into tracking stubs. Settings `Optimize` compacts toward 150 MB. Tracking stubs must preserve `sourceUri`, `outputUri`, `outputHash`, and `targetLanguage` so cleanup can still identify generated outputs after cached translations are reclaimed.
 
 The Command Palette delete command should delete only the current project's extension-tracked outputs and project private metadata/cache. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation. The Settings Danger Zone is the only user-facing entry point for cross-project cleanup.
 
@@ -64,7 +66,7 @@ The Command Palette delete command should delete only the current project's exte
 - request plan, chunk counts, estimated prompt tokens, request duration, and request status
 - warnings, errors, and concise event messages
 
-Do not add raw API keys, full prompt text, full OpenRouter responses, or duplicate full source/translated document snapshots to `debug`. The normal cache already stores source blocks and translated blocks.
+Do not add raw API keys, full prompt text, full OpenRouter responses, or duplicate full source/translated document snapshots to `debug`. The normal cache stores translated blocks; metadata should keep source block hashes rather than duplicate full source text.
 
 On translation failure, preserve existing cache metadata when possible and update only `debug`, so one failed run does not wipe incremental-translation state.
 

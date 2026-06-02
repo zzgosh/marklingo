@@ -88,6 +88,10 @@ function getPreviewBridgeScript(nonce) {
           console.info('[MarkLingo Settings preview] clearData is mocked; no files or settings are deleted.', message.scopes);
           return;
         }
+        if (message.type === 'optimizeStorage') {
+          console.info('[MarkLingo Settings preview] optimizeStorage is mocked; no cached translations are changed.');
+          return;
+        }
         if (message.type === 'copySystemPrompt') {
           navigator.clipboard?.writeText(message.value ?? '').catch(() => {});
           console.info('[MarkLingo Settings preview] copySystemPrompt is mocked.');
@@ -113,6 +117,15 @@ function buildState(url) {
     systemPrompt: resolveSystemPrompt('', usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文'),
     customPrompt: '',
     storageRoot: path.join(root, '.vscode-test', 'marklingo-preview', 'globalStorage', 'projects'),
+    storageStats: {
+      totalBytes: url.searchParams.get('storage') === 'full' ? 285 * 1024 * 1024 : 46 * 1024 * 1024,
+      quotaBytes: 300 * 1024 * 1024,
+      projectCount: 3,
+      metaFileCount: 14,
+      activeCacheCount: 11,
+      evictedCacheCount: 3,
+      cachePayloadBytes: url.searchParams.get('storage') === 'full' ? 250 * 1024 * 1024 : 38 * 1024 * 1024,
+    },
   };
 }
 
