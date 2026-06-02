@@ -8,6 +8,8 @@ MarkLingo turns the active saved Markdown file into a translated copy while pres
 
 Translation runs through [OpenRouter](https://openrouter.ai) with your own API key, so you pick the model and pay only for what you use.
 
+MarkLingo itself is free to use and fully open source: all source code is public on [GitHub](https://github.com/zzgosh/marklingo). You only pay OpenRouter/model usage directly, based on the model you choose.
+
 ![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## Why MarkLingo
@@ -18,6 +20,7 @@ Translation runs through [OpenRouter](https://openrouter.ai) with your own API k
 - Reuse prior translations when unchanged Markdown blocks are translated again.
 - Translate selected human-facing YAML frontmatter values, such as `title` and `description`, while preserving field names and machine-readable values.
 - Configure the OpenRouter endpoint, model, API key, target language, and custom instructions from a dedicated settings page.
+- Use a transparent, fully open-source extension with no extension fee; the source code is public on [GitHub](https://github.com/zzgosh/marklingo).
 - Store API keys in VS Code `SecretStorage`; do not store them in workspace files or extension metadata.
 
 ## Install

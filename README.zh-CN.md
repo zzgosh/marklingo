@@ -8,6 +8,8 @@ MarkLingo 会将当前已保存的 Markdown 文件翻译成一份副本，同时
 
 翻译通过 [OpenRouter](https://openrouter.ai) 并使用你自己的 API 密钥完成，因此模型由你选择，用多少付多少。
 
+MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代码都公开在 [GitHub](https://github.com/zzgosh/marklingo) 上。你只需按所选模型直接支付 OpenRouter/模型服务的用量费用。
+
 ![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## 为什么选择 MarkLingo
@@ -18,6 +20,7 @@ MarkLingo 会将当前已保存的 Markdown 文件翻译成一份副本，同时
 - 当未改动的 Markdown 块再次被翻译时，复用此前的翻译。
 - 翻译选定的、面向人类阅读的 YAML frontmatter 值（例如 `title` 和 `description`），同时保留字段名和机器可读的值。
 - 在专门的设置页面中配置 OpenRouter 端点、模型、API 密钥、目标语言和自定义指令。
+- 使用完全开源透明、插件本身免费的扩展；所有源代码都公开在 [GitHub](https://github.com/zzgosh/marklingo) 上。
 - 将 API 密钥存储在 VS Code 的 `SecretStorage` 中；不会存入工作区文件或扩展元数据。
 
 ## 安装
