@@ -4,16 +4,11 @@ All notable changes to MarkLingo are documented in this file.
 
 ## 0.0.3
 
-- Add editor and Explorer context-menu actions for Markdown translation.
-- Add folder and Explorer multi-selection batch translation for `.md` and `.markdown` files.
-- Reuse cached block translations during batch translation and open only the first successful batch output.
-- Skip generated `*_mdt.md` files, `.git`, `node_modules`, and symbolic links during folder scanning.
-- Simplify translation progress notifications to reduce visual noise during single-file and batch translation.
-- Keep Explorer translation commands separate from the editor shortcut command so Explorer menus do not show the editor shortcut.
-- Refine project cleanup UX: the Command Palette delete action now removes only current-project tracked translated Markdown files, while Settings Danger Zone handles project data and all-data cleanup.
-- Add an isolated VS Code development launcher for manual extension smoke testing.
-- Highlight that MarkLingo is free and open source in English, Simplified Chinese, Traditional Chinese, and Japanese README files.
-- Stop uploading checksum assets to GitHub Releases.
+- Batch translate folders from the Explorer. Right-click a folder, or multi-select Markdown files and folders, to translate source `.md` and `.markdown` files in one run.
+- Keep batch translation usable while it runs. MarkLingo opens the first translated output and preview, writes the rest beside their source files, reuses cached blocks, and keeps progress notifications concise.
+- Reduce translation menu clutter. Generated `*_mdt.md` outputs are skipped and hidden from translation actions, and Explorer commands no longer show the editor keyboard shortcut.
+- Make project cleanup safer. The Command Palette cleanup now removes only tracked translated files for the current project; metadata/cache cleanup stays in Settings.
+- Clarify in the README that MarkLingo is free and open source.
 
 ## 0.0.2
 
