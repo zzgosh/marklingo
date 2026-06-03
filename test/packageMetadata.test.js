@@ -31,6 +31,7 @@ test('command palette contributions expose only main user actions', () => {
     'marklingo.openSettings',
     'marklingo.translateCurrentMarkdown',
     'marklingo.translateCurrentMarkdownFull',
+    'marklingo.translateFolderMarkdown',
   ]);
   assert.ok(!commandIds.has('marklingo.clearExtensionData'));
   assert.ok(!commandIds.has('marklingo.openrouter.resetApiKey'));
@@ -38,6 +39,30 @@ test('command palette contributions expose only main user actions', () => {
   assert.ok(!commandIds.has('marklingo.openrouter.setApiKey'));
   assert.ok(!commandIds.has('marklingo.openrouter.setModelId'));
   assert.ok(!commandIds.has('marklingo.setTargetLanguage'));
+});
+
+test('context menus expose markdown and folder translation actions', () => {
+  const pkg = readPackageJson();
+  const editorMenus = pkg.contributes.menus['editor/context'];
+  const explorerMenus = pkg.contributes.menus['explorer/context'];
+
+  const editorTranslate = editorMenus.find((item) => item.command === 'marklingo.translateCurrentMarkdown');
+  assert.ok(editorTranslate, 'expected editor context menu translation command');
+  assert.match(editorTranslate.when, /editorLangId == markdown/);
+  assert.match(editorTranslate.when, /resourceExtname == \.md/);
+  assert.match(editorTranslate.when, /resourceExtname == \.markdown/);
+
+  const explorerFileTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateCurrentMarkdown');
+  assert.ok(explorerFileTranslate, 'expected explorer file context menu translation command');
+  assert.match(explorerFileTranslate.when, /!explorerResourceIsFolder/);
+  assert.match(explorerFileTranslate.when, /isFileSystemResource/);
+  assert.match(explorerFileTranslate.when, /resourceExtname == \.md/);
+  assert.match(explorerFileTranslate.when, /resourceExtname == \.markdown/);
+
+  const explorerFolderTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateFolderMarkdown');
+  assert.ok(explorerFolderTranslate, 'expected explorer folder context menu translation command');
+  assert.match(explorerFolderTranslate.when, /explorerResourceIsFolder/);
+  assert.match(explorerFolderTranslate.when, /isFileSystemResource/);
 });
 
 test('cleanup configuration keys match package configuration contributions', () => {

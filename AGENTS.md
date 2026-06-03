@@ -32,7 +32,7 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 ## Main Architecture
 
 - `src/extension.ts` registers VS Code commands.
-- `src/commands/translateCurrentMarkdown.ts` owns the translation workflow: validation, target-language selection, segmentation, cache reuse, request planning, OpenRouter calls, output assembly, metadata writing, and Markdown preview.
+- `src/commands/translateCurrentMarkdown.ts` owns single-file and folder translation workflows: validation, target-language selection, folder scanning, serial batch translation, segmentation, cache reuse, request planning, OpenRouter calls, output assembly, metadata writing, and Markdown preview.
 - `src/services/openRouterClient.ts` handles OpenRouter settings, endpoint validation, per-origin SecretStorage API keys, model-context lookup, and chat completions.
 - `src/translation/segmenter.ts` splits Markdown into stable translatable blocks, including selected human-facing YAML frontmatter scalar values.
 - `src/translation/frontmatterValues.ts` finds translatable YAML frontmatter scalar value ranges for known human-facing fields while preserving field names, delimiters, comments, and machine-readable values.

@@ -59,6 +59,10 @@
         "title": "MarkLingo: Retranslate Current Markdown"
       },
       {
+        "command": "marklingo.translateFolderMarkdown",
+        "title": "MarkLingo: Translate All Markdown in This Folder"
+      },
+      {
         "command": "marklingo.deleteCurrentProjectTranslatedFiles",
         "title": "MarkLingo: Delete Current Project Translated Files"
       },
@@ -81,6 +85,27 @@
         "when": "editorTextFocus && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "marklingo.translateCurrentMarkdown",
+          "when": "editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown",
+          "group": "navigation@10"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "marklingo.translateCurrentMarkdown",
+          "when": "!explorerResourceIsFolder && isFileSystemResource && (resourceExtname == .md || resourceExtname == .markdown)",
+          "group": "navigation@10"
+        },
+        {
+          "command": "marklingo.translateFolderMarkdown",
+          "when": "explorerResourceIsFolder && isFileSystemResource",
+          "group": "navigation@11"
+        }
+      ]
+    },
     "configuration": {
       "title": "MarkLingo",
       "properties": {

@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { getOpenRouterModelContextLength, getOpenRouterSettings, openRouterChatCompletion } from '../services/openRouterClient.js';
+import {
+  getOpenRouterModelContextLength,
+  getOpenRouterSettings,
+  openRouterChatCompletion,
+  type OpenRouterSettings,
+} from '../services/openRouterClient.js';
 import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
 import { getMetaFileUri, getOutputLocation, getTranslatedFileUri } from '../storage/paths.js';
 import { restoreTranslatedBlock } from '../translation/blockResults.js';
@@ -238,6 +243,38 @@ function tryParseJsonObject(text: string): any {
 
 export type TranslateMode = 'auto' | 'full';
 
+type TranslationRuntime = {
+  targetLanguage: string;
+  settings: OpenRouterSettings;
+  maxBlocksPerRequest: number;
+  maxContextUsageRatio: number;
+  systemPrompt: string;
+  customPrompt: string;
+};
+
+type TranslationProgress = vscode.Progress<{ message?: string; increment?: number }>;
+
+type TranslateMarkdownOptions = {
+  mode?: TranslateMode;
+  openOutput?: boolean;
+  outputViewColumn?: vscode.ViewColumn;
+  progress?: TranslationProgress;
+};
+
+type TranslateMarkdownResult =
+  | {
+      status: 'translated';
+      sourceUri: vscode.Uri;
+      translatedUri: vscode.Uri;
+      metaUri: vscode.Uri;
+    }
+  | {
+      status: 'skipped';
+      sourceUri: vscode.Uri;
+      reason: 'empty' | 'noTranslatable';
+      message: string;
+    };
+
 function hasMarkdownFileExtension(uri: vscode.Uri): boolean {
   const ext = path.extname(uri.fsPath).toLowerCase();
   return ext === '.md' || ext === '.markdown';
@@ -247,42 +284,103 @@ function isMarkdownDocument(doc: vscode.TextDocument): boolean {
   return doc.languageId === 'markdown' || hasMarkdownFileExtension(doc.uri);
 }
 
-async function openTranslatedMarkdown(translatedUri: vscode.Uri): Promise<void> {
+function isTranslatedMarkdownOutput(uri: vscode.Uri): boolean {
+  return path.parse(uri.fsPath).name.endsWith('_mdt');
+}
+
+async function openTranslatedMarkdown(translatedUri: vscode.Uri, viewColumn: vscode.ViewColumn): Promise<void> {
   const translatedDoc = await vscode.workspace.openTextDocument(translatedUri);
   await vscode.window.showTextDocument(translatedDoc, {
-    viewColumn: vscode.ViewColumn.Active,
+    viewColumn,
     preview: false,
   });
   await vscode.commands.executeCommand('markdown.showPreviewToSide', translatedUri);
 }
 
-export async function translateCurrentMarkdown(context: vscode.ExtensionContext, options: { mode?: TranslateMode } = {}) {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    await vscode.window.showErrorMessage('MarkLingo: No active editor is available.');
-    return;
+function getOutputViewColumnForSource(sourceUri?: vscode.Uri): vscode.ViewColumn {
+  const activeEditor = vscode.window.activeTextEditor;
+  if (!sourceUri) {
+    return activeEditor?.viewColumn ?? vscode.ViewColumn.Active;
   }
+  if (activeEditor?.document.uri.toString() === sourceUri.toString()) {
+    return activeEditor.viewColumn ?? vscode.ViewColumn.Active;
+  }
+  return vscode.ViewColumn.One;
+}
 
-  const doc = editor.document;
+function getDocumentValidationError(doc: vscode.TextDocument, sourceLabel: 'active file' | 'selected file'): string | undefined {
   if (!isMarkdownDocument(doc)) {
-    await vscode.window.showErrorMessage('MarkLingo: The active file is not Markdown.');
-    return;
+    return sourceLabel === 'active file'
+      ? 'MarkLingo: The active file is not Markdown.'
+      : 'MarkLingo: The selected file is not Markdown.';
   }
   if (doc.isUntitled) {
-    await vscode.window.showErrorMessage('MarkLingo: Save the file before translating.');
-    return;
+    return 'MarkLingo: Save the file before translating.';
+  }
+  if (isTranslatedMarkdownOutput(doc.uri)) {
+    return 'MarkLingo: This file already looks like translated output (*_mdt.md). Run translation on the source Markdown file.';
+  }
+  return undefined;
+}
+
+async function resolveMarkdownDocument(sourceUri?: vscode.Uri): Promise<{ doc?: vscode.TextDocument; error?: string }> {
+  if (sourceUri) {
+    if (sourceUri.scheme !== 'file') {
+      return { error: 'MarkLingo: Only local Markdown files can be translated.' };
+    }
+    let doc: vscode.TextDocument;
+    try {
+      doc = await vscode.workspace.openTextDocument(sourceUri);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { error: `MarkLingo: Could not open the selected file. ${msg}` };
+    }
+    return { doc, error: getDocumentValidationError(doc, 'selected file') };
   }
 
-  const parsed = path.parse(doc.uri.fsPath);
-  if (parsed.name.endsWith('_mdt')) {
-    await vscode.window.showErrorMessage('MarkLingo: This file already looks like translated output (*_mdt.md). Run translation on the source Markdown file.');
-    return;
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return { error: 'MarkLingo: No active editor is available.' };
   }
+  const doc = editor.document;
+  return { doc, error: getDocumentValidationError(doc, 'active file') };
+}
 
+async function resolveTranslationRuntime(context: vscode.ExtensionContext): Promise<TranslationRuntime | null> {
+  const targetLanguage = await ensureTargetLanguage(context);
+  if (!targetLanguage) return null;
+
+  const settings = await getOpenRouterSettings(context);
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
+  const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
+  const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
+  const customPrompt = (cfg.get<string>('translation.customPrompt') ?? '').trim();
+
+  return {
+    targetLanguage,
+    settings,
+    maxBlocksPerRequest,
+    maxContextUsageRatio,
+    systemPrompt,
+    customPrompt,
+  };
+}
+
+async function translateMarkdownDocument(
+  context: vscode.ExtensionContext,
+  doc: vscode.TextDocument,
+  runtime: TranslationRuntime,
+  options: TranslateMarkdownOptions = {},
+): Promise<TranslateMarkdownResult> {
   const sourceText = doc.getText();
   if (!sourceText.trim()) {
-    await vscode.window.showInformationMessage('MarkLingo: The active document is empty.');
-    return;
+    return {
+      status: 'skipped',
+      sourceUri: doc.uri,
+      reason: 'empty',
+      message: 'MarkLingo: The Markdown document is empty.',
+    };
   }
 
   const debugStartedAtMs = Date.now();
@@ -292,19 +390,19 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
   let metaUri: vscode.Uri | undefined;
 
   try {
-    const targetLanguage = await ensureTargetLanguage(context);
-    if (!targetLanguage) return;
+    const {
+      targetLanguage,
+      settings,
+      maxBlocksPerRequest,
+      maxContextUsageRatio,
+      systemPrompt,
+      customPrompt,
+    } = runtime;
     const currentTranslatedUri = getTranslatedFileUri(context, doc.uri, targetLanguage);
     const currentMetaUri = getMetaFileUri(context, doc.uri, targetLanguage);
     translatedUri = currentTranslatedUri;
     metaUri = currentMetaUri;
 
-    const settings = await getOpenRouterSettings(context);
-    const cfg = vscode.workspace.getConfiguration('marklingo');
-    const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
-    const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
-    const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
-    const customPrompt = (cfg.get<string>('translation.customPrompt') ?? '').trim();
     debug.settings = {
       baseUrl: settings.baseUrl,
       modelId: settings.modelId,
@@ -330,17 +428,15 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
     const segments = segmentMarkdownDocument(doc);
     const translatableBase = segments.filter((s) => s.translatable && s.text.trim());
     if (translatableBase.length === 0) {
-      await vscode.window.showInformationMessage('MarkLingo: No translatable Markdown content was found.');
-      return;
+      return {
+        status: 'skipped',
+        sourceUri: doc.uri,
+        reason: 'noTranslatable',
+        message: 'MarkLingo: No translatable Markdown content was found.',
+      };
     }
 
-    const { markdown: translatedMarkdown, meta: nextMeta } = await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: 'MarkLingo: Translating Markdown',
-        cancellable: false,
-      },
-      async (progress) => {
+    const translateWithProgress = async (progress: TranslationProgress) => {
         debug.document.totalSegments = segments.length;
         debug.document.translatableBlocks = translatableBase.length;
 
@@ -531,8 +627,18 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
         markTranslationMetaCacheActive(meta, meta.updatedAt);
 
         return { markdown: out, meta };
-      },
-    );
+      };
+
+    const { markdown: translatedMarkdown, meta: nextMeta } = options.progress
+      ? await translateWithProgress(options.progress)
+      : await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'MarkLingo: Translating Markdown',
+          cancellable: false,
+        },
+        translateWithProgress,
+      );
 
     await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(currentTranslatedUri.fsPath)));
     await Promise.all([
@@ -553,7 +659,15 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       );
     }
 
-    await openTranslatedMarkdown(currentTranslatedUri);
+    if (options.openOutput !== false) {
+      await openTranslatedMarkdown(currentTranslatedUri, options.outputViewColumn ?? vscode.ViewColumn.Active);
+    }
+    return {
+      status: 'translated',
+      sourceUri: doc.uri,
+      translatedUri: currentTranslatedUri,
+      metaUri: currentMetaUri,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     addDebugEvent(debug, 'error', msg);
@@ -569,6 +683,222 @@ export async function translateCurrentMarkdown(context: vscode.ExtensionContext,
       const metaMessage = metaError instanceof Error ? metaError.message : String(metaError);
       outputChannel.appendLine(`[${new Date().toISOString()}] Error: failed to write translation debug metadata: ${metaMessage}`);
     }
-    await vscode.window.showErrorMessage(`MarkLingo: Translation failed. ${msg}`);
+    throw err;
   }
+}
+
+type TranslateCurrentMarkdownOptions = {
+  mode?: TranslateMode;
+};
+
+export async function translateCurrentMarkdown(
+  context: vscode.ExtensionContext,
+  sourceUriOrOptions?: vscode.Uri | TranslateCurrentMarkdownOptions,
+  maybeOptions: TranslateCurrentMarkdownOptions = {},
+): Promise<TranslateMarkdownResult | undefined> {
+  const sourceUri = sourceUriOrOptions instanceof vscode.Uri ? sourceUriOrOptions : undefined;
+  const options = sourceUriOrOptions instanceof vscode.Uri ? maybeOptions : (sourceUriOrOptions ?? maybeOptions);
+  const { doc, error } = await resolveMarkdownDocument(sourceUri);
+  if (error || !doc) {
+    await vscode.window.showErrorMessage(error ?? 'MarkLingo: No Markdown file is available.');
+    return undefined;
+  }
+
+  try {
+    const runtime = await resolveTranslationRuntime(context);
+    if (!runtime) return undefined;
+    const result = await translateMarkdownDocument(context, doc, runtime, {
+      mode: options.mode,
+      outputViewColumn: getOutputViewColumnForSource(sourceUri),
+    });
+    if (result.status === 'skipped') {
+      await vscode.window.showInformationMessage(result.message);
+    }
+    return result;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await vscode.window.showErrorMessage(`MarkLingo: Translation failed. ${msg}`);
+    return undefined;
+  }
+}
+
+const TRANSLATE_FOLDER_CONFIRM_ACTION = 'Translate';
+const SKIPPED_FOLDER_NAMES = new Set(['.git', 'node_modules']);
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function getRelativeFolderLabel(baseUri: vscode.Uri, uri: vscode.Uri): string {
+  const relative = path.relative(baseUri.fsPath, uri.fsPath);
+  return relative && !relative.startsWith('..') ? relative : path.basename(uri.fsPath);
+}
+
+async function resolveMarkdownFolder(folderUri?: vscode.Uri): Promise<{ folderUri?: vscode.Uri; error?: string }> {
+  const resolvedUri = folderUri ?? (
+    vscode.window.activeTextEditor
+      ? vscode.Uri.file(path.dirname(vscode.window.activeTextEditor.document.uri.fsPath))
+      : undefined
+  );
+  if (!resolvedUri) {
+    return { error: 'MarkLingo: Select a folder in the Explorer or open a Markdown file first.' };
+  }
+  if (resolvedUri.scheme !== 'file') {
+    return { error: 'MarkLingo: Only local folders can be translated.' };
+  }
+
+  let stat: vscode.FileStat;
+  try {
+    stat = await vscode.workspace.fs.stat(resolvedUri);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { error: `MarkLingo: Could not inspect the selected folder. ${msg}` };
+  }
+  if ((stat.type & vscode.FileType.Directory) === 0) {
+    return { error: 'MarkLingo: Select a folder to translate all Markdown files in it.' };
+  }
+  return { folderUri: resolvedUri };
+}
+
+async function findMarkdownSourceFilesInFolder(folderUri: vscode.Uri): Promise<vscode.Uri[]> {
+  const files: vscode.Uri[] = [];
+  const visit = async (dirUri: vscode.Uri) => {
+    const entries = await vscode.workspace.fs.readDirectory(dirUri);
+    entries.sort(([a], [b]) => a.localeCompare(b));
+
+    for (const [name, type] of entries) {
+      const childUri = vscode.Uri.joinPath(dirUri, name);
+      if ((type & vscode.FileType.Directory) !== 0) {
+        if (!SKIPPED_FOLDER_NAMES.has(name)) {
+          await visit(childUri);
+        }
+        continue;
+      }
+      if ((type & vscode.FileType.File) !== 0 && hasMarkdownFileExtension(childUri) && !isTranslatedMarkdownOutput(childUri)) {
+        files.push(childUri);
+      }
+    }
+  };
+
+  await visit(folderUri);
+  return files;
+}
+
+export async function translateFolderMarkdown(context: vscode.ExtensionContext, folderUri?: vscode.Uri): Promise<void> {
+  const resolved = await resolveMarkdownFolder(folderUri);
+  if (resolved.error || !resolved.folderUri) {
+    await vscode.window.showErrorMessage(resolved.error ?? 'MarkLingo: No folder is available.');
+    return;
+  }
+
+  let markdownFiles: vscode.Uri[];
+  try {
+    markdownFiles = await findMarkdownSourceFilesInFolder(resolved.folderUri);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    await vscode.window.showErrorMessage(`MarkLingo: Could not scan the selected folder. ${msg}`);
+    return;
+  }
+
+  if (markdownFiles.length === 0) {
+    await vscode.window.showInformationMessage('MarkLingo: No source Markdown files were found in the selected folder.');
+    return;
+  }
+
+  const folderLabel = path.basename(resolved.folderUri.fsPath) || resolved.folderUri.fsPath;
+  const confirmed = await vscode.window.showWarningMessage(
+    `MarkLingo: Translate ${pluralize(markdownFiles.length, 'Markdown file')} in ${folderLabel} and subfolders?`,
+    { modal: true },
+    TRANSLATE_FOLDER_CONFIRM_ACTION,
+  );
+  if (confirmed !== TRANSLATE_FOLDER_CONFIRM_ACTION) {
+    await vscode.window.showInformationMessage('MarkLingo: Folder translation canceled.');
+    return;
+  }
+
+  let runtime: TranslationRuntime | null;
+  try {
+    runtime = await resolveTranslationRuntime(context);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    await vscode.window.showErrorMessage(`MarkLingo: Translation failed. ${msg}`);
+    return;
+  }
+  if (!runtime) return;
+
+  const summary = {
+    translated: 0,
+    skipped: 0,
+    failed: [] as Array<{ uri: vscode.Uri; message: string }>,
+    canceled: false,
+  };
+  const outputViewColumn = vscode.ViewColumn.One;
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'MarkLingo: Translating Folder',
+      cancellable: true,
+    },
+    async (progress, token) => {
+      for (const [index, uri] of markdownFiles.entries()) {
+        if (token.isCancellationRequested) {
+          summary.canceled = true;
+          break;
+        }
+
+        const relativeLabel = getRelativeFolderLabel(resolved.folderUri!, uri);
+        const fileLabel = `File ${index + 1} of ${markdownFiles.length}: ${relativeLabel}`;
+        progress.report({ message: fileLabel });
+
+        try {
+          const doc = await vscode.workspace.openTextDocument(uri);
+          const validationError = getDocumentValidationError(doc, 'selected file');
+          if (validationError) {
+            summary.skipped += 1;
+            outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped ${uri.fsPath}: ${validationError}`);
+            continue;
+          }
+
+          const fileProgress: TranslationProgress = {
+            report: (value) => {
+              progress.report({
+                message: value.message ? `${fileLabel} · ${value.message}` : fileLabel,
+              });
+            },
+          };
+          const result = await translateMarkdownDocument(context, doc, runtime!, {
+            mode: 'auto',
+            outputViewColumn,
+            progress: fileProgress,
+          });
+          if (result.status === 'translated') {
+            summary.translated += 1;
+          } else {
+            summary.skipped += 1;
+            outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped ${uri.fsPath}: ${result.message}`);
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          summary.failed.push({ uri, message: msg });
+          outputChannel.appendLine(`[${new Date().toISOString()}] Error: folder translation failed for ${uri.fsPath}: ${msg}`);
+        } finally {
+          progress.report({ increment: 100 / markdownFiles.length });
+        }
+      }
+    },
+  );
+
+  const summaryText = [
+    pluralize(summary.translated, 'file'),
+    summary.skipped > 0 ? `${pluralize(summary.skipped, 'file')} skipped` : undefined,
+    summary.failed.length > 0 ? `${pluralize(summary.failed.length, 'file')} failed` : undefined,
+  ].filter(Boolean).join(', ');
+
+  if (summary.failed.length > 0) {
+    await vscode.window.showErrorMessage(`MarkLingo: Folder translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}. See the MarkLingo output for details.`);
+    return;
+  }
+
+  await vscode.window.showInformationMessage(`MarkLingo: Folder translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}.`);
 }
