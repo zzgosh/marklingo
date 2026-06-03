@@ -24,6 +24,7 @@ export type SettingsState = {
   systemPrompt: string;
   customPrompt: string;
   storageRoot: string;
+  currentProjectPath?: string;
   storageStats: {
     totalBytes: number;
     quotaBytes: number;
@@ -117,6 +118,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     ? Math.min(100, Math.max(0, Math.round((state.storageStats.totalBytes / state.storageStats.quotaBytes) * 100)))
     : 0;
   const storageMeterState = storagePercent >= 90 ? 'warning' : 'normal';
+  const currentProjectPath = state.currentProjectPath?.trim();
+  const currentProjectDataDisabled = currentProjectPath ? '' : ' disabled';
+  const currentProjectDataDescription = currentProjectPath
+    ? currentProjectPath
+    : 'Open a file or single workspace folder to select a current project.';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -425,10 +431,25 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       justify-content: flex-end;
       align-items: flex-start;
     }
+    .danger-row {
+      grid-template-columns: minmax(0, 1fr) max-content;
+      gap: 32px;
+    }
+    .danger-copy {
+      min-width: 0;
+    }
+    .danger-row button {
+      white-space: nowrap;
+    }
     .danger-list {
       margin-top: 4px;
       color: var(--muted);
       overflow-wrap: anywhere;
+      max-width: 92ch;
+    }
+    .danger-list.path {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
     }
     .storage-panel {
       display: flex;
@@ -533,6 +554,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     @media (max-width: 760px) {
       main { padding: 28px 18px 54px; }
       .row { grid-template-columns: 1fr; gap: 12px; padding: 14px 16px; }
+      .danger-row { grid-template-columns: 1fr; }
+      .danger-action { justify-content: flex-start; }
       .shortcut-controls { justify-content: flex-start; }
     }
   </style>
@@ -668,13 +691,22 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
         <h2 class="danger-title">Danger Zone</h2>
         <section class="card danger">
-          <div class="row top-align">
-            <div>
-              <div class="label">Clear Data</div>
-              <div class="danger-list">Delete saved API key, MarkLingo settings, translation metadata/cache, and tracked translated files.</div>
+          <div class="row top-align danger-row">
+            <div class="danger-copy">
+              <div class="label">Clear Current Project Data</div>
+              <div class="danger-list path">${escapeHtml(currentProjectDataDescription)}</div>
             </div>
             <div class="danger-action">
-              <button class="danger" type="button" id="clear-data">Clear data</button>
+              <button class="danger" type="button" id="clear-current-project-data"${currentProjectDataDisabled}>Clear current project data</button>
+            </div>
+          </div>
+          <div class="row top-align danger-row">
+            <div class="danger-copy">
+              <div class="label">Clear All Data</div>
+              <div class="danger-list">Delete the saved API key, settings, metadata/cache, and tracked translated files if selected.</div>
+            </div>
+            <div class="danger-action">
+              <button class="danger" type="button" id="clear-all-data">Clear all data</button>
             </div>
           </div>
         </section>
@@ -891,9 +923,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       vscode.postMessage({ type: 'setApiKey', value: trimmed, saveId });
     });
 
-    const clearDataBtn = document.getElementById('clear-data');
-    clearDataBtn.addEventListener('click', () => {
-      vscode.postMessage({ type: 'clearData' });
+    const clearCurrentProjectDataBtn = document.getElementById('clear-current-project-data');
+    clearCurrentProjectDataBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'clearCurrentProjectData' });
+    });
+    const clearAllDataBtn = document.getElementById('clear-all-data');
+    clearAllDataBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'clearAllData' });
     });
 
     const copySystemPromptBtn = document.getElementById('copy-system-prompt');

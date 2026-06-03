@@ -21,7 +21,7 @@ function sanitizePathPart(value: string): string {
   return sanitized || 'project';
 }
 
-function getProjectRootUri(sourceUri: vscode.Uri): vscode.Uri {
+export function getProjectRootUri(sourceUri: vscode.Uri): vscode.Uri {
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(sourceUri);
   if (workspaceFolder) return workspaceFolder.uri;
   return vscode.Uri.file(path.dirname(sourceUri.fsPath));

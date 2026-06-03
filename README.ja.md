@@ -128,12 +128,19 @@ MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキ�
 
 保存されたデータを消去するには、`MarkLingo: Open Settings` とその危険ゾーンを使用します。
 
+`Clear All Data` では以下を削除できます。
+
 - 保存された API キー
 - MarkLingo のユーザー設定
-- 翻訳メタデータ/キャッシュ
+- グローバル翻訳メタデータ/キャッシュ
 - （任意）追跡されている翻訳ワークスペース出力
 
-現在のプロジェクトの拡張機能が追跡する翻訳ファイルとプライベートなメタデータ/キャッシュだけを整理したい場合は、`MarkLingo: Delete Current Project Translated Files` を使用します。このプロジェクト単位のコマンドは、生成後に編集されたものであっても、追跡対象の出力を意図的に削除します。
+`Clear Current Project Data` では、表示されているプロジェクトディレクトリについて以下を削除できます。
+
+- 追跡されているプロジェクトの翻訳出力
+- プロジェクトの翻訳メタデータ/キャッシュ
+
+現在のプロジェクトで拡張機能が追跡する翻訳ファイルだけを整理したい場合は、`MarkLingo: Delete Current Project Translated Files` を使用します。このプロジェクト単位のコマンドは、生成後に編集されたものであっても、追跡対象の出力を意図的に削除します。
 
 ## 開発
 
@@ -142,10 +149,13 @@ npm install
 npm run compile
 npm test
 npm run test:vscode
+npm run dev:vscode
 npm run package:dry
 ```
 
 `npm test` は高速な Node ユニットテストを実行します。`npm run test:vscode` は、一時的なワークスペース、ローカルのモック OpenRouter エンドポイント、偽の SecretStorage API キーを備えた、隔離された VS Code 拡張機能ホストを起動します。インストール済みの VSIX 設定や実際の OpenRouter キーは使用しません。
+
+`npm run dev:vscode` は、現在の作業ツリーを手動でスモークテストするために使います。拡張機能をビルドしてから、`--extensionDevelopmentPath` を使って別の VS Code ウィンドウを開き、システムの一時ディレクトリ内にある `marklingo-dev-user` という隔離ユーザーデータディレクトリと、`marklingo-dev-extensions` という隔離拡張機能ディレクトリを使用します。通常の VS Code プロファイルやインストール済みの Marketplace 版には影響しません。拡張機能は VSIX としてインストールされるのではなく開発パスから読み込まれるため、隔離された Extensions ビューに `Installed 0` と表示される場合がありますが、これは想定どおりです。Command Palette で `MarkLingo: Open Settings` を実行するか、`Developer: Show Running Extensions` を使って、開発版拡張機能が読み込まれていることを確認してください。実際の翻訳リクエストをテストする場合は、その隔離ウィンドウ内で API キーを再設定してください。固定ディレクトリを使いたい場合は、`MARKLINGO_DEV_USER_DATA_DIR` または `MARKLINGO_DEV_EXTENSIONS_DIR` で上書きできます。
 
 ローカルの VSIX をパッケージ化するには：
 

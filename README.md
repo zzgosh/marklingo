@@ -56,7 +56,7 @@ You can also run `MarkLingo: Open Settings` first to save your API key, target l
 | `MarkLingo: Retranslate Current Markdown` | Force a full retranslation of the current Markdown file. |
 | `MarkLingo: Open Settings` | Open MarkLingo settings for OpenRouter, API key, target language, custom instructions, shortcut status, and cleanup. |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
-| `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs and private translation metadata/cache. |
+| `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |
 
 ## Settings
 
@@ -92,7 +92,7 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Default: empty
   - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt.
 
-The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and Clear Data actions take effect immediately after confirmation.
+The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and cleanup actions take effect immediately after confirmation.
 
 ## Output Files
 
@@ -126,14 +126,21 @@ Changing `marklingo.openrouter.baseUrl` changes where future translation request
 
 ## Cleanup
 
-Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data:
+Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data.
+
+`Clear All Data` can delete:
 
 - Saved API key
 - MarkLingo user settings
-- Translation metadata/cache
+- Global translation metadata/cache
 - Optionally, tracked translated workspace outputs
 
-Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files and private metadata/cache. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation.
+`Clear Current Project Data` can delete, for the shown project directory:
+
+- Tracked translated project outputs
+- Project translation metadata/cache
+
+Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files. It intentionally deletes tracked outputs even if they were edited after generation.
 
 ## Development
 
@@ -142,10 +149,13 @@ npm install
 npm run compile
 npm test
 npm run test:vscode
+npm run dev:vscode
 npm run package:dry
 ```
 
 `npm test` runs fast Node unit tests. `npm run test:vscode` launches an isolated VS Code Extension Host with a temporary workspace, a local mock OpenRouter endpoint, and a fake SecretStorage API key. It does not use your installed VSIX settings or real OpenRouter key.
+
+Use `npm run dev:vscode` for manual smoke testing of the current working tree. It builds the extension, then opens a separate VS Code window with `--extensionDevelopmentPath`, an isolated user data directory named `marklingo-dev-user` in the system temp directory, and an isolated extensions directory named `marklingo-dev-extensions` in the system temp directory. This keeps your regular VS Code profile and installed Marketplace version untouched. Because the extension is loaded from the development path instead of installed as a VSIX, the isolated Extensions view may still show `Installed 0`; that is expected. Verify the loaded development extension from the Command Palette with `MarkLingo: Open Settings`, or use `Developer: Show Running Extensions`. Configure the API key again inside that isolated window when testing real translation requests. Override `MARKLINGO_DEV_USER_DATA_DIR` or `MARKLINGO_DEV_EXTENSIONS_DIR` to choose fixed directories.
 
 Package a local VSIX:
 
