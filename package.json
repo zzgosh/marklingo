@@ -2,7 +2,7 @@
   "name": "marklingo",
   "displayName": "MarkLingo - Translate Markdown with AI",
   "description": "Translate Markdown through OpenRouter while preserving structure, links, code, and frontmatter.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "zzgosh",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
