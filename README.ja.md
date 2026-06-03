@@ -155,7 +155,7 @@ npm run package:dry
 
 `npm test` は高速な Node ユニットテストを実行します。`npm run test:vscode` は、一時的なワークスペース、ローカルのモック OpenRouter エンドポイント、偽の SecretStorage API キーを備えた、隔離された VS Code 拡張機能ホストを起動します。インストール済みの VSIX 設定や実際の OpenRouter キーは使用しません。
 
-`npm run dev:vscode` は、現在の作業ツリーを手動でスモークテストするために使います。拡張機能をビルドしてから、`--extensionDevelopmentPath` を使って別の VS Code ウィンドウを開き、隔離されたユーザーデータディレクトリ `/tmp/marklingo-dev-user` と隔離された拡張機能ディレクトリ `/tmp/marklingo-dev-extensions` を使用します。通常の VS Code プロファイルやインストール済みの Marketplace 版には影響しません。拡張機能は VSIX としてインストールされるのではなく開発パスから読み込まれるため、隔離された Extensions ビューに `Installed 0` と表示される場合がありますが、これは想定どおりです。Command Palette で `MarkLingo: Open Settings` を実行するか、`Developer: Show Running Extensions` を使って、開発版拡張機能が読み込まれていることを確認してください。実際の翻訳リクエストをテストする場合は、その隔離ウィンドウ内で API キーを再設定してください。
+`npm run dev:vscode` は、現在の作業ツリーを手動でスモークテストするために使います。拡張機能をビルドしてから、`--extensionDevelopmentPath` を使って別の VS Code ウィンドウを開き、システムの一時ディレクトリ内にある `marklingo-dev-user` という隔離ユーザーデータディレクトリと、`marklingo-dev-extensions` という隔離拡張機能ディレクトリを使用します。通常の VS Code プロファイルやインストール済みの Marketplace 版には影響しません。拡張機能は VSIX としてインストールされるのではなく開発パスから読み込まれるため、隔離された Extensions ビューに `Installed 0` と表示される場合がありますが、これは想定どおりです。Command Palette で `MarkLingo: Open Settings` を実行するか、`Developer: Show Running Extensions` を使って、開発版拡張機能が読み込まれていることを確認してください。実際の翻訳リクエストをテストする場合は、その隔離ウィンドウ内で API キーを再設定してください。固定ディレクトリを使いたい場合は、`MARKLINGO_DEV_USER_DATA_DIR` または `MARKLINGO_DEV_EXTENSIONS_DIR` で上書きできます。
 
 ローカルの VSIX をパッケージ化するには：
 

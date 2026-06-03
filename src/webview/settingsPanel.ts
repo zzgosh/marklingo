@@ -338,7 +338,7 @@ async function clearCurrentProjectData(context: vscode.ExtensionContext, panel: 
     parts.push(`${summary.deleted} translated file(s)`);
     if (summary.missing > 0) parts.push(`${summary.missing} file(s) already missing`);
   }
-  if (scopes.metadataCache) parts.push('translation metadata/cache');
+  if (summary.metadataCacheCleared) parts.push('translation metadata/cache');
 
   await vscode.window.showInformationMessage(`MarkLingo: Cleared current project data: ${parts.join(', ')}.`);
 }

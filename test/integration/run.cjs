@@ -147,6 +147,23 @@ async function translate(uri, languageId) {
   await vscode.commands.executeCommand('marklingo.translateCurrentMarkdown');
 }
 
+async function withWindowMessageStubs(stubs, fn) {
+  const originals = {};
+  for (const [key, stub] of Object.entries(stubs)) {
+    originals[key] = vscode.window[key];
+    vscode.window[key] = stub;
+    assert.equal(vscode.window[key], stub, `expected vscode.window.${key} to be stubbed`);
+  }
+
+  try {
+    return await fn();
+  } finally {
+    for (const [key, original] of Object.entries(originals)) {
+      vscode.window[key] = original;
+    }
+  }
+}
+
 function translatedPath(sourceUri, suffix = 'en') {
   const parsed = path.parse(sourceUri.fsPath);
   return path.join(parsed.dir, `${parsed.name}_${suffix}_mdt.md`);
@@ -409,6 +426,50 @@ async function testDeletesTranslatedFilesButKeepsCurrentProjectCache(context) {
   assert.ok(fs.existsSync(output), 'expected cached translation to recreate the output file');
 }
 
+async function testCommandDeletesTranslatedFilesButKeepsCurrentProjectCache(context) {
+  await cleanWorkspace();
+  await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
+    projectUri: vscode.Uri.file(workspaceRoot()).toString(),
+  });
+  const source = await writeMarkdown('command-file-only-cleanup.md', '# Cleanup\n\nCommand cached paragraph.\n');
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+  assert.equal(context.server.state.chatRequests.length, 1);
+  const output = translatedPath(source);
+  assert.ok(fs.existsSync(output), 'expected current project output before command cleanup');
+  fs.appendFileSync(output, '\nManual edit before command cleanup.\n', 'utf8');
+
+  const messages = { warnings: [], infos: [] };
+  await withWindowMessageStubs({
+    showWarningMessage: async (message, ...items) => {
+      messages.warnings.push(String(message));
+      return items.includes('Delete') ? 'Delete' : undefined;
+    },
+    showInformationMessage: async (message) => {
+      messages.infos.push(String(message));
+      return undefined;
+    },
+  }, async () => {
+    const doc = await vscode.workspace.openTextDocument(source);
+    await vscode.window.showTextDocument(doc);
+    await vscode.commands.executeCommand('marklingo.deleteCurrentProjectTranslatedFiles');
+  });
+
+  assert.deepEqual(messages.warnings, [
+    "MarkLingo: Delete this project's tracked translated Markdown files, including files edited after generation?",
+  ]);
+  assert.ok(!messages.warnings[0].includes('metadata/cache'), 'expected confirmation copy to omit metadata/cache');
+  assert.equal(fs.existsSync(output), false, 'expected command to delete edited current project output');
+  assert.equal(findMetasForSource(context.seeded.globalStorageUri, source).length, 1, 'expected command to keep metadata cache');
+  assert.match(messages.infos.at(-1) ?? '', /Translation metadata\/cache was kept/);
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+  assert.equal(context.server.state.chatRequests.length, 0, 'expected cached translations to rebuild the deleted output');
+  assert.ok(fs.existsSync(output), 'expected cached translation to recreate the output file');
+}
+
 async function testDeletesCurrentProjectTranslations(context) {
   await cleanWorkspace();
   await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
@@ -472,6 +533,7 @@ async function run() {
     await runTest('translates .md files even when VS Code uses a different language mode', testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode, context);
     await runTest('retries fallback blocks instead of caching source fallback', testRetriesFallbackBlocks, context);
     await runTest('deletes current project translated files while keeping metadata cache', testDeletesTranslatedFilesButKeepsCurrentProjectCache, context);
+    await runTest('command deletes current project translated files while keeping metadata cache', testCommandDeletesTranslatedFilesButKeepsCurrentProjectCache, context);
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
   } finally {
     await server.close();

@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const repoRoot = resolve('.');
-const userDataDir = process.env.MARKLINGO_DEV_USER_DATA_DIR ?? '/tmp/marklingo-dev-user';
-const extensionsDir = process.env.MARKLINGO_DEV_EXTENSIONS_DIR ?? '/tmp/marklingo-dev-extensions';
+const userDataDir = process.env.MARKLINGO_DEV_USER_DATA_DIR ?? join(tmpdir(), 'marklingo-dev-user');
+const extensionsDir = process.env.MARKLINGO_DEV_EXTENSIONS_DIR ?? join(tmpdir(), 'marklingo-dev-extensions');
 const macCodeCli = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
 const codeCli = process.env.VSCODE_CLI
   ?? (process.platform === 'darwin' && existsSync(macCodeCli) ? macCodeCli : 'code');

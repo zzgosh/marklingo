@@ -155,7 +155,7 @@ npm run package:dry
 
 `npm test` 會執行快速的 Node 單元測試。`npm run test:vscode` 會啟動一個隔離的 VS Code 擴充功能宿主，帶有臨時工作區、本機模擬 OpenRouter 端點與一個偽造的 SecretStorage API 金鑰。它不會使用你已安裝的 VSIX 設定或真實的 OpenRouter 金鑰。
 
-使用 `npm run dev:vscode` 對目前工作樹進行手動冒煙測試。它會建置擴充功能，然後透過 `--extensionDevelopmentPath` 開啟一個獨立的 VS Code 視窗，並使用 `/tmp/marklingo-dev-user` 作為隔離的使用者資料目錄、`/tmp/marklingo-dev-extensions` 作為隔離的擴充功能目錄。這不會影響你的常規 VS Code 設定或已安裝的 Marketplace 版本。由於擴充功能是從開發路徑載入，而不是以 VSIX 形式安裝，隔離視窗的 Extensions 檢視仍可能顯示 `Installed 0`；這是預期現象。可在 Command Palette 中執行 `MarkLingo: Open Settings`，或使用 `Developer: Show Running Extensions` 來確認開發擴充功能已載入。測試真實翻譯請求時，需要在這個隔離視窗中重新設定 API 金鑰。
+使用 `npm run dev:vscode` 對目前工作樹進行手動冒煙測試。它會建置擴充功能，然後透過 `--extensionDevelopmentPath` 開啟一個獨立的 VS Code 視窗，並在系統臨時目錄中使用名為 `marklingo-dev-user` 的隔離使用者資料目錄、名為 `marklingo-dev-extensions` 的隔離擴充功能目錄。這不會影響你的常規 VS Code 設定或已安裝的 Marketplace 版本。由於擴充功能是從開發路徑載入，而不是以 VSIX 形式安裝，隔離視窗的 Extensions 檢視仍可能顯示 `Installed 0`；這是預期現象。可在 Command Palette 中執行 `MarkLingo: Open Settings`，或使用 `Developer: Show Running Extensions` 來確認開發擴充功能已載入。測試真實翻譯請求時，需要在這個隔離視窗中重新設定 API 金鑰。可透過 `MARKLINGO_DEV_USER_DATA_DIR` 或 `MARKLINGO_DEV_EXTENSIONS_DIR` 指定固定目錄。
 
 打包一個本機 VSIX：
 

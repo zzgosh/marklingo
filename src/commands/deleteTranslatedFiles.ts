@@ -82,7 +82,6 @@ export type ProjectTranslationDataScopes = {
 };
 
 export type ProjectTranslationDataDeleteSummary = WorkspaceOutputDeleteSummary & {
-  metadataCacheSelected: boolean;
   metadataCacheCleared: boolean;
 };
 
@@ -140,6 +139,14 @@ export async function deleteTrackedWorkspaceOutputs(
   options: DeleteTrackedWorkspaceOutputOptions = {},
 ): Promise<WorkspaceOutputDeleteSummary> {
   const { outputs } = await scanTrackedWorkspaceOutputs(context, options);
+  return deleteTrackedWorkspaceOutputEntries(outputs, progress, { skipModified: options.skipModified });
+}
+
+async function deleteTrackedWorkspaceOutputEntries(
+  outputs: TrackedWorkspaceOutput[],
+  progress: vscode.Progress<{ message?: string }> | undefined,
+  options: { skipModified?: boolean } = {},
+): Promise<WorkspaceOutputDeleteSummary> {
   const skipModified = options.skipModified ?? true;
   let deleted = 0;
   let skipped = 0;
@@ -191,7 +198,6 @@ export async function deleteProjectTranslationData(
     : createWorkspaceOutputDeleteSummary();
   const summary: ProjectTranslationDataDeleteSummary = {
     ...outputSummary,
-    metadataCacheSelected: Boolean(scopes.metadataCache),
     metadataCacheCleared: false,
   };
 
@@ -241,7 +247,7 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
       cancellable: false,
     },
     async (progress) => {
-      return deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false });
+      return deleteTrackedWorkspaceOutputEntries(outputs, progress, { skipModified: false });
     },
   );
 
