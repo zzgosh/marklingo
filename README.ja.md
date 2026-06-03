@@ -48,7 +48,7 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 
 翻訳の前に `MarkLingo: Open Settings` を実行して、API キー、ターゲット言語、モデル、カスタム指示を保存しておくこともできます。
 
-Markdown エディターまたはエクスプローラー内の Markdown ファイルを右クリックして、`MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。
+Markdown エディターまたはエクスプローラー内の Markdown ファイルを右クリックして、`MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。エクスプローラーで複数の Markdown ファイルやフォルダーを選択し、同じコンテキストメニュー操作で 1 つのバッチとして翻訳することもできます。
 
 ## コマンド
 

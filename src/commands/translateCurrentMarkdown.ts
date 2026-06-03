@@ -773,6 +773,11 @@ type TranslateMarkdownResourcesOptions = {
   sourceLabel?: string;
 };
 
+type MarkdownSourceScanResult = {
+  files: vscode.Uri[];
+  skippedSymbolicLinks: number;
+};
+
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -794,8 +799,9 @@ function shouldSkipFolderEntry(name: string, type: vscode.FileType): boolean {
   return SKIPPED_FOLDER_NAMES.has(name) || (type & vscode.FileType.SymbolicLink) !== 0;
 }
 
-async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<{ files: vscode.Uri[] }> {
+async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<MarkdownSourceScanResult> {
   const filesByUri = new Map<string, vscode.Uri>();
+  let skippedSymbolicLinks = 0;
 
   const addMarkdownSourceFile = (uri: vscode.Uri) => {
     if (!hasMarkdownFileExtension(uri) || isTranslatedMarkdownOutput(uri)) return;
@@ -803,11 +809,21 @@ async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<{ fi
   };
 
   const visitDirectory = async (dirUri: vscode.Uri) => {
-    const entries = await vscode.workspace.fs.readDirectory(dirUri);
+    let entries: [string, vscode.FileType][];
+    try {
+      entries = await vscode.workspace.fs.readDirectory(dirUri);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped unreadable directory ${dirUri.fsPath}: ${msg}`);
+      return;
+    }
     entries.sort(([a], [b]) => a.localeCompare(b));
 
     for (const [name, type] of entries) {
-      if (shouldSkipFolderEntry(name, type)) continue;
+      if (shouldSkipFolderEntry(name, type)) {
+        if ((type & vscode.FileType.SymbolicLink) !== 0) skippedSymbolicLinks += 1;
+        continue;
+      }
 
       const childUri = vscode.Uri.joinPath(dirUri, name);
       if ((type & vscode.FileType.Directory) !== 0) {
@@ -836,6 +852,7 @@ async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<{ fi
     }
 
     if ((stat.type & vscode.FileType.SymbolicLink) !== 0) {
+      skippedSymbolicLinks += 1;
       outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped symbolic link ${resource.fsPath}.`);
       continue;
     }
@@ -848,7 +865,7 @@ async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<{ fi
     }
   }
 
-  return { files: [...filesByUri.values()] };
+  return { files: [...filesByUri.values()], skippedSymbolicLinks };
 }
 
 function buildBatchConfirmationMessage(files: vscode.Uri[], sourceLabel?: string): string {
@@ -974,7 +991,7 @@ async function translateMarkdownResources(
   resources: vscode.Uri[],
   options: TranslateMarkdownResourcesOptions = {},
 ): Promise<void> {
-  let collected: { files: vscode.Uri[] };
+  let collected: MarkdownSourceScanResult;
   try {
     collected = await collectMarkdownSourceFiles(resources);
   } catch (error) {
@@ -984,6 +1001,12 @@ async function translateMarkdownResources(
   }
 
   if (collected.files.length === 0) {
+    if (collected.skippedSymbolicLinks > 0) {
+      await vscode.window.showInformationMessage(
+        `MarkLingo: No source Markdown files were found. ${pluralize(collected.skippedSymbolicLinks, 'symbolic link')} skipped.`,
+      );
+      return;
+    }
     await vscode.window.showInformationMessage('MarkLingo: No source Markdown files were found in the selected resources.');
     return;
   }

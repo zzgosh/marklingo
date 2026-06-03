@@ -48,7 +48,7 @@ Default shortcut:
 
 You can also run `MarkLingo: Open Settings` first to save your API key, target language, model, and custom instructions before translating.
 
-Right-click a Markdown editor or Markdown file in the Explorer to run `MarkLingo: Translate Current Markdown`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs.
+Right-click a Markdown editor or Markdown file in the Explorer to run `MarkLingo: Translate Current Markdown`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs. You can also select multiple Markdown files or folders in the Explorer and run the same context-menu action to translate them as one batch.
 
 ## Commands
 

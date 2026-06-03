@@ -48,7 +48,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 你也可以先執行 `MarkLingo: Open Settings`，在翻譯前儲存 API 金鑰、目標語言、模型與自訂指令。
 
-也可以在 Markdown 編輯器或資源管理器中的 Markdown 檔案上按右鍵執行 `MarkLingo: Translate Current Markdown`。在資源管理器中的資料夾上按右鍵執行 `MarkLingo: Translate All Markdown in This Folder`，可翻譯該資料夾及其子資料夾中的 `.md` 與 `.markdown` 檔案，並略過已產生的 `*_mdt.md` 輸出。
+也可以在 Markdown 編輯器或資源管理器中的 Markdown 檔案上按右鍵執行 `MarkLingo: Translate Current Markdown`。在資源管理器中的資料夾上按右鍵執行 `MarkLingo: Translate All Markdown in This Folder`，可翻譯該資料夾及其子資料夾中的 `.md` 與 `.markdown` 檔案，並略過已產生的 `*_mdt.md` 輸出。也可以在資源管理器中多選 Markdown 檔案或資料夾，再透過同一個右鍵選單作為一批翻譯。
 
 ## 命令
 

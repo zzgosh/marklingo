@@ -21,7 +21,7 @@ test('translation keybinding is available for markdown file extensions', () => {
   assert.match(binding.when, /resourceExtname == \.markdown/);
 });
 
-test('command palette contributions expose only main user actions', () => {
+test('registered command contributions expose only main user actions', () => {
   const pkg = readPackageJson();
   const commandIds = new Set(pkg.contributes.commands.map((item) => item.command));
 
