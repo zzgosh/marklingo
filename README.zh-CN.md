@@ -48,7 +48,7 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 
 你也可以先运行 `MarkLingo: Open Settings`，在翻译前保存 API 密钥、目标语言、模型和自定义指令。
 
-也可以在 Markdown 编辑器或资源管理器中的 Markdown 文件上右键运行 `MarkLingo: Translate Current Markdown`。在资源管理器中的文件夹上右键运行 `MarkLingo: Translate All Markdown in This Folder`，可翻译该文件夹及其子文件夹中的 `.md` 和 `.markdown` 文件，并跳过已生成的 `*_mdt.md` 输出。也可以在资源管理器中多选 Markdown 文件或文件夹，再通过同一个右键菜单作为一批翻译。
+也可以在 Markdown 编辑器上右键运行 `MarkLingo: Translate Current Markdown`。在资源管理器中的 Markdown 文件上右键运行 `MarkLingo: Translate This Markdown File`。在资源管理器中的文件夹上右键运行 `MarkLingo: Translate All Markdown in This Folder`，可翻译该文件夹及其子文件夹中的 `.md` 和 `.markdown` 文件，并跳过已生成的 `*_mdt.md` 输出。也可以在资源管理器中多选 Markdown 文件或文件夹，再运行 `MarkLingo: Translate Selected Markdown Files` 作为一批翻译。
 
 ## 命令
 
@@ -56,6 +56,8 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 | --- | --- |
 | `MarkLingo: Translate Current Markdown` | 翻译当前已保存的 Markdown 文件，尽可能复用缓存的块翻译。 |
 | `MarkLingo: Retranslate Current Markdown` | 强制对当前 Markdown 文件进行一次完整重新翻译。 |
+| `MarkLingo: Translate This Markdown File` | 翻译从资源管理器右键菜单中选中的 Markdown 文件。 |
+| `MarkLingo: Translate Selected Markdown Files` | 将资源管理器中选中的文件和文件夹收集到的 Markdown 文件作为一批翻译，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 翻译所选文件夹及其子文件夹中的源 Markdown 文件，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
 | `MarkLingo: Open Settings` | 打开 MarkLingo 设置，管理 OpenRouter、API 密钥、目标语言、自定义指令、快捷键状态和清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 将 `*_mdt.md` 添加到当前仓库的本地 Git 排除文件中。 |

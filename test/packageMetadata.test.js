@@ -19,9 +19,17 @@ test('translation keybinding is available for markdown file extensions', () => {
   assert.match(binding.when, /editorLangId == markdown/);
   assert.match(binding.when, /resourceExtname == \.md/);
   assert.match(binding.when, /resourceExtname == \.markdown/);
+  assert.equal(
+    pkg.contributes.keybindings.some((item) => item.command === 'marklingo.translateExplorerMarkdownFile'),
+    false,
+  );
+  assert.equal(
+    pkg.contributes.keybindings.some((item) => item.command === 'marklingo.translateSelectedMarkdownResources'),
+    false,
+  );
 });
 
-test('registered command contributions expose only main user actions', () => {
+test('registered command contributions include user-facing actions', () => {
   const pkg = readPackageJson();
   const commandIds = new Set(pkg.contributes.commands.map((item) => item.command));
 
@@ -31,7 +39,9 @@ test('registered command contributions expose only main user actions', () => {
     'marklingo.openSettings',
     'marklingo.translateCurrentMarkdown',
     'marklingo.translateCurrentMarkdownFull',
+    'marklingo.translateExplorerMarkdownFile',
     'marklingo.translateFolderMarkdown',
+    'marklingo.translateSelectedMarkdownResources',
   ]);
   assert.ok(!commandIds.has('marklingo.clearExtensionData'));
   assert.ok(!commandIds.has('marklingo.openrouter.resetApiKey'));
@@ -53,26 +63,43 @@ test('context menus expose markdown and folder translation actions', () => {
   assert.match(editorTranslate.when, /resourceExtname == \.markdown/);
   assert.match(editorTranslate.group, /^marklingo@/);
 
-  const explorerFileTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateCurrentMarkdown');
+  const explorerFileTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateExplorerMarkdownFile');
   assert.ok(explorerFileTranslate, 'expected explorer file context menu translation command');
+  assert.match(explorerFileTranslate.when, /!listMultiSelection/);
   assert.match(explorerFileTranslate.when, /!explorerResourceIsFolder/);
   assert.match(explorerFileTranslate.when, /isFileSystemResource/);
   assert.match(explorerFileTranslate.when, /resourceExtname == \.md/);
   assert.match(explorerFileTranslate.when, /resourceExtname == \.markdown/);
   assert.match(explorerFileTranslate.group, /^marklingo@/);
 
+  const explorerSelectionTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateSelectedMarkdownResources');
+  assert.ok(explorerSelectionTranslate, 'expected explorer multi-selection translation command');
+  assert.ok(explorerSelectionTranslate.when.includes('listMultiSelection'));
+  assert.ok(!explorerSelectionTranslate.when.includes('!listMultiSelection'));
+  assert.match(explorerSelectionTranslate.when, /isFileSystemResource/);
+  assert.match(explorerSelectionTranslate.when, /resourceExtname == \.md/);
+  assert.match(explorerSelectionTranslate.when, /resourceExtname == \.markdown/);
+  assert.match(explorerSelectionTranslate.group, /^marklingo@/);
+
   const explorerFolderTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateFolderMarkdown');
   assert.ok(explorerFolderTranslate, 'expected explorer folder context menu translation command');
+  assert.match(explorerFolderTranslate.when, /!listMultiSelection/);
   assert.match(explorerFolderTranslate.when, /explorerResourceIsFolder/);
   assert.match(explorerFolderTranslate.when, /isFileSystemResource/);
   assert.match(explorerFolderTranslate.group, /^marklingo@/);
 });
 
-test('folder translation command is hidden from the command palette', () => {
+test('explorer-only translation commands are hidden from the command palette', () => {
   const pkg = readPackageJson();
   const commandPaletteMenus = pkg.contributes.menus.commandPalette;
+  const explorerFileTranslate = commandPaletteMenus.find((item) => item.command === 'marklingo.translateExplorerMarkdownFile');
+  const selectedResourcesTranslate = commandPaletteMenus.find((item) => item.command === 'marklingo.translateSelectedMarkdownResources');
   const folderTranslate = commandPaletteMenus.find((item) => item.command === 'marklingo.translateFolderMarkdown');
 
+  assert.ok(explorerFileTranslate, 'expected explorer file translation command palette override');
+  assert.equal(explorerFileTranslate.when, 'false');
+  assert.ok(selectedResourcesTranslate, 'expected selected resources translation command palette override');
+  assert.equal(selectedResourcesTranslate.when, 'false');
   assert.ok(folderTranslate, 'expected folder translation command palette override');
   assert.equal(folderTranslate.when, 'false');
 });

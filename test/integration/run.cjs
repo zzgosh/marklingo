@@ -293,7 +293,7 @@ async function testTranslatesExplorerSelectedMarkdownFile(context) {
   const source = await writeMarkdown('explorer-selected.md', '# Explorer\n\nTranslate without opening the source first.\n');
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 
-  await vscode.commands.executeCommand('marklingo.translateCurrentMarkdown', source);
+  await vscode.commands.executeCommand('marklingo.translateExplorerMarkdownFile', source);
 
   assert.equal(context.server.state.chatRequests.length, 1);
   assert.match(readText(translatedPath(source)), /MOCK:# Explorer/);
@@ -316,7 +316,7 @@ async function testTranslatesExplorerMultiSelectedMarkdownResources(context) {
       showInformationMessage: async () => undefined,
     },
     async () => {
-      await vscode.commands.executeCommand('marklingo.translateCurrentMarkdown', clicked, [clicked, other]);
+      await vscode.commands.executeCommand('marklingo.translateSelectedMarkdownResources', clicked, [clicked, other]);
     },
   );
 

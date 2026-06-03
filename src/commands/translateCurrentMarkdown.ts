@@ -23,6 +23,7 @@ import {
   sha256,
   type TranslationMetaDebug,
 } from '../translation/cache.js';
+import { TRANSLATION_PROGRESS_MESSAGES, getBatchTranslationProgressMessage } from './progressMessages.js';
 
 function buildBlocksTranslatePrompt(
   input: { blocks: Array<{ id: string; markdown: string }> },
@@ -507,7 +508,7 @@ async function translateMarkdownDocument(
           placeholdersById.set(seg.id, protectedResult);
         }
 
-        progress.report({ message: 'Preparing translation' });
+        progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.preparing });
         const modelContextLength = await getOpenRouterModelContextLength(settings);
         const buildPrompt = (blocks: TranslationRequestBlock[]) => buildBlocksTranslatePrompt({ blocks }, { systemPrompt, customPrompt, targetLanguage });
         const plan = planTranslationRequests(protectedBlocks, {
@@ -542,14 +543,12 @@ async function translateMarkdownDocument(
         );
 
         if (plan.chunks.length === 0) {
-          progress.report({ message: 'Using cached translations' });
+          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.cached });
         }
 
         for (const [chunkIndex, plannedChunk] of plan.chunks.entries()) {
           throwIfCancellationRequested(options.cancellationToken);
-          progress.report({
-            message: `Processing batch ${chunkIndex + 1} of ${plan.chunks.length} · ${plannedChunk.blocks.length} blocks`,
-          });
+          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.translating });
           const prompt = buildPrompt(plannedChunk.blocks);
           const requestStartedAt = Date.now();
           const requestDebug = debug.plan?.chunks[chunkIndex];
@@ -624,7 +623,7 @@ async function translateMarkdownDocument(
           );
         }
         debug.warnings = warnings;
-        progress.report({ message: 'Writing translated file' });
+        progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.writing });
 
         const parts: string[] = [];
         let cursor = 0;
@@ -765,6 +764,18 @@ export async function translateCurrentMarkdown(
   }
 }
 
+export async function translateExplorerMarkdownFile(
+  context: vscode.ExtensionContext,
+  resource?: vscode.Uri,
+): Promise<TranslateMarkdownResult | undefined> {
+  if (!resource) {
+    await vscode.window.showErrorMessage('MarkLingo: Right-click a Markdown file in the Explorer to translate it.');
+    return undefined;
+  }
+
+  return translateCurrentMarkdown(context, resource);
+}
+
 const TRANSLATE_FOLDER_CONFIRM_ACTION = 'Translate';
 const SKIPPED_FOLDER_NAMES = new Set(['.git', 'node_modules']);
 
@@ -788,11 +799,6 @@ function getCommandResources(resource?: vscode.Uri, selectedResources?: vscode.U
     resources.unshift(resource);
   }
   return resources;
-}
-
-function getRelativeResourceLabel(baseUri: vscode.Uri, uri: vscode.Uri): string {
-  const relative = path.relative(baseUri.fsPath, uri.fsPath);
-  return relative && !relative.startsWith('..') ? relative : path.basename(uri.fsPath);
 }
 
 function shouldSkipFolderEntry(name: string, type: vscode.FileType): boolean {
@@ -922,9 +928,7 @@ async function translateMarkdownFilesBatch(
           break;
         }
 
-        const baseUri = vscode.Uri.file(path.dirname(uri.fsPath));
-        const relativeLabel = getRelativeResourceLabel(baseUri, uri);
-        const fileLabel = `File ${index + 1} of ${markdownFiles.length}: ${relativeLabel}`;
+        const fileLabel = getBatchTranslationProgressMessage(index, markdownFiles.length);
         progress.report({ message: fileLabel });
 
         try {
@@ -937,11 +941,7 @@ async function translateMarkdownFilesBatch(
           }
 
           const fileProgress: TranslationProgress = {
-            report: (value) => {
-              progress.report({
-                message: value.message ? `${fileLabel} · ${value.message}` : fileLabel,
-              });
-            },
+            report: () => progress.report({ message: fileLabel }),
           };
           const result = await translateMarkdownDocument(context, doc, runtime!, {
             mode: options.mode ?? 'auto',
@@ -1012,6 +1012,20 @@ async function translateMarkdownResources(
   }
 
   await translateMarkdownFilesBatch(context, collected.files, options);
+}
+
+export async function translateSelectedMarkdownResources(
+  context: vscode.ExtensionContext,
+  resource?: vscode.Uri,
+  selectedResources?: vscode.Uri[],
+): Promise<void> {
+  const resources = getCommandResources(resource, selectedResources);
+  if (resources.length === 0) {
+    await vscode.window.showErrorMessage('MarkLingo: Right-click Markdown files or folders in the Explorer to translate them.');
+    return;
+  }
+
+  await translateMarkdownResources(context, resources);
 }
 
 export async function translateFolderMarkdown(

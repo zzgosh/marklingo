@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
-import { seedTargetLanguageSelectionForTest, translateCurrentMarkdown, translateFolderMarkdown } from './commands/translateCurrentMarkdown.js';
+import {
+  seedTargetLanguageSelectionForTest,
+  translateCurrentMarkdown,
+  translateExplorerMarkdownFile,
+  translateFolderMarkdown,
+  translateSelectedMarkdownResources,
+} from './commands/translateCurrentMarkdown.js';
 import { deleteCurrentProjectTranslatedFiles, deleteProjectTranslationData } from './commands/deleteTranslatedFiles.js';
 import { setOpenRouterApiKey } from './commands/openRouterApiKey.js';
 import { setOpenRouterModelId } from './commands/openRouterModelId.js';
@@ -19,6 +25,18 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('marklingo.translateCurrentMarkdownFull', (resource?: vscode.Uri, selectedResources?: vscode.Uri[]) => {
       return translateCurrentMarkdown(context, resource, { mode: 'full' }, selectedResources);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('marklingo.translateExplorerMarkdownFile', (resource?: vscode.Uri) => {
+      return translateExplorerMarkdownFile(context, resource);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('marklingo.translateSelectedMarkdownResources', (resource?: vscode.Uri, selectedResources?: vscode.Uri[]) => {
+      return translateSelectedMarkdownResources(context, resource, selectedResources);
     }),
   );
 
