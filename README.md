@@ -140,7 +140,7 @@ Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data.
 - Tracked translated project outputs
 - Project translation metadata/cache
 
-Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files. This command keeps private metadata/cache so the next translation can reuse cached blocks. It intentionally deletes tracked outputs even if they were edited after generation.
+Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files. It intentionally deletes tracked outputs even if they were edited after generation.
 
 ## Development
 
@@ -149,10 +149,13 @@ npm install
 npm run compile
 npm test
 npm run test:vscode
+npm run dev:vscode
 npm run package:dry
 ```
 
 `npm test` runs fast Node unit tests. `npm run test:vscode` launches an isolated VS Code Extension Host with a temporary workspace, a local mock OpenRouter endpoint, and a fake SecretStorage API key. It does not use your installed VSIX settings or real OpenRouter key.
+
+Use `npm run dev:vscode` for manual smoke testing of the current working tree. It builds the extension, then opens a separate VS Code window with `--extensionDevelopmentPath`, an isolated user data directory at `/tmp/marklingo-dev-user`, and an isolated extensions directory at `/tmp/marklingo-dev-extensions`. This keeps your regular VS Code profile and installed Marketplace version untouched. Because the extension is loaded from the development path instead of installed as a VSIX, the isolated Extensions view may still show `Installed 0`; that is expected. Verify the loaded development extension from the Command Palette with `MarkLingo: Open Settings`, or use `Developer: Show Running Extensions`. Configure the API key again inside that isolated window when testing real translation requests.
 
 Package a local VSIX:
 

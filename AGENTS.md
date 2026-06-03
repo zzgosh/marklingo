@@ -22,6 +22,7 @@ Do not edit generated `out/` or `dist/` files manually. Use the package scripts.
 - `npm run check:integration`: run `npm run check`, then `npm run test:vscode`.
 - `npm run benchmark:postprocessing`: run the local Markdown postprocessing benchmark.
 - `npm run preview:settings`: compile, then serve a mocked Settings webview preview for browser-based UI iteration.
+- `npm run dev:vscode`: build the extension, then open the current working tree in an isolated VS Code development window for manual smoke testing.
 - `npm run package`: compile and bundle `dist/extension.js`.
 - `npm run package:dry`: build the extension and list VSIX contents.
 - `npm run vsix`: run checks, then create the `.vsix` package.
@@ -85,6 +86,8 @@ The custom language option label is `Custom...`.
 The English `README.md` is packaged into the VSIX and used by Visual Studio Marketplace and Open VSX listings. Keep its language-switch links as absolute GitHub `main` URLs so they remain valid outside the repository context. Localized README files may use relative links for GitHub browsing.
 
 ## VSIX Testing Notes
+
+Use `npm run dev:vscode` to manually test the current working tree without replacing the installed Marketplace/VSIX copy. It runs `npm run package`, then opens VS Code with `--extensionDevelopmentPath`, `--user-data-dir /tmp/marklingo-dev-user`, and `--extensions-dir /tmp/marklingo-dev-extensions`. The extension is loaded as a development extension, not installed as a VSIX, so the isolated Extensions view may still show `Installed 0`; verify it through `MarkLingo: Open Settings` in the Command Palette or `Developer: Show Running Extensions`. The isolated profile keeps its own SecretStorage and settings, so configure an API key there when real translation requests are needed. Override `VSCODE_CLI`, `MARKLINGO_DEV_USER_DATA_DIR`, or `MARKLINGO_DEV_EXTENSIONS_DIR` if the default macOS VS Code CLI path or `/tmp` directories are not appropriate.
 
 After installing a VSIX into an already-open VS Code window, reload the window with `Developer: Reload Window` before retesting. The extension host may keep running the previous extension code until reload.
 

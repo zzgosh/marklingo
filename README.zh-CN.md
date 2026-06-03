@@ -126,14 +126,21 @@ MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送�
 
 ## 清理
 
-使用 `MarkLingo: Open Settings` 及其中的危险区域来清除已保存的数据：
+使用 `MarkLingo: Open Settings` 及其中的危险区域来清除已保存的数据。
+
+`Clear All Data` 可以删除：
 
 - 已保存的 API 密钥
 - MarkLingo 用户设置
-- 翻译元数据/缓存
+- 全局翻译元数据/缓存
 - （可选）已跟踪的翻译工作区输出
 
-当你只想清理当前项目中由扩展跟踪的翻译文件以及私有元数据/缓存时，使用 `MarkLingo: Delete Current Project Translated Files`。这个项目范围的命令会有意删除已跟踪的输出，即使它们在生成后被编辑过。
+`Clear Current Project Data` 可以删除当前显示项目目录下的：
+
+- 已跟踪的项目翻译输出
+- 项目翻译元数据/缓存
+
+当你只想清理当前项目中由扩展跟踪的翻译文件时，使用 `MarkLingo: Delete Current Project Translated Files`。这个项目范围的命令会有意删除已跟踪的输出，即使它们在生成后被编辑过。
 
 ## 开发
 
@@ -142,10 +149,13 @@ npm install
 npm run compile
 npm test
 npm run test:vscode
+npm run dev:vscode
 npm run package:dry
 ```
 
 `npm test` 运行快速的 Node 单元测试。`npm run test:vscode` 会启动一个隔离的 VS Code 扩展宿主，带有临时工作区、本地模拟 OpenRouter 端点和一个伪造的 SecretStorage API 密钥。它不会使用你已安装的 VSIX 设置或真实的 OpenRouter 密钥。
+
+使用 `npm run dev:vscode` 对当前工作树进行手动冒烟测试。它会构建扩展，然后通过 `--extensionDevelopmentPath` 打开一个单独的 VS Code 窗口，并使用 `/tmp/marklingo-dev-user` 作为隔离的用户数据目录、`/tmp/marklingo-dev-extensions` 作为隔离的扩展目录。这不会影响你的常规 VS Code 配置或已安装的 Marketplace 版本。由于扩展是从开发路径加载，而不是以 VSIX 形式安装，隔离窗口的 Extensions 视图仍可能显示 `Installed 0`；这是预期现象。可在 Command Palette 中运行 `MarkLingo: Open Settings`，或使用 `Developer: Show Running Extensions` 来确认开发扩展已加载。测试真实翻译请求时，需要在这个隔离窗口中重新配置 API 密钥。
 
 打包一个本地 VSIX：
 

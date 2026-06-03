@@ -228,7 +228,7 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    "MarkLingo: Delete this project's tracked translated Markdown files, including files edited after generation? Translation metadata/cache will be kept.",
+    "MarkLingo: Delete this project's tracked translated Markdown files, including files edited after generation?",
     { modal: true },
     'Delete',
   );

@@ -152,6 +152,7 @@
     "check": "npm run compile && npm test",
     "benchmark:postprocessing": "npm run compile && node scripts/benchmark-postprocessing.mjs",
     "preview:settings": "node scripts/preview-settings.mjs",
+    "dev:vscode": "npm run package && node scripts/open-vscode-dev.mjs",
     "package": "npm run compile && npm run bundle",
     "package:dry": "npm run package && npx --no-install vsce ls --tree",
     "vsix": "npm run check && npx --no-install vsce package",

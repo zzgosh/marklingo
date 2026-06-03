@@ -60,8 +60,10 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /\/Users\/example\/project/);
   assert.match(html, /id="clear-current-project-data">Clear current project data<\/button>/);
   assert.match(html, /Clear All Data/);
-  assert.match(html, /global translation metadata\/cache/);
+  assert.match(html, /Delete the saved API key, settings, metadata\/cache, and tracked translated files if selected\./);
   assert.match(html, /id="clear-all-data">Clear all data<\/button>/);
+  assert.match(html, /\.danger-row \{\s+grid-template-columns: minmax\(0, 1fr\) max-content;/);
+  assert.match(html, /<div class="row top-align danger-row">/);
   assert.match(html, /\.section-warning \{\s+margin-top: 8px;\s+color: var\(--danger\);/);
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);

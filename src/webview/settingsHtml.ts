@@ -431,10 +431,21 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       justify-content: flex-end;
       align-items: flex-start;
     }
+    .danger-row {
+      grid-template-columns: minmax(0, 1fr) max-content;
+      gap: 32px;
+    }
+    .danger-copy {
+      min-width: 0;
+    }
+    .danger-row button {
+      white-space: nowrap;
+    }
     .danger-list {
       margin-top: 4px;
       color: var(--muted);
       overflow-wrap: anywhere;
+      max-width: 92ch;
     }
     .danger-list.path {
       font-family: var(--vscode-editor-font-family);
@@ -543,6 +554,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     @media (max-width: 760px) {
       main { padding: 28px 18px 54px; }
       .row { grid-template-columns: 1fr; gap: 12px; padding: 14px 16px; }
+      .danger-row { grid-template-columns: 1fr; }
+      .danger-action { justify-content: flex-start; }
       .shortcut-controls { justify-content: flex-start; }
     }
   </style>
@@ -678,8 +691,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
         <h2 class="danger-title">Danger Zone</h2>
         <section class="card danger">
-          <div class="row top-align">
-            <div>
+          <div class="row top-align danger-row">
+            <div class="danger-copy">
               <div class="label">Clear Current Project Data</div>
               <div class="danger-list path">${escapeHtml(currentProjectDataDescription)}</div>
             </div>
@@ -687,10 +700,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <button class="danger" type="button" id="clear-current-project-data"${currentProjectDataDisabled}>Clear current project data</button>
             </div>
           </div>
-          <div class="row top-align">
-            <div>
+          <div class="row top-align danger-row">
+            <div class="danger-copy">
               <div class="label">Clear All Data</div>
-              <div class="danger-list">Delete saved API key, MarkLingo settings, global translation metadata/cache, and optionally tracked translated files.</div>
+              <div class="danger-list">Delete the saved API key, settings, metadata/cache, and tracked translated files if selected.</div>
             </div>
             <div class="danger-action">
               <button class="danger" type="button" id="clear-all-data">Clear all data</button>
