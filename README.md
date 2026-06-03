@@ -14,7 +14,7 @@ MarkLingo itself is free to use and fully open source: all source code is public
 
 ## Why MarkLingo
 
-- Translate a saved Markdown document from VS Code with one command.
+- Translate saved Markdown documents from the Command Palette, the editor context menu, or the Explorer context menu.
 - Keep the original file intact and write a translated `*_<language>_mdt.md` file next to it.
 - Open the translated Markdown tab and its Markdown Preview after translation.
 - Reuse prior translations when unchanged Markdown blocks are translated again.
@@ -48,12 +48,17 @@ Default shortcut:
 
 You can also run `MarkLingo: Open Settings` first to save your API key, target language, model, and custom instructions before translating.
 
+Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Right-click a Markdown file in the Explorer to run `MarkLingo: Translate This Markdown File`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs. You can also select multiple Markdown files or folders in the Explorer and run `MarkLingo: Translate Selected Markdown Files` to translate them as one batch.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `MarkLingo: Translate Current Markdown` | Translate the current saved Markdown file, reusing cached block translations when possible. |
 | `MarkLingo: Retranslate Current Markdown` | Force a full retranslation of the current Markdown file. |
+| `MarkLingo: Translate This Markdown File` | Translate the Markdown file selected from the Explorer context menu. |
+| `MarkLingo: Translate Selected Markdown Files` | Translate Markdown files gathered from selected Explorer files and folders as one batch, opening the first translated output and writing the rest next to their sources. |
+| `MarkLingo: Translate All Markdown in This Folder` | Translate source Markdown files in the selected folder and subfolders, opening the first translated output and writing the rest next to their sources. |
 | `MarkLingo: Open Settings` | Open MarkLingo settings for OpenRouter, API key, target language, custom instructions, shortcut status, and cleanup. |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
 | `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |

@@ -14,7 +14,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 ## 為什麼選擇 MarkLingo
 
-- 在 VS Code 中用一條命令翻譯已儲存的 Markdown 文件。
+- 可從命令選擇區、編輯器右鍵選單或資源管理器右鍵選單翻譯已儲存的 Markdown 文件。
 - 保持原始檔案不變，並在其旁邊寫出一個翻譯後的 `*_<language>_mdt.md` 檔案。
 - 翻譯完成後開啟翻譯後的 Markdown 分頁及其 Markdown 預覽。
 - 當未更動的 Markdown 區塊再次被翻譯時，重複使用先前的翻譯。
@@ -48,12 +48,17 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 你也可以先執行 `MarkLingo: Open Settings`，在翻譯前儲存 API 金鑰、目標語言、模型與自訂指令。
 
+也可以在 Markdown 編輯器上按右鍵執行 `MarkLingo: Translate Current Markdown`。在資源管理器中的 Markdown 檔案上按右鍵執行 `MarkLingo: Translate This Markdown File`。在資源管理器中的資料夾上按右鍵執行 `MarkLingo: Translate All Markdown in This Folder`，可翻譯該資料夾及其子資料夾中的 `.md` 與 `.markdown` 檔案，並略過已產生的 `*_mdt.md` 輸出。也可以在資源管理器中多選 Markdown 檔案或資料夾，再執行 `MarkLingo: Translate Selected Markdown Files` 作為一批翻譯。
+
 ## 命令
 
 | 命令 | 功能 |
 | --- | --- |
 | `MarkLingo: Translate Current Markdown` | 翻譯目前已儲存的 Markdown 檔案，並盡可能重複使用快取的區塊翻譯。 |
 | `MarkLingo: Retranslate Current Markdown` | 強制對目前的 Markdown 檔案進行一次完整重新翻譯。 |
+| `MarkLingo: Translate This Markdown File` | 翻譯從資源管理器右鍵選單中選取的 Markdown 檔案。 |
+| `MarkLingo: Translate Selected Markdown Files` | 將資源管理器中選取的檔案和資料夾收集到的 Markdown 檔案作為一批翻譯，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
+| `MarkLingo: Translate All Markdown in This Folder` | 翻譯所選資料夾及其子資料夾中的來源 Markdown 檔案，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
 | `MarkLingo: Open Settings` | 開啟 MarkLingo 設定，管理 OpenRouter、API 金鑰、目標語言、自訂指令、快捷鍵狀態與清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 將 `*_mdt.md` 加入目前儲存庫的本機 Git 排除檔案中。 |
 | `MarkLingo: Delete Current Project Translated Files` | 刪除本專案中由擴充功能追蹤的翻譯輸出，以及私有的翻譯中繼資料/快取。 |

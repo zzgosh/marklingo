@@ -123,6 +123,7 @@ async function configureExtension(mockServer) {
 
 async function writeMarkdown(name, content) {
   const uri = vscode.Uri.file(path.join(workspaceRoot(), name));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(uri.fsPath)));
   await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
   return uri;
 }
@@ -171,6 +172,13 @@ function translatedPath(sourceUri, suffix = 'en') {
 
 function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
+}
+
+function openTabFilePaths() {
+  return vscode.window.tabGroups.all
+    .flatMap((group) => group.tabs)
+    .map((tab) => tab.input?.uri?.fsPath)
+    .filter(Boolean);
 }
 
 function findMetasForSource(globalStorageUri, sourceUri) {
@@ -230,6 +238,137 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.equal(meta.debug.settings.request.reasoning.effort, 'none');
   assert.equal(meta.debug.result.warningCount, 0);
   assert.ok(!JSON.stringify(meta.debug).includes('test-key'), 'debug metadata must not include the API key');
+}
+
+async function testTranslatesFolderMarkdownFiles(context) {
+  await cleanWorkspace();
+  const folder = vscode.Uri.file(path.join(workspaceRoot(), 'docs'));
+  const first = await writeMarkdown('docs/first.md', '# First\n\nTranslate the first file.\n');
+  const second = await writeMarkdown('docs/nested/second.markdown', '# Second\n\nTranslate the nested file.\n');
+  const generated = await writeMarkdown('docs/existing_en_mdt.md', '# Existing output\n\nDo not translate this generated file.\n');
+  await writeMarkdown('docs/.git/config.md', '# Git\n\nDo not scan this directory.\n');
+  await writeMarkdown('docs/node_modules/package.md', '# Dependency\n\nDo not scan this directory.\n');
+  await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(workspaceRoot(), 'docs', 'notes.txt')), Buffer.from('Not Markdown.\n', 'utf8'));
+
+  await withWindowMessageStubs(
+    {
+      showWarningMessage: async (message, _options, action) => {
+        assert.match(message, /Translate 2 Markdown files/);
+        assert.match(message, /docs and subfolders/);
+        return action;
+      },
+      showInformationMessage: async () => undefined,
+    },
+    async () => {
+      await vscode.commands.executeCommand('marklingo.translateFolderMarkdown', folder);
+    },
+  );
+
+  assert.equal(context.server.state.chatRequests.length, 2);
+  assert.match(readText(translatedPath(first)), /MOCK:# First/);
+  assert.match(readText(translatedPath(second)), /MOCK:# Second/);
+  assert.equal(
+    fs.existsSync(path.join(path.dirname(generated.fsPath), 'existing_en_mdt_en_mdt.md')),
+    false,
+    'expected generated Markdown output to be skipped',
+  );
+
+  const openTabs = openTabFilePaths();
+  assert.ok(openTabs.includes(translatedPath(first)), 'expected first translated file to be opened as a tab');
+  assert.ok(!openTabs.includes(translatedPath(second)), 'expected later batch output not to be opened as a tab');
+  assert.equal(
+    fs.existsSync(translatedPath(vscode.Uri.file(path.join(workspaceRoot(), 'docs', '.git', 'config.md')))),
+    false,
+    'expected .git Markdown files to be skipped',
+  );
+  assert.equal(
+    fs.existsSync(translatedPath(vscode.Uri.file(path.join(workspaceRoot(), 'docs', 'node_modules', 'package.md')))),
+    false,
+    'expected node_modules Markdown files to be skipped',
+  );
+}
+
+async function testTranslatesExplorerSelectedMarkdownFile(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown('explorer-selected.md', '# Explorer\n\nTranslate without opening the source first.\n');
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+
+  await vscode.commands.executeCommand('marklingo.translateExplorerMarkdownFile', source);
+
+  assert.equal(context.server.state.chatRequests.length, 1);
+  assert.match(readText(translatedPath(source)), /MOCK:# Explorer/);
+  assert.ok(openTabFilePaths().includes(translatedPath(source)), 'expected translated Explorer-selected file to be opened as a tab');
+}
+
+async function testTranslatesExplorerMultiSelectedMarkdownResources(context) {
+  await cleanWorkspace();
+  const clicked = await writeMarkdown('multi/clicked.md', '# Clicked\n\nTranslate the clicked file.\n');
+  const other = await writeMarkdown('multi/other.markdown', '# Other\n\nTranslate the other selected file.\n');
+  await writeMarkdown('multi/ignore.txt', 'Not Markdown.\n');
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+
+  await withWindowMessageStubs(
+    {
+      showWarningMessage: async (message, _options, action) => {
+        assert.match(message, /Translate 2 Markdown files from the selected Explorer items/);
+        return action;
+      },
+      showInformationMessage: async () => undefined,
+    },
+    async () => {
+      await vscode.commands.executeCommand('marklingo.translateSelectedMarkdownResources', clicked, [clicked, other]);
+    },
+  );
+
+  assert.equal(context.server.state.chatRequests.length, 2);
+  assert.match(readText(translatedPath(clicked)), /MOCK:# Clicked/);
+  assert.match(readText(translatedPath(other)), /MOCK:# Other/);
+
+  const openTabs = openTabFilePaths();
+  assert.ok(openTabs.includes(translatedPath(clicked)), 'expected first selected output to be opened');
+  assert.ok(!openTabs.includes(translatedPath(other)), 'expected later selected outputs not to be opened');
+}
+
+async function testFolderTranslationReusesCachedFiles(context) {
+  await cleanWorkspace();
+  const folder = vscode.Uri.file(path.join(workspaceRoot(), 'cached-docs'));
+  const cached = await writeMarkdown('cached-docs/cached.md', '# Cached\n\nReuse this cached translation.\n');
+  const fresh = await writeMarkdown('cached-docs/fresh.md', '# Fresh\n\nTranslate this fresh file.\n');
+
+  await translate(cached);
+  assert.equal(context.server.state.chatRequests.length, 1);
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  context.server.state.chatRequests = [];
+
+  await withWindowMessageStubs(
+    {
+      showWarningMessage: async (_message, _options, action) => action,
+      showInformationMessage: async () => undefined,
+    },
+    async () => {
+      await vscode.commands.executeCommand('marklingo.translateFolderMarkdown', folder);
+    },
+  );
+
+  assert.equal(context.server.state.chatRequests.length, 1, 'expected only the uncached file to call OpenRouter');
+  assert.match(context.server.state.chatRequests[0].blocks.map((block) => block.markdown).join('\n'), /Fresh/);
+  assert.ok(fs.existsSync(translatedPath(cached)), 'expected cached output to be rewritten from cache');
+  assert.ok(fs.existsSync(translatedPath(fresh)), 'expected fresh output to be written');
+}
+
+async function testFolderCommandRequiresExplorerResource() {
+  await cleanWorkspace();
+
+  await withWindowMessageStubs(
+    {
+      showErrorMessage: async (message) => {
+        assert.match(message, /Right-click a folder in the Explorer/);
+      },
+    },
+    async () => {
+      await vscode.commands.executeCommand('marklingo.translateFolderMarkdown');
+    },
+  );
 }
 
 async function testTranslatesFrontmatterValues(context) {
@@ -527,6 +666,11 @@ async function run() {
     const seeded = await configureExtension(server);
     const context = { server, seeded };
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
+    await runTest('translates folder markdown files through explorer command', testTranslatesFolderMarkdownFiles, context);
+    await runTest('translates explorer-selected markdown file', testTranslatesExplorerSelectedMarkdownFile, context);
+    await runTest('translates explorer multi-selected markdown resources', testTranslatesExplorerMultiSelectedMarkdownResources, context);
+    await runTest('folder translation reuses cached files', testFolderTranslationReusesCachedFiles, context);
+    await runTest('folder command requires an explorer resource', testFolderCommandRequiresExplorerResource, context);
     await runTest('translates selected YAML frontmatter values only', testTranslatesFrontmatterValues, context);
     await runTest('reuses cached translations on incremental runs', testReusesCachedTranslations, context);
     await runTest('compacts private cache into tracking stubs', testCompactsPrivateCacheIntoTrackingStubs, context);

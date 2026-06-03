@@ -14,7 +14,7 @@ MarkLingo 自体は無料で利用でき、完全にオープンソースで透�
 
 ## MarkLingo の特長
 
-- VS Code から、保存済みの Markdown ドキュメントを 1 つのコマンドで翻訳します。
+- コマンドパレット、エディターのコンテキストメニュー、またはエクスプローラーのコンテキストメニューから、保存済みの Markdown ドキュメントを翻訳します。
 - 元のファイルはそのまま保持し、その隣に翻訳済みの `*_<language>_mdt.md` ファイルを書き出します。
 - 翻訳後、翻訳済みの Markdown タブとその Markdown プレビューを開きます。
 - 変更されていない Markdown ブロックが再び翻訳されるとき、以前の翻訳を再利用します。
@@ -48,12 +48,17 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 
 翻訳の前に `MarkLingo: Open Settings` を実行して、API キー、ターゲット言語、モデル、カスタム指示を保存しておくこともできます。
 
+Markdown エディターを右クリックして `MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内の Markdown ファイルを右クリックすると `MarkLingo: Translate This Markdown File` を実行できます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。エクスプローラーで複数の Markdown ファイルやフォルダーを選択し、`MarkLingo: Translate Selected Markdown Files` で 1 つのバッチとして翻訳することもできます。
+
 ## コマンド
 
 | コマンド | 機能 |
 | --- | --- |
 | `MarkLingo: Translate Current Markdown` | 現在保存されている Markdown ファイルを翻訳します。可能な場合はキャッシュされたブロック翻訳を再利用します。 |
 | `MarkLingo: Retranslate Current Markdown` | 現在の Markdown ファイルの完全な再翻訳を強制します。 |
+| `MarkLingo: Translate This Markdown File` | エクスプローラーのコンテキストメニューで選択した Markdown ファイルを翻訳します。 |
+| `MarkLingo: Translate Selected Markdown Files` | エクスプローラーで選択したファイルやフォルダーから集めた Markdown ファイルを 1 つのバッチとして翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
+| `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Open Settings` | OpenRouter、API キー、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
 | `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力と、プライベートな翻訳メタデータ/キャッシュを削除します。 |

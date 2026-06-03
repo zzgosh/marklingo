@@ -59,6 +59,18 @@
         "title": "MarkLingo: Retranslate Current Markdown"
       },
       {
+        "command": "marklingo.translateExplorerMarkdownFile",
+        "title": "MarkLingo: Translate This Markdown File"
+      },
+      {
+        "command": "marklingo.translateSelectedMarkdownResources",
+        "title": "MarkLingo: Translate Selected Markdown Files"
+      },
+      {
+        "command": "marklingo.translateFolderMarkdown",
+        "title": "MarkLingo: Translate All Markdown in This Folder"
+      },
+      {
         "command": "marklingo.deleteCurrentProjectTranslatedFiles",
         "title": "MarkLingo: Delete Current Project Translated Files"
       },
@@ -81,6 +93,46 @@
         "when": "editorTextFocus && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "marklingo.translateCurrentMarkdown",
+          "when": "!(resourceFilename =~ /_mdt[.](md|markdown)$/i) && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)",
+          "group": "marklingo@10"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "marklingo.translateExplorerMarkdownFile",
+          "when": "!listMultiSelection && !explorerResourceIsFolder && isFileSystemResource && !(resourceFilename =~ /_mdt[.](md|markdown)$/i) && (resourceExtname == .md || resourceExtname == .markdown)",
+          "group": "marklingo@10"
+        },
+        {
+          "command": "marklingo.translateSelectedMarkdownResources",
+          "when": "listMultiSelection && isFileSystemResource && !(resourceFilename =~ /_mdt[.](md|markdown)$/i) && (explorerResourceIsFolder || resourceExtname == .md || resourceExtname == .markdown)",
+          "group": "marklingo@10"
+        },
+        {
+          "command": "marklingo.translateFolderMarkdown",
+          "when": "!listMultiSelection && explorerResourceIsFolder && isFileSystemResource",
+          "group": "marklingo@11"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "marklingo.translateExplorerMarkdownFile",
+          "when": "false"
+        },
+        {
+          "command": "marklingo.translateSelectedMarkdownResources",
+          "when": "false"
+        },
+        {
+          "command": "marklingo.translateFolderMarkdown",
+          "when": "false"
+        }
+      ]
+    },
     "configuration": {
       "title": "MarkLingo",
       "properties": {
