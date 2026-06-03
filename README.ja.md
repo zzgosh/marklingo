@@ -56,7 +56,7 @@ Markdown エディターまたはエクスプローラー内の Markdown ファ�
 | --- | --- |
 | `MarkLingo: Translate Current Markdown` | 現在保存されている Markdown ファイルを翻訳します。可能な場合はキャッシュされたブロック翻訳を再利用します。 |
 | `MarkLingo: Retranslate Current Markdown` | 現在の Markdown ファイルの完全な再翻訳を強制します。 |
-| `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、各ファイルの完了後に翻訳出力を開きます。 |
+| `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Open Settings` | OpenRouter、API キー、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
 | `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力と、プライベートな翻訳メタデータ/キャッシュを削除します。 |

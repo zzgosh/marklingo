@@ -90,19 +90,25 @@
         {
           "command": "marklingo.translateCurrentMarkdown",
           "when": "editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown",
-          "group": "navigation@10"
+          "group": "marklingo@10"
         }
       ],
       "explorer/context": [
         {
           "command": "marklingo.translateCurrentMarkdown",
           "when": "!explorerResourceIsFolder && isFileSystemResource && (resourceExtname == .md || resourceExtname == .markdown)",
-          "group": "navigation@10"
+          "group": "marklingo@10"
         },
         {
           "command": "marklingo.translateFolderMarkdown",
           "when": "explorerResourceIsFolder && isFileSystemResource",
-          "group": "navigation@11"
+          "group": "marklingo@11"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "marklingo.translateFolderMarkdown",
+          "when": "false"
         }
       ]
     },

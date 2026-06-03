@@ -11,20 +11,20 @@ import { compactPrivateStorage, readPrivateStorageStats } from './storage/privat
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('marklingo.translateCurrentMarkdown', (resource?: vscode.Uri) => {
-      return translateCurrentMarkdown(context, resource);
+    vscode.commands.registerCommand('marklingo.translateCurrentMarkdown', (resource?: vscode.Uri, selectedResources?: vscode.Uri[]) => {
+      return translateCurrentMarkdown(context, resource, {}, selectedResources);
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('marklingo.translateCurrentMarkdownFull', (resource?: vscode.Uri) => {
-      return translateCurrentMarkdown(context, resource, { mode: 'full' });
+    vscode.commands.registerCommand('marklingo.translateCurrentMarkdownFull', (resource?: vscode.Uri, selectedResources?: vscode.Uri[]) => {
+      return translateCurrentMarkdown(context, resource, { mode: 'full' }, selectedResources);
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('marklingo.translateFolderMarkdown', (resource?: vscode.Uri) => {
-      return translateFolderMarkdown(context, resource);
+    vscode.commands.registerCommand('marklingo.translateFolderMarkdown', (resource?: vscode.Uri, selectedResources?: vscode.Uri[]) => {
+      return translateFolderMarkdown(context, resource, selectedResources);
     }),
   );
 

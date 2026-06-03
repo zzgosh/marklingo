@@ -16,6 +16,7 @@ export type ChatCompletionOptions = {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  signal?: AbortSignal;
   responseFormat?: ResponseFormat;
   reasoning?: ReasoningOptions;
 };
@@ -245,8 +246,14 @@ async function fetchJsonWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
+  externalSignal?: AbortSignal,
 ): Promise<{ ok: boolean; status: number; statusText: string; json: unknown; text: string }> {
   const controller = new AbortController();
+  const abortFromExternalSignal = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) {
+    abortFromExternalSignal();
+  }
+  externalSignal?.addEventListener('abort', abortFromExternalSignal, { once: true });
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
@@ -259,6 +266,7 @@ async function fetchJsonWithTimeout(
     }
     return { ok: res.ok, status: res.status, statusText: res.statusText, json, text };
   } finally {
+    externalSignal?.removeEventListener('abort', abortFromExternalSignal);
     clearTimeout(id);
   }
 }
@@ -295,6 +303,7 @@ export async function openRouterChatCompletion(
       body: JSON.stringify(body),
     },
     timeoutMs,
+    options.signal,
   );
 
   if (!res.ok) {

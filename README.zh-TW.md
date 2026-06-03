@@ -56,7 +56,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 | --- | --- |
 | `MarkLingo: Translate Current Markdown` | 翻譯目前已儲存的 Markdown 檔案，並盡可能重複使用快取的區塊翻譯。 |
 | `MarkLingo: Retranslate Current Markdown` | 強制對目前的 Markdown 檔案進行一次完整重新翻譯。 |
-| `MarkLingo: Translate All Markdown in This Folder` | 翻譯所選資料夾及其子資料夾中的來源 Markdown 檔案，並在每個檔案完成後開啟翻譯輸出。 |
+| `MarkLingo: Translate All Markdown in This Folder` | 翻譯所選資料夾及其子資料夾中的來源 Markdown 檔案，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
 | `MarkLingo: Open Settings` | 開啟 MarkLingo 設定，管理 OpenRouter、API 金鑰、目標語言、自訂指令、快捷鍵狀態與清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 將 `*_mdt.md` 加入目前儲存庫的本機 Git 排除檔案中。 |
 | `MarkLingo: Delete Current Project Translated Files` | 刪除本專案中由擴充功能追蹤的翻譯輸出，以及私有的翻譯中繼資料/快取。 |

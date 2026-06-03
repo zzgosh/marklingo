@@ -259,6 +259,7 @@ type TranslateMarkdownOptions = {
   openOutput?: boolean;
   outputViewColumn?: vscode.ViewColumn;
   progress?: TranslationProgress;
+  cancellationToken?: vscode.CancellationToken;
 };
 
 type TranslateMarkdownResult =
@@ -306,6 +307,36 @@ function getOutputViewColumnForSource(sourceUri?: vscode.Uri): vscode.ViewColumn
     return activeEditor.viewColumn ?? vscode.ViewColumn.Active;
   }
   return vscode.ViewColumn.One;
+}
+
+function throwIfCancellationRequested(token: vscode.CancellationToken | undefined): void {
+  if (token?.isCancellationRequested) {
+    throw new vscode.CancellationError();
+  }
+}
+
+function createAbortSignalFromCancellationToken(token: vscode.CancellationToken | undefined): {
+  signal?: AbortSignal;
+  dispose: () => void;
+} {
+  if (!token) return { dispose: () => undefined };
+  const controller = new AbortController();
+  if (token.isCancellationRequested) {
+    controller.abort(new Error('Translation canceled.'));
+    return { signal: controller.signal, dispose: () => undefined };
+  }
+
+  const subscription = token.onCancellationRequested(() => {
+    controller.abort(new Error('Translation canceled.'));
+  });
+  return {
+    signal: controller.signal,
+    dispose: () => subscription.dispose(),
+  };
+}
+
+function isCancellationError(error: unknown): boolean {
+  return error instanceof vscode.CancellationError;
 }
 
 function getDocumentValidationError(doc: vscode.TextDocument, sourceLabel: 'active file' | 'selected file'): string | undefined {
@@ -437,6 +468,7 @@ async function translateMarkdownDocument(
     }
 
     const translateWithProgress = async (progress: TranslationProgress) => {
+        throwIfCancellationRequested(options.cancellationToken);
         debug.document.totalSegments = segments.length;
         debug.document.translatableBlocks = translatableBase.length;
 
@@ -514,12 +546,14 @@ async function translateMarkdownDocument(
         }
 
         for (const [chunkIndex, plannedChunk] of plan.chunks.entries()) {
+          throwIfCancellationRequested(options.cancellationToken);
           progress.report({
             message: `Processing batch ${chunkIndex + 1} of ${plan.chunks.length} · ${plannedChunk.blocks.length} blocks`,
           });
           const prompt = buildPrompt(plannedChunk.blocks);
           const requestStartedAt = Date.now();
           const requestDebug = debug.plan?.chunks[chunkIndex];
+          const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
           let raw: string;
           try {
             raw = await openRouterChatCompletion(
@@ -531,6 +565,7 @@ async function translateMarkdownDocument(
               {
                 timeoutMs: 120_000,
                 temperature: 0,
+                signal: abortSignal.signal,
                 responseFormat: { type: 'json_object' },
                 reasoning: { effort: 'none', exclude: true },
               },
@@ -541,7 +576,10 @@ async function translateMarkdownDocument(
               requestDebug.status = 'error';
             }
             throw error;
+          } finally {
+            abortSignal.dispose();
           }
+          throwIfCancellationRequested(options.cancellationToken);
           const requestDurationMs = Date.now() - requestStartedAt;
           if (requestDebug) {
             requestDebug.durationMs = requestDurationMs;
@@ -693,11 +731,16 @@ type TranslateCurrentMarkdownOptions = {
 
 export async function translateCurrentMarkdown(
   context: vscode.ExtensionContext,
-  sourceUriOrOptions?: vscode.Uri | TranslateCurrentMarkdownOptions,
-  maybeOptions: TranslateCurrentMarkdownOptions = {},
+  sourceUri?: vscode.Uri,
+  options: TranslateCurrentMarkdownOptions = {},
+  selectedResources?: vscode.Uri[],
 ): Promise<TranslateMarkdownResult | undefined> {
-  const sourceUri = sourceUriOrOptions instanceof vscode.Uri ? sourceUriOrOptions : undefined;
-  const options = sourceUriOrOptions instanceof vscode.Uri ? maybeOptions : (sourceUriOrOptions ?? maybeOptions);
+  const commandResources = getCommandResources(sourceUri, selectedResources);
+  if (commandResources.length > 1) {
+    await translateMarkdownResources(context, commandResources, { mode: options.mode });
+    return undefined;
+  }
+
   const { doc, error } = await resolveMarkdownDocument(sourceUri);
   if (error || !doc) {
     await vscode.window.showErrorMessage(error ?? 'MarkLingo: No Markdown file is available.');
@@ -725,94 +768,108 @@ export async function translateCurrentMarkdown(
 const TRANSLATE_FOLDER_CONFIRM_ACTION = 'Translate';
 const SKIPPED_FOLDER_NAMES = new Set(['.git', 'node_modules']);
 
+type TranslateMarkdownResourcesOptions = {
+  mode?: TranslateMode;
+  sourceLabel?: string;
+};
+
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function getRelativeFolderLabel(baseUri: vscode.Uri, uri: vscode.Uri): string {
+function getCommandResources(resource?: vscode.Uri, selectedResources?: vscode.Uri[]): vscode.Uri[] {
+  const resources = selectedResources?.length ? [...selectedResources] : [];
+  if (resource && !resources.some((item) => item.toString() === resource.toString())) {
+    resources.unshift(resource);
+  }
+  return resources;
+}
+
+function getRelativeResourceLabel(baseUri: vscode.Uri, uri: vscode.Uri): string {
   const relative = path.relative(baseUri.fsPath, uri.fsPath);
   return relative && !relative.startsWith('..') ? relative : path.basename(uri.fsPath);
 }
 
-async function resolveMarkdownFolder(folderUri?: vscode.Uri): Promise<{ folderUri?: vscode.Uri; error?: string }> {
-  const resolvedUri = folderUri ?? (
-    vscode.window.activeTextEditor
-      ? vscode.Uri.file(path.dirname(vscode.window.activeTextEditor.document.uri.fsPath))
-      : undefined
-  );
-  if (!resolvedUri) {
-    return { error: 'MarkLingo: Select a folder in the Explorer or open a Markdown file first.' };
-  }
-  if (resolvedUri.scheme !== 'file') {
-    return { error: 'MarkLingo: Only local folders can be translated.' };
-  }
-
-  let stat: vscode.FileStat;
-  try {
-    stat = await vscode.workspace.fs.stat(resolvedUri);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return { error: `MarkLingo: Could not inspect the selected folder. ${msg}` };
-  }
-  if ((stat.type & vscode.FileType.Directory) === 0) {
-    return { error: 'MarkLingo: Select a folder to translate all Markdown files in it.' };
-  }
-  return { folderUri: resolvedUri };
+function shouldSkipFolderEntry(name: string, type: vscode.FileType): boolean {
+  return SKIPPED_FOLDER_NAMES.has(name) || (type & vscode.FileType.SymbolicLink) !== 0;
 }
 
-async function findMarkdownSourceFilesInFolder(folderUri: vscode.Uri): Promise<vscode.Uri[]> {
-  const files: vscode.Uri[] = [];
-  const visit = async (dirUri: vscode.Uri) => {
+async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<{ files: vscode.Uri[] }> {
+  const filesByUri = new Map<string, vscode.Uri>();
+
+  const addMarkdownSourceFile = (uri: vscode.Uri) => {
+    if (!hasMarkdownFileExtension(uri) || isTranslatedMarkdownOutput(uri)) return;
+    filesByUri.set(uri.toString(), uri);
+  };
+
+  const visitDirectory = async (dirUri: vscode.Uri) => {
     const entries = await vscode.workspace.fs.readDirectory(dirUri);
     entries.sort(([a], [b]) => a.localeCompare(b));
 
     for (const [name, type] of entries) {
+      if (shouldSkipFolderEntry(name, type)) continue;
+
       const childUri = vscode.Uri.joinPath(dirUri, name);
       if ((type & vscode.FileType.Directory) !== 0) {
-        if (!SKIPPED_FOLDER_NAMES.has(name)) {
-          await visit(childUri);
-        }
+        await visitDirectory(childUri);
         continue;
       }
-      if ((type & vscode.FileType.File) !== 0 && hasMarkdownFileExtension(childUri) && !isTranslatedMarkdownOutput(childUri)) {
-        files.push(childUri);
+      if ((type & vscode.FileType.File) !== 0) {
+        addMarkdownSourceFile(childUri);
       }
     }
   };
 
-  await visit(folderUri);
-  return files;
+  for (const resource of resources) {
+    if (resource.scheme !== 'file') {
+      outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped non-file resource ${resource.toString()}.`);
+      continue;
+    }
+
+    let stat: vscode.FileStat;
+    try {
+      stat = await vscode.workspace.fs.stat(resource);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped unreadable resource ${resource.fsPath}: ${msg}`);
+      continue;
+    }
+
+    if ((stat.type & vscode.FileType.SymbolicLink) !== 0) {
+      outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped symbolic link ${resource.fsPath}.`);
+      continue;
+    }
+    if ((stat.type & vscode.FileType.Directory) !== 0) {
+      await visitDirectory(resource);
+      continue;
+    }
+    if ((stat.type & vscode.FileType.File) !== 0) {
+      addMarkdownSourceFile(resource);
+    }
+  }
+
+  return { files: [...filesByUri.values()] };
 }
 
-export async function translateFolderMarkdown(context: vscode.ExtensionContext, folderUri?: vscode.Uri): Promise<void> {
-  const resolved = await resolveMarkdownFolder(folderUri);
-  if (resolved.error || !resolved.folderUri) {
-    await vscode.window.showErrorMessage(resolved.error ?? 'MarkLingo: No folder is available.');
-    return;
+function buildBatchConfirmationMessage(files: vscode.Uri[], sourceLabel?: string): string {
+  if (sourceLabel) {
+    return `MarkLingo: Translate ${pluralize(files.length, 'Markdown file')} in ${sourceLabel} and subfolders?`;
   }
+  return `MarkLingo: Translate ${pluralize(files.length, 'Markdown file')} from the selected Explorer items?`;
+}
 
-  let markdownFiles: vscode.Uri[];
-  try {
-    markdownFiles = await findMarkdownSourceFilesInFolder(resolved.folderUri);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    await vscode.window.showErrorMessage(`MarkLingo: Could not scan the selected folder. ${msg}`);
-    return;
-  }
-
-  if (markdownFiles.length === 0) {
-    await vscode.window.showInformationMessage('MarkLingo: No source Markdown files were found in the selected folder.');
-    return;
-  }
-
-  const folderLabel = path.basename(resolved.folderUri.fsPath) || resolved.folderUri.fsPath;
+async function translateMarkdownFilesBatch(
+  context: vscode.ExtensionContext,
+  markdownFiles: vscode.Uri[],
+  options: TranslateMarkdownResourcesOptions,
+): Promise<void> {
   const confirmed = await vscode.window.showWarningMessage(
-    `MarkLingo: Translate ${pluralize(markdownFiles.length, 'Markdown file')} in ${folderLabel} and subfolders?`,
+    buildBatchConfirmationMessage(markdownFiles, options.sourceLabel),
     { modal: true },
     TRANSLATE_FOLDER_CONFIRM_ACTION,
   );
   if (confirmed !== TRANSLATE_FOLDER_CONFIRM_ACTION) {
-    await vscode.window.showInformationMessage('MarkLingo: Folder translation canceled.');
+    await vscode.window.showInformationMessage('MarkLingo: Batch translation canceled.');
     return;
   }
 
@@ -833,11 +890,12 @@ export async function translateFolderMarkdown(context: vscode.ExtensionContext, 
     canceled: false,
   };
   const outputViewColumn = vscode.ViewColumn.One;
+  let openedFirstOutput = false;
 
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'MarkLingo: Translating Folder',
+      title: 'MarkLingo: Translating Markdown Files',
       cancellable: true,
     },
     async (progress, token) => {
@@ -847,7 +905,8 @@ export async function translateFolderMarkdown(context: vscode.ExtensionContext, 
           break;
         }
 
-        const relativeLabel = getRelativeFolderLabel(resolved.folderUri!, uri);
+        const baseUri = vscode.Uri.file(path.dirname(uri.fsPath));
+        const relativeLabel = getRelativeResourceLabel(baseUri, uri);
         const fileLabel = `File ${index + 1} of ${markdownFiles.length}: ${relativeLabel}`;
         progress.report({ message: fileLabel });
 
@@ -868,20 +927,27 @@ export async function translateFolderMarkdown(context: vscode.ExtensionContext, 
             },
           };
           const result = await translateMarkdownDocument(context, doc, runtime!, {
-            mode: 'auto',
+            mode: options.mode ?? 'auto',
+            openOutput: !openedFirstOutput,
             outputViewColumn,
             progress: fileProgress,
+            cancellationToken: token,
           });
           if (result.status === 'translated') {
             summary.translated += 1;
+            openedFirstOutput = true;
           } else {
             summary.skipped += 1;
             outputChannel.appendLine(`[${new Date().toISOString()}] Warning: skipped ${uri.fsPath}: ${result.message}`);
           }
         } catch (error) {
+          if (token.isCancellationRequested || isCancellationError(error)) {
+            summary.canceled = true;
+            break;
+          }
           const msg = error instanceof Error ? error.message : String(error);
           summary.failed.push({ uri, message: msg });
-          outputChannel.appendLine(`[${new Date().toISOString()}] Error: folder translation failed for ${uri.fsPath}: ${msg}`);
+          outputChannel.appendLine(`[${new Date().toISOString()}] Error: batch translation failed for ${uri.fsPath}: ${msg}`);
         } finally {
           progress.report({ increment: 100 / markdownFiles.length });
         }
@@ -896,9 +962,46 @@ export async function translateFolderMarkdown(context: vscode.ExtensionContext, 
   ].filter(Boolean).join(', ');
 
   if (summary.failed.length > 0) {
-    await vscode.window.showErrorMessage(`MarkLingo: Folder translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}. See the MarkLingo output for details.`);
+    await vscode.window.showErrorMessage(`MarkLingo: Batch translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}. See the MarkLingo output for details.`);
     return;
   }
 
-  await vscode.window.showInformationMessage(`MarkLingo: Folder translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}.`);
+  await vscode.window.showInformationMessage(`MarkLingo: Batch translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}.`);
+}
+
+async function translateMarkdownResources(
+  context: vscode.ExtensionContext,
+  resources: vscode.Uri[],
+  options: TranslateMarkdownResourcesOptions = {},
+): Promise<void> {
+  let collected: { files: vscode.Uri[] };
+  try {
+    collected = await collectMarkdownSourceFiles(resources);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    await vscode.window.showErrorMessage(`MarkLingo: Could not scan the selected resources. ${msg}`);
+    return;
+  }
+
+  if (collected.files.length === 0) {
+    await vscode.window.showInformationMessage('MarkLingo: No source Markdown files were found in the selected resources.');
+    return;
+  }
+
+  await translateMarkdownFilesBatch(context, collected.files, options);
+}
+
+export async function translateFolderMarkdown(
+  context: vscode.ExtensionContext,
+  resource?: vscode.Uri,
+  selectedResources?: vscode.Uri[],
+): Promise<void> {
+  const resources = getCommandResources(resource, selectedResources);
+  if (resources.length === 0) {
+    await vscode.window.showErrorMessage('MarkLingo: Right-click a folder in the Explorer to translate Markdown files.');
+    return;
+  }
+
+  const sourceLabel = resources.length === 1 ? path.basename(resources[0].fsPath) || resources[0].fsPath : undefined;
+  await translateMarkdownResources(context, resources, { sourceLabel });
 }
