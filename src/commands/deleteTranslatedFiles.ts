@@ -76,6 +76,20 @@ type DeleteTrackedWorkspaceOutputOptions = CleanupStorageOptions & {
   skipModified?: boolean;
 };
 
+export type ProjectTranslationDataScopes = {
+  workspaceOutputs?: boolean;
+  metadataCache?: boolean;
+};
+
+export type ProjectTranslationDataDeleteSummary = WorkspaceOutputDeleteSummary & {
+  metadataCacheSelected: boolean;
+  metadataCacheCleared: boolean;
+};
+
+function createWorkspaceOutputDeleteSummary(): WorkspaceOutputDeleteSummary {
+  return { deleted: 0, skipped: 0, missing: 0, tracked: 0, errors: [] };
+}
+
 function getCleanupStorageRoot(context: vscode.ExtensionContext, options: CleanupStorageOptions = {}): vscode.Uri {
   return options.projectUri
     ? getProjectStorageRoot(context, options.projectUri)
@@ -89,6 +103,15 @@ function getCurrentProjectUri(): vscode.Uri | undefined {
   const folders = vscode.workspace.workspaceFolders ?? [];
   if (folders.length === 1) return folders[0].uri;
   return undefined;
+}
+
+async function uriExists(uri: vscode.Uri): Promise<boolean> {
+  try {
+    await vscode.workspace.fs.stat(uri);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function scanTrackedWorkspaceOutputs(
@@ -161,14 +184,26 @@ export async function deleteProjectTranslationData(
   context: vscode.ExtensionContext,
   projectUri: vscode.Uri,
   progress?: vscode.Progress<{ message?: string }>,
-): Promise<WorkspaceOutputDeleteSummary> {
-  const { storageRoot } = await scanTrackedWorkspaceOutputs(context, { projectUri });
-  const summary = await deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false });
+  scopes: ProjectTranslationDataScopes = { workspaceOutputs: true, metadataCache: true },
+): Promise<ProjectTranslationDataDeleteSummary> {
+  const outputSummary = scopes.workspaceOutputs
+    ? await deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false })
+    : createWorkspaceOutputDeleteSummary();
+  const summary: ProjectTranslationDataDeleteSummary = {
+    ...outputSummary,
+    metadataCacheSelected: Boolean(scopes.metadataCache),
+    metadataCacheCleared: false,
+  };
 
-  progress?.report({ message: 'Clearing translation metadata/cache' });
-  const cacheError = await deletePrivateTranslationCache(context, projectUri);
-  if (cacheError) {
-    summary.errors.push(`${storageRoot.fsPath}: ${cacheError}`);
+  if (scopes.metadataCache) {
+    progress?.report({ message: 'Clearing translation metadata/cache' });
+    const storageRoot = getProjectStorageRoot(context, projectUri);
+    const cacheError = await deletePrivateTranslationCache(context, projectUri);
+    if (cacheError) {
+      summary.errors.push(`${storageRoot.fsPath}: ${cacheError}`);
+    } else {
+      summary.metadataCacheCleared = true;
+    }
   }
 
   return summary;
@@ -181,15 +216,19 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
     return;
   }
 
-  const { storageRoot, storageFiles, outputs } = await scanTrackedWorkspaceOutputs(context, { projectUri });
+  const { outputs } = await scanTrackedWorkspaceOutputs(context, { projectUri });
+  const existingOutputs: TrackedWorkspaceOutput[] = [];
+  for (const output of outputs) {
+    if (await uriExists(output.uri)) existingOutputs.push(output);
+  }
 
-  if (storageFiles.length === 0 && outputs.length === 0) {
-    await vscode.window.showInformationMessage('MarkLingo: No translated files or translation metadata/cache were found for the current project.');
+  if (existingOutputs.length === 0) {
+    await vscode.window.showInformationMessage('MarkLingo: No tracked translated files were found for the current project.');
     return;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    "MarkLingo: Delete this project's tracked translated files, including files edited after generation, and translation metadata/cache?",
+    "MarkLingo: Delete this project's tracked translated Markdown files, including files edited after generation? Translation metadata/cache will be kept.",
     { modal: true },
     'Delete',
   );
@@ -198,23 +237,26 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   const summary = await vscode.window.withProgress<WorkspaceOutputDeleteSummary>(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'MarkLingo: Deleting current project translations...',
+      title: 'MarkLingo: Deleting current project translated files...',
       cancellable: false,
     },
     async (progress) => {
-      return deleteProjectTranslationData(context, projectUri, progress);
+      return deleteTrackedWorkspaceOutputs(context, progress, { projectUri, skipModified: false });
     },
   );
 
   if (summary.errors.length) {
     console.warn('[marklingo] current project delete errors:', summary.errors.slice(0, 20));
     await vscode.window.showWarningMessage(
-      `MarkLingo: Deleted ${summary.deleted} translated file(s), ${summary.missing} file(s) were already missing, and ${summary.errors.length} operation(s) failed.`,
+      `MarkLingo: Deleted ${summary.deleted} translated file(s), kept translation metadata/cache, and ${summary.errors.length} operation(s) failed.`,
     );
     return;
   }
 
+  const missingText = summary.missing > 0
+    ? ` ${summary.missing} tracked file(s) were already missing.`
+    : '';
   await vscode.window.showInformationMessage(
-    `MarkLingo: Cleared current project metadata/cache and deleted ${summary.deleted} tracked translated file(s).`,
+    `MarkLingo: Deleted ${summary.deleted} tracked translated file(s). Translation metadata/cache was kept.${missingText}`,
   );
 }

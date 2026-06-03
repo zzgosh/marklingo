@@ -15,6 +15,7 @@ function getState(overrides = {}) {
     systemPrompt: 'You are a precise Markdown translation assistant.',
     customPrompt: '',
     storageRoot: '/tmp/marklingo/projects',
+    currentProjectPath: '/Users/example/project',
     storageStats: {
       totalBytes: 42 * 1024 * 1024,
       quotaBytes: 300 * 1024 * 1024,
@@ -55,6 +56,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /class="info-tip"/);
   assert.match(html, /When usage reaches 300 MB, MarkLingo automatically removes the oldest cached translations/);
   assert.match(html, />Optimize<\/button>/);
+  assert.match(html, /Clear Current Project Data/);
+  assert.match(html, /\/Users\/example\/project/);
+  assert.match(html, /id="clear-current-project-data">Clear current project data<\/button>/);
+  assert.match(html, /Clear All Data/);
+  assert.match(html, /global translation metadata\/cache/);
+  assert.match(html, /id="clear-all-data">Clear all data<\/button>/);
   assert.match(html, /\.section-warning \{\s+margin-top: 8px;\s+color: var\(--danger\);/);
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);
@@ -71,6 +78,18 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('outputLocation-hint'));
   assert.ok(!html.includes('Type CLEAR to confirm'));
   assert.ok(!html.includes('Can delete saved API key'));
+  assert.ok(!html.includes('id="clear-data"'));
+});
+
+test('renders disabled current project cleanup when no project is selected', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({ currentProjectPath: undefined }),
+  });
+
+  assert.match(html, /Open a file or single workspace folder to select a current project\./);
+  assert.match(html, /id="clear-current-project-data" disabled>Clear current project data<\/button>/);
 });
 
 test('renders empty API key input when no key is on file', () => {

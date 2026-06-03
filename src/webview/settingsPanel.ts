@@ -11,7 +11,8 @@ import {
   PRIVATE_STORAGE_COMPACT_TARGET_BYTES,
   readPrivateStorageStats,
 } from '../storage/privateStorage.js';
-import { getProjectsStorageRoot } from '../storage/paths.js';
+import { getProjectRootUri, getProjectsStorageRoot } from '../storage/paths.js';
+import { deleteProjectTranslationData, type ProjectTranslationDataScopes } from '../commands/deleteTranslatedFiles.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
 import {
   acceptVisibleOnboardingDefaults,
@@ -39,6 +40,7 @@ const UPDATABLE_SETTING_KEYS = new Set<string>([
 ]);
 
 let currentPanel: vscode.WebviewPanel | undefined;
+let currentPanelProjectUri: vscode.Uri | undefined;
 
 function stripJsonComments(text: string): string {
   let output = '';
@@ -118,6 +120,19 @@ async function getShortcutState(context: vscode.ExtensionContext): Promise<Short
   return getShortcutStateFromKeybindings(keybindings, defaultKeys);
 }
 
+function getCurrentProjectUri(): vscode.Uri | undefined {
+  const activeUri = vscode.window.activeTextEditor?.document.uri;
+  if (activeUri?.scheme === 'file') return activeUri;
+
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.length === 1) return folders[0].uri;
+  return undefined;
+}
+
+function getCurrentProjectDirectoryPath(projectUri: vscode.Uri | undefined): string | undefined {
+  return projectUri ? getProjectRootUri(projectUri).fsPath : undefined;
+}
+
 function getKeyboardShortcutsSearchQuery(): string {
   return getDefaultTranslateKeybindingSearchQuery({
     extensionHostPlatform: process.platform,
@@ -125,7 +140,7 @@ function getKeyboardShortcutsSearchQuery(): string {
   });
 }
 
-async function readSettingsState(context: vscode.ExtensionContext): Promise<SettingsState> {
+async function readSettingsState(context: vscode.ExtensionContext, projectUri?: vscode.Uri): Promise<SettingsState> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const shortcutState = await getShortcutState(context);
   const targetLanguage = cfg.get<string>('translation.targetLanguage', '简体中文');
@@ -145,11 +160,12 @@ async function readSettingsState(context: vscode.ExtensionContext): Promise<Sett
     systemPrompt: resolveSystemPrompt(systemPrompt, resolvedTargetLanguage),
     customPrompt: cfg.get<string>('translation.customPrompt', ''),
     storageRoot: getProjectsStorageRoot(context).fsPath,
+    currentProjectPath: getCurrentProjectDirectoryPath(projectUri),
     storageStats: await readPrivateStorageStats(context),
   };
 }
 
-async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
+async function pickClearAllDataScopes(): Promise<CleanupScopes | undefined> {
   type ClearDataItem = vscode.QuickPickItem & { scope: keyof CleanupScopes };
   const items: ClearDataItem[] = [
     {
@@ -166,13 +182,13 @@ async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
     },
     {
       label: 'Translation metadata and cache',
-      description: 'Extension global storage',
+      description: 'All projects in extension global storage',
       picked: true,
       scope: 'globalStorage',
     },
     {
       label: 'Tracked translated files',
-      description: '*_<language>_mdt.md generated outputs',
+      description: 'Optional unmodified *_<language>_mdt.md generated outputs',
       picked: false,
       scope: 'workspaceOutputs',
     },
@@ -181,7 +197,7 @@ async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
     canPickMany: true,
     ignoreFocusOut: true,
     placeHolder: 'Select data to delete, then press Enter.',
-    title: 'MarkLingo: Clear Data',
+    title: 'MarkLingo: Clear All Data',
   });
   if (!selected || selected.length === 0) return undefined;
   return {
@@ -189,6 +205,36 @@ async function pickClearDataScopes(): Promise<CleanupScopes | undefined> {
     settings: selected.some((item) => item.scope === 'settings'),
     globalStorage: selected.some((item) => item.scope === 'globalStorage'),
     workspaceOutputs: selected.some((item) => item.scope === 'workspaceOutputs'),
+  };
+}
+
+async function pickCurrentProjectDataScopes(projectPath: string): Promise<ProjectTranslationDataScopes | undefined> {
+  type CurrentProjectDataItem = vscode.QuickPickItem & { scope: keyof ProjectTranslationDataScopes };
+  const items: CurrentProjectDataItem[] = [
+    {
+      label: 'Tracked translated files',
+      description: '*_<language>_mdt.md in the current project',
+      picked: true,
+      scope: 'workspaceOutputs',
+    },
+    {
+      label: 'Translation metadata and cache',
+      description: 'Current project private storage',
+      detail: projectPath,
+      picked: true,
+      scope: 'metadataCache',
+    },
+  ];
+  const selected = await vscode.window.showQuickPick(items, {
+    canPickMany: true,
+    ignoreFocusOut: true,
+    placeHolder: 'Select current project data to delete, then press Enter.',
+    title: 'MarkLingo: Clear Current Project Data',
+  });
+  if (!selected || selected.length === 0) return undefined;
+  return {
+    workspaceOutputs: selected.some((item) => item.scope === 'workspaceOutputs'),
+    metadataCache: selected.some((item) => item.scope === 'metadataCache'),
   };
 }
 
@@ -224,7 +270,7 @@ function getHtml(webview: vscode.Webview, state: SettingsState): string {
 }
 
 async function refreshPanel(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
-  panel.webview.html = getHtml(panel.webview, await readSettingsState(context));
+  panel.webview.html = getHtml(panel.webview, await readSettingsState(context, currentPanelProjectUri));
 }
 
 async function optimizePrivateStorage(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
@@ -255,6 +301,46 @@ async function optimizePrivateStorage(context: vscode.ExtensionContext, panel: v
   await vscode.window.showInformationMessage(
     `MarkLingo: Removed ${formatBytes(summary.reclaimedBytes)} from ${summary.evictedEntries} old cache record(s).`,
   );
+}
+
+async function clearCurrentProjectData(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
+  const projectUri = currentPanelProjectUri ?? getCurrentProjectUri();
+  if (!projectUri) {
+    await vscode.window.showWarningMessage('MarkLingo: Open a file or single workspace folder before clearing current project data.');
+    return;
+  }
+
+  const projectPath = getProjectRootUri(projectUri).fsPath;
+  const scopes = await pickCurrentProjectDataScopes(projectPath);
+  if (!scopes) return;
+
+  const summary = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'MarkLingo: Clearing current project data...',
+      cancellable: false,
+    },
+    (progress) => deleteProjectTranslationData(context, projectUri, progress, scopes),
+  );
+
+  await refreshPanel(context, panel);
+
+  if (summary.errors.length > 0) {
+    console.warn('[marklingo] current project data cleanup errors:', summary.errors.slice(0, 20));
+    await vscode.window.showWarningMessage(
+      `MarkLingo: Cleared current project data with ${summary.errors.length} operation(s) failed.`,
+    );
+    return;
+  }
+
+  const parts: string[] = [];
+  if (scopes.workspaceOutputs) {
+    parts.push(`${summary.deleted} translated file(s)`);
+    if (summary.missing > 0) parts.push(`${summary.missing} file(s) already missing`);
+  }
+  if (scopes.metadataCache) parts.push('translation metadata/cache');
+
+  await vscode.window.showInformationMessage(`MarkLingo: Cleared current project data: ${parts.join(', ')}.`);
 }
 
 async function postShortcutState(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
@@ -294,7 +380,9 @@ function watchUserKeybindings(context: vscode.ExtensionContext, panel: vscode.We
 }
 
 export async function openSettingsPanel(context: vscode.ExtensionContext): Promise<void> {
+  const projectUri = getCurrentProjectUri();
   if (currentPanel) {
+    if (projectUri) currentPanelProjectUri = projectUri;
     currentPanel.reveal(vscode.ViewColumn.Active);
     await refreshPanel(context, currentPanel);
     return;
@@ -310,10 +398,12 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
     },
   );
   currentPanel = panel;
+  currentPanelProjectUri = projectUri;
   const keybindingsWatcher = watchUserKeybindings(context, panel);
   panel.onDidDispose(() => {
     keybindingsWatcher.dispose();
     currentPanel = undefined;
+    currentPanelProjectUri = undefined;
   });
 
   panel.webview.onDidReceiveMessage(async (message) => {
@@ -349,11 +439,15 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         }
         return;
       }
-      if (message?.type === 'clearData') {
-        const scopes = await pickClearDataScopes();
+      if (message?.type === 'clearAllData') {
+        const scopes = await pickClearAllDataScopes();
         if (!scopes) return;
         const didClear = await clearExtensionDataScopes(context, scopes);
         if (didClear) await refreshPanel(context, panel);
+        return;
+      }
+      if (message?.type === 'clearCurrentProjectData') {
+        await clearCurrentProjectData(context, panel);
         return;
       }
       if (message?.type === 'optimizeStorage') {

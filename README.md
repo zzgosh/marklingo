@@ -56,7 +56,7 @@ You can also run `MarkLingo: Open Settings` first to save your API key, target l
 | `MarkLingo: Retranslate Current Markdown` | Force a full retranslation of the current Markdown file. |
 | `MarkLingo: Open Settings` | Open MarkLingo settings for OpenRouter, API key, target language, custom instructions, shortcut status, and cleanup. |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
-| `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs and private translation metadata/cache. |
+| `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |
 
 ## Settings
 
@@ -92,7 +92,7 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Default: empty
   - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt.
 
-The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and Clear Data actions take effect immediately after confirmation.
+The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and cleanup actions take effect immediately after confirmation.
 
 ## Output Files
 
@@ -126,14 +126,21 @@ Changing `marklingo.openrouter.baseUrl` changes where future translation request
 
 ## Cleanup
 
-Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data:
+Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data.
+
+`Clear All Data` can delete:
 
 - Saved API key
 - MarkLingo user settings
-- Translation metadata/cache
+- Global translation metadata/cache
 - Optionally, tracked translated workspace outputs
 
-Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files and private metadata/cache. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation.
+`Clear Current Project Data` can delete, for the shown project directory:
+
+- Tracked translated project outputs
+- Project translation metadata/cache
+
+Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files. This command keeps private metadata/cache so the next translation can reuse cached blocks. It intentionally deletes tracked outputs even if they were edited after generation.
 
 ## Development
 

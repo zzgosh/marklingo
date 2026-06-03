@@ -52,7 +52,7 @@ Translation metadata lives under VS Code private global storage through `context
 
 Private storage is quota-managed. Successful translation writes active cache payloads, then enforces the 300 MB private storage quota by evicting least-recently-used cache payloads into tracking stubs. Settings `Optimize` compacts toward 150 MB. Tracking stubs must preserve `sourceUri`, `outputUri`, `outputHash`, and `targetLanguage` so cleanup can still identify generated outputs after cached translations are reclaimed.
 
-The Command Palette delete command should delete only the current project's extension-tracked outputs and project private metadata/cache. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation. The Settings Danger Zone is the only user-facing entry point for cross-project cleanup.
+The Command Palette delete command should delete only the current project's extension-tracked outputs and keep project private metadata/cache so cached blocks remain reusable. This project-scoped command intentionally deletes tracked outputs even if they were edited after generation. The Settings Danger Zone is the user-facing entry point for deleting metadata/cache through `Clear Current Project Data` or cross-project cleanup through `Clear All Data`.
 
 ## Metadata Debug Field
 

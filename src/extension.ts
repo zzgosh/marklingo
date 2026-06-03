@@ -68,10 +68,17 @@ export function activate(context: vscode.ExtensionContext) {
       }),
     );
     context.subscriptions.push(
-      vscode.commands.registerCommand('marklingo.test.deleteProjectTranslationData', (options?: { projectUri?: string }) => {
+      vscode.commands.registerCommand('marklingo.test.deleteProjectTranslationData', (options?: {
+        projectUri?: string;
+        workspaceOutputs?: boolean;
+        metadataCache?: boolean;
+      }) => {
         const projectUri = options?.projectUri ? vscode.Uri.parse(options.projectUri) : vscode.window.activeTextEditor?.document.uri;
         if (!projectUri) throw new Error('Missing projectUri for test cleanup command.');
-        return deleteProjectTranslationData(context, projectUri);
+        return deleteProjectTranslationData(context, projectUri, undefined, {
+          workspaceOutputs: options?.workspaceOutputs ?? true,
+          metadataCache: options?.metadataCache ?? true,
+        });
       }),
     );
     context.subscriptions.push(

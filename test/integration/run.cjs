@@ -373,6 +373,42 @@ async function testRetriesFallbackBlocks(context) {
   assert.match(secondOutput, /MOCK:See \[docs\]\(https:\/\/example\.com\)\./);
 }
 
+async function testDeletesTranslatedFilesButKeepsCurrentProjectCache(context) {
+  await cleanWorkspace();
+  await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
+    projectUri: vscode.Uri.file(workspaceRoot()).toString(),
+  });
+  const source = await writeMarkdown('file-only-cleanup.md', '# Cleanup\n\nCached paragraph.\n');
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+  assert.equal(context.server.state.chatRequests.length, 1);
+  const output = translatedPath(source);
+  assert.ok(fs.existsSync(output), 'expected current project output before file-only cleanup');
+  fs.appendFileSync(output, '\nManual edit before file-only cleanup.\n', 'utf8');
+  const firstMeta = findMetaForSource(context.seeded.globalStorageUri, source).meta;
+  assert.equal(firstMeta.cache.payloadStatus, 'active');
+
+  const summary = await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
+    projectUri: source.toString(),
+    workspaceOutputs: true,
+    metadataCache: false,
+  });
+
+  assert.equal(summary.deleted, 1);
+  assert.equal(summary.skipped, 0);
+  assert.equal(summary.missing, 0);
+  assert.equal(summary.errors.length, 0);
+  assert.equal(summary.metadataCacheCleared, false);
+  assert.equal(fs.existsSync(output), false, 'expected edited current project output to be deleted');
+  assert.equal(findMetasForSource(context.seeded.globalStorageUri, source).length, 1);
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+  assert.equal(context.server.state.chatRequests.length, 0, 'expected cached translations to rebuild the deleted output');
+  assert.ok(fs.existsSync(output), 'expected cached translation to recreate the output file');
+}
+
 async function testDeletesCurrentProjectTranslations(context) {
   await cleanWorkspace();
   await vscode.commands.executeCommand('marklingo.test.deleteProjectTranslationData', {
@@ -435,6 +471,7 @@ async function run() {
     await runTest('compacts private cache into tracking stubs', testCompactsPrivateCacheIntoTrackingStubs, context);
     await runTest('translates .md files even when VS Code uses a different language mode', testTranslatesMarkdownExtensionWithNonMarkdownLanguageMode, context);
     await runTest('retries fallback blocks instead of caching source fallback', testRetriesFallbackBlocks, context);
+    await runTest('deletes current project translated files while keeping metadata cache', testDeletesTranslatedFilesButKeepsCurrentProjectCache, context);
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
   } finally {
     await server.close();
