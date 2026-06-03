@@ -97,19 +97,19 @@
       "editor/context": [
         {
           "command": "marklingo.translateCurrentMarkdown",
-          "when": "editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown",
+          "when": "!(resourceFilename =~ /_mdt[.](md|markdown)$/i) && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)",
           "group": "marklingo@10"
         }
       ],
       "explorer/context": [
         {
           "command": "marklingo.translateExplorerMarkdownFile",
-          "when": "!listMultiSelection && !explorerResourceIsFolder && isFileSystemResource && (resourceExtname == .md || resourceExtname == .markdown)",
+          "when": "!listMultiSelection && !explorerResourceIsFolder && isFileSystemResource && !(resourceFilename =~ /_mdt[.](md|markdown)$/i) && (resourceExtname == .md || resourceExtname == .markdown)",
           "group": "marklingo@10"
         },
         {
           "command": "marklingo.translateSelectedMarkdownResources",
-          "when": "listMultiSelection && isFileSystemResource && (explorerResourceIsFolder || resourceExtname == .md || resourceExtname == .markdown)",
+          "when": "listMultiSelection && isFileSystemResource && !(resourceFilename =~ /_mdt[.](md|markdown)$/i) && (explorerResourceIsFolder || resourceExtname == .md || resourceExtname == .markdown)",
           "group": "marklingo@10"
         },
         {

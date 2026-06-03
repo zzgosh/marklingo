@@ -7,6 +7,13 @@ function readPackageJson() {
   return JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 }
 
+function assertExcludesTranslatedOutput(whenClause) {
+  assert.ok(
+    whenClause.includes('!(resourceFilename =~ /_mdt[.](md|markdown)$/i)'),
+    'expected translated Markdown outputs to be hidden from this menu',
+  );
+}
+
 test('translation keybinding is available for markdown file extensions', () => {
   const pkg = readPackageJson();
   const binding = pkg.contributes.keybindings.find((item) => item.command === 'marklingo.translateCurrentMarkdown');
@@ -61,6 +68,7 @@ test('context menus expose markdown and folder translation actions', () => {
   assert.match(editorTranslate.when, /editorLangId == markdown/);
   assert.match(editorTranslate.when, /resourceExtname == \.md/);
   assert.match(editorTranslate.when, /resourceExtname == \.markdown/);
+  assertExcludesTranslatedOutput(editorTranslate.when);
   assert.match(editorTranslate.group, /^marklingo@/);
 
   const explorerFileTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateExplorerMarkdownFile');
@@ -70,6 +78,7 @@ test('context menus expose markdown and folder translation actions', () => {
   assert.match(explorerFileTranslate.when, /isFileSystemResource/);
   assert.match(explorerFileTranslate.when, /resourceExtname == \.md/);
   assert.match(explorerFileTranslate.when, /resourceExtname == \.markdown/);
+  assertExcludesTranslatedOutput(explorerFileTranslate.when);
   assert.match(explorerFileTranslate.group, /^marklingo@/);
 
   const explorerSelectionTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateSelectedMarkdownResources');
@@ -79,6 +88,7 @@ test('context menus expose markdown and folder translation actions', () => {
   assert.match(explorerSelectionTranslate.when, /isFileSystemResource/);
   assert.match(explorerSelectionTranslate.when, /resourceExtname == \.md/);
   assert.match(explorerSelectionTranslate.when, /resourceExtname == \.markdown/);
+  assertExcludesTranslatedOutput(explorerSelectionTranslate.when);
   assert.match(explorerSelectionTranslate.group, /^marklingo@/);
 
   const explorerFolderTranslate = explorerMenus.find((item) => item.command === 'marklingo.translateFolderMarkdown');

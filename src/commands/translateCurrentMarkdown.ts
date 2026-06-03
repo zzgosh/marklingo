@@ -261,6 +261,7 @@ type TranslateMarkdownOptions = {
   outputViewColumn?: vscode.ViewColumn;
   progress?: TranslationProgress;
   cancellationToken?: vscode.CancellationToken;
+  enforceQuota?: boolean;
 };
 
 type TranslateMarkdownResult =
@@ -297,6 +298,22 @@ async function openTranslatedMarkdown(translatedUri: vscode.Uri, viewColumn: vsc
     preview: false,
   });
   await vscode.commands.executeCommand('markdown.showPreviewToSide', translatedUri);
+}
+
+async function enforcePrivateStorageQuotaWithWarning(context: vscode.ExtensionContext): Promise<void> {
+  try {
+    const quotaSummary = await enforcePrivateStorageQuota(context);
+    if (quotaSummary.errors.length > 0) {
+      outputChannel.appendLine(
+        `[${new Date().toISOString()}] Warning: private cache quota cleanup reported ${quotaSummary.errors.length} issue(s).`,
+      );
+    }
+  } catch (quotaError) {
+    const quotaMessage = quotaError instanceof Error ? quotaError.message : String(quotaError);
+    outputChannel.appendLine(
+      `[${new Date().toISOString()}] Warning: private cache quota cleanup failed: ${quotaMessage}`,
+    );
+  }
 }
 
 function getOutputViewColumnForSource(sourceUri?: vscode.Uri): vscode.ViewColumn {
@@ -682,18 +699,8 @@ async function translateMarkdownDocument(
       vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(translatedMarkdown, 'utf8')),
       saveTranslationMeta(currentMetaUri, nextMeta),
     ]);
-    try {
-      const quotaSummary = await enforcePrivateStorageQuota(context);
-      if (quotaSummary.errors.length > 0) {
-        outputChannel.appendLine(
-          `[${new Date().toISOString()}] Warning: private cache quota cleanup reported ${quotaSummary.errors.length} issue(s).`,
-        );
-      }
-    } catch (quotaError) {
-      const quotaMessage = quotaError instanceof Error ? quotaError.message : String(quotaError);
-      outputChannel.appendLine(
-        `[${new Date().toISOString()}] Warning: private cache quota cleanup failed: ${quotaMessage}`,
-      );
+    if (options.enforceQuota !== false) {
+      await enforcePrivateStorageQuotaWithWarning(context);
     }
 
     if (options.openOutput !== false) {
@@ -949,6 +956,7 @@ async function translateMarkdownFilesBatch(
             outputViewColumn,
             progress: fileProgress,
             cancellationToken: token,
+            enforceQuota: false,
           });
           if (result.status === 'translated') {
             summary.translated += 1;
@@ -971,6 +979,10 @@ async function translateMarkdownFilesBatch(
       }
     },
   );
+
+  if (summary.translated > 0) {
+    await enforcePrivateStorageQuotaWithWarning(context);
+  }
 
   const summaryText = [
     pluralize(summary.translated, 'file'),
