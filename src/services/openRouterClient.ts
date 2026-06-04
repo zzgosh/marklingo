@@ -50,7 +50,6 @@ export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
 export const DEFAULT_PROVIDER_TYPE: ProviderType = 'openrouter';
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = 'http://127.0.0.1:8080/v1';
-export const DEFAULT_OPENAI_COMPATIBLE_MODEL_ID = 'hy-mt2';
 
 const LEGACY_OPENROUTER_API_KEY_SECRET = 'marklingo.openrouter.apiKey';
 const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey.v2.';

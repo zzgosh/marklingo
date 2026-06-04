@@ -21,7 +21,6 @@ export type SettingsState = {
   openRouterBaseUrl: string;
   openRouterModelId: string;
   openRouterHasApiKey: boolean;
-  openAiCompatibleDefaultBaseUrl: string;
   openAiCompatibleBaseUrl: string;
   openAiCompatibleModelId: string;
   openAiCompatibleHasApiKey: boolean;
@@ -223,6 +222,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       background: color-mix(in srgb, var(--panel) 80%, transparent);
     }
     .card.danger { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+    .provider-card .row {
+      border-bottom: 0;
+    }
     .row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
@@ -645,7 +647,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         <div class="section-warning" id="shortcut-warning">${escapeHtml(shortcutWarningText)}</div>
 
         <h2>Provider</h2>
-        <section class="card">
+        <section class="card provider-card">
           <div class="row">
             <div>
               <div class="label">Provider</div>
@@ -882,7 +884,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         hasApiKey: ${scriptJson(state.openRouterHasApiKey)},
       },
       openaiCompatible: {
-        baseUrl: ${scriptJson(state.openAiCompatibleBaseUrl || state.openAiCompatibleDefaultBaseUrl)},
+        baseUrl: ${scriptJson(state.openAiCompatibleBaseUrl)},
         modelId: ${scriptJson(state.openAiCompatibleModelId)},
         hasApiKey: ${scriptJson(state.openAiCompatibleHasApiKey)},
       },
@@ -964,6 +966,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       );
     }
 
+    function canVerifyProvider() {
+      const values = getProviderValues();
+      const hasRequiredBaseUrl = values.providerType !== 'openaiCompatible' || values.baseUrl.length > 0;
+      const hasRequiredModelId = values.modelId.length > 0;
+      const hasRequiredApiKey = isApiKeyMasked() || apiKeyInput.value.trim().length > 0;
+      return hasRequiredBaseUrl && hasRequiredModelId && hasRequiredApiKey;
+    }
+
     function setProviderStatus(text, failed) {
       providerStatus.textContent = text || '';
       providerStatus.title = text || '';
@@ -979,7 +989,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     function updateProviderVerificationState() {
       if (providerPending) return;
       const dirty = isProviderDirty();
-      verifyProviderBtn.disabled = !dirty;
+      verifyProviderBtn.disabled = !dirty || !canVerifyProvider();
       verifyProviderBtn.textContent = dirty ? 'Save and Verify' : 'Saved and Verified';
       verifyProviderBtn.classList.toggle('saved', !dirty && Boolean(providerBaseline.verifiedAdapterMode));
       if (dirty) {

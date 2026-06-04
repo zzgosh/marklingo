@@ -12,9 +12,8 @@ function getState(overrides = {}) {
     openRouterBaseUrl: 'https://openrouter.ai/api/v1',
     openRouterModelId: 'google/gemini-3.1-flash-lite',
     openRouterHasApiKey: true,
-    openAiCompatibleDefaultBaseUrl: 'http://127.0.0.1:8080/v1',
-    openAiCompatibleBaseUrl: 'http://127.0.0.1:8080/v1',
-    openAiCompatibleModelId: 'hy-mt2',
+    openAiCompatibleBaseUrl: '',
+    openAiCompatibleModelId: '',
     openAiCompatibleHasApiKey: false,
     hasApiKey: true,
     modelId: 'openrouter/example-model',
@@ -57,10 +56,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, />Edit<\/button>/);
   assert.match(html, /System Instructions/);
   assert.match(html, /<h2>Provider<\/h2>/);
+  assert.match(html, /<section class="card provider-card">/);
   assert.match(html, /<option value="openrouter" selected>OpenRouter<\/option>/);
   assert.match(html, /<option value="openaiCompatible">OpenAI Compatible<\/option>/);
   assert.match(html, /id="baseUrlRow" hidden/);
   assert.match(html, /\[hidden\] \{ display: none !important; \}/);
+  assert.match(html, /\.provider-card \.row \{\s+border-bottom: 0;/);
   assert.match(html, /select \{\s+appearance: none;\s+color: var\(--fg\);/);
   assert.match(html, /select option \{\s+background: var\(--input\);\s+color: var\(--fg\);/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
@@ -95,6 +96,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /window\.acquireVsCodeApi/);
   assert.match(html, /id="apiKey" type="password" autocomplete="off" value="•{32}" data-masked="true"/);
   assert.match(html, /modelId: "google\/gemini-3\.1-flash-lite"/);
+  assert.match(html, /openaiCompatible: \{\s+baseUrl: "",\s+modelId: "",\s+hasApiKey: false,\s+\}/);
   assert.match(html, /showApiKeyMask\(\)/);
   assert.match(html, /providerDrafts/);
   assert.match(html, /selectedProviderType/);
@@ -144,7 +146,10 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
     state: getState({
       providerType: 'openaiCompatible',
       baseUrl: 'http://127.0.0.1:8080/v1',
+      openAiCompatibleBaseUrl: 'http://127.0.0.1:8080/v1',
       modelId: 'hy-mt2',
+      openAiCompatibleModelId: 'hy-mt2',
+      openAiCompatibleHasApiKey: true,
       verifiedAdapterMode: 'translationModel',
     }),
   });
