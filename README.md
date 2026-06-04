@@ -84,9 +84,10 @@ Use `MarkLingo: Open Settings` for the settings most users need.
 
 - **Translation Mode**
   - Setting: `marklingo.translation.requestMode`
-  - Default: `auto`
-  - `auto` uses Chat JSON mode for general chat models and Translation Model mode for known Hy-MT model IDs.
-  - Translation Model mode uses small same-shape JSON batches, adaptive split retries, and optional concurrency. Advanced knobs: `marklingo.translation.translationModelMaxBlocksPerRequest` and `marklingo.translation.translationModelConcurrency`.
+  - Default: `chatJson`
+  - Use `Chat JSON` for general chat models. Use `Translation Model` for dedicated translation models that do not reliably follow chat-style JSON instructions.
+  - `auto` is a convenience mode for known translation-model IDs such as Hy-MT; it cannot detect every translation model or custom alias.
+  - Translation Model mode uses small same-shape JSON batches, adaptive retry for failed blocks, and optional concurrency. Advanced knobs: `marklingo.translation.translationModelMaxBlocksPerRequest`, `marklingo.translation.translationModelConcurrency`, and `marklingo.translation.translationModelMaxOutputTokens`.
 
 - **Target Language**
   - Setting: `marklingo.translation.targetLanguage`
@@ -115,7 +116,8 @@ llama-server \
   --host 127.0.0.1 \
   --port 8080 \
   --alias hy-mt2 \
-  --ctx-size 4096 \
+  --parallel 2 \
+  --ctx-size 8192 \
   --api-key local-hy-secret
 ```
 
@@ -124,7 +126,9 @@ Use these settings:
 - Base URL: `http://127.0.0.1:8080/v1`
 - API Key: `local-hy-secret`
 - Model ID: `hy-mt2`
-- Translation Mode: `Auto` or `Translation Model`
+- Translation Mode: `Translation Model`
+
+Local throughput depends on the model, quantization, and hardware. For tuning, keep `translationModelMaxOutputTokens` at `0` so MarkLingo estimates the output budget from the model context window, then try larger `translationModelMaxBlocksPerRequest` values until debug metadata starts showing split retries or block warnings. Set `translationModelConcurrency` no higher than the `llama-server --parallel` slot count; extra client concurrency will usually queue instead of running faster.
 
 ## Output Files
 

@@ -192,13 +192,18 @@ export function compactPlaceholderTokens(protectedResult: ProtectResult): Protec
 
   let text = protectedResult.text;
   const placeholders: PlaceholderMap = {};
+  const reservedTexts = [protectedResult.text, ...Object.values(protectedResult.placeholders)];
   let nextIndex = 0;
 
   for (const [token, original] of entries) {
     let alias = '';
     do {
       alias = `__M${nextIndex++}__`;
-    } while (text.includes(alias) || Object.hasOwn(protectedResult.placeholders, alias));
+    } while (
+      text.includes(alias) ||
+      reservedTexts.some((reserved) => reserved.includes(alias)) ||
+      Object.hasOwn(protectedResult.placeholders, alias)
+    );
 
     text = text.split(token).join(alias);
     placeholders[alias] = original;

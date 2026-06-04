@@ -14,7 +14,16 @@ import {
 import { getProjectRootUri, getProjectsStorageRoot } from '../storage/paths.js';
 import { deleteProjectTranslationData, type ProjectTranslationDataScopes } from '../commands/deleteTranslatedFiles.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
-import { coerceTranslationRequestMode, DEFAULT_TRANSLATION_REQUEST_MODE } from '../translation/translationAdapters.js';
+import {
+  coerceTranslationModelConcurrency,
+  coerceTranslationModelMaxBlocksPerRequest,
+  coerceTranslationModelMaxOutputTokens,
+  coerceTranslationRequestMode,
+  DEFAULT_TRANSLATION_MODEL_CONCURRENCY,
+  DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST,
+  DEFAULT_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS,
+  DEFAULT_TRANSLATION_REQUEST_MODE,
+} from '../translation/translationAdapters.js';
 import {
   acceptVisibleOnboardingDefaults,
   markOpenRouterModelAccepted,
@@ -36,6 +45,9 @@ const UPDATABLE_SETTING_KEYS = new Set<string>([
   'openrouter.baseUrl',
   'openrouter.modelId',
   'translation.requestMode',
+  'translation.translationModelMaxBlocksPerRequest',
+  'translation.translationModelConcurrency',
+  'translation.translationModelMaxOutputTokens',
   'translation.targetLanguage',
   'translation.targetLanguageCustom',
   'translation.customPrompt',
@@ -158,6 +170,15 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     hasApiKey: await hasOpenRouterApiKey(context),
     modelId: (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID,
     requestMode: coerceTranslationRequestMode(cfg.get<string>('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE)),
+    translationModelMaxBlocksPerRequest: coerceTranslationModelMaxBlocksPerRequest(
+      cfg.get<number>('translation.translationModelMaxBlocksPerRequest', DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST),
+    ),
+    translationModelConcurrency: coerceTranslationModelConcurrency(
+      cfg.get<number>('translation.translationModelConcurrency', DEFAULT_TRANSLATION_MODEL_CONCURRENCY),
+    ),
+    translationModelMaxOutputTokens: coerceTranslationModelMaxOutputTokens(
+      cfg.get<number>('translation.translationModelMaxOutputTokens', DEFAULT_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS),
+    ),
     targetLanguage,
     targetLanguageCustom,
     systemPrompt: resolveSystemPrompt(systemPrompt, resolvedTargetLanguage),
@@ -245,6 +266,9 @@ function coerceSettingValue(key: string, raw: unknown): unknown {
   const value = String(raw ?? '').trim();
   if (key === 'translation.targetLanguage') return value || '简体中文';
   if (key === 'translation.requestMode') return coerceTranslationRequestMode(value);
+  if (key === 'translation.translationModelMaxBlocksPerRequest') return coerceTranslationModelMaxBlocksPerRequest(raw);
+  if (key === 'translation.translationModelConcurrency') return coerceTranslationModelConcurrency(raw);
+  if (key === 'translation.translationModelMaxOutputTokens') return coerceTranslationModelMaxOutputTokens(raw);
   if (key === 'openrouter.modelId') return value || DEFAULT_OPENROUTER_MODEL_ID;
   return value;
 }

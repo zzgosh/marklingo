@@ -27,7 +27,12 @@ if (compile.status !== 0) {
 }
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const defaultModelId = packageJson.contributes.configuration.properties['marklingo.openrouter.modelId'].default;
+const configProperties = packageJson.contributes.configuration.properties;
+const defaultModelId = configProperties['marklingo.openrouter.modelId'].default;
+const defaultRequestMode = configProperties['marklingo.translation.requestMode'].default;
+const defaultTranslationModelMaxBlocksPerRequest = configProperties['marklingo.translation.translationModelMaxBlocksPerRequest'].default;
+const defaultTranslationModelConcurrency = configProperties['marklingo.translation.translationModelConcurrency'].default;
+const defaultTranslationModelMaxOutputTokens = configProperties['marklingo.translation.translationModelMaxOutputTokens'].default;
 const settingsHtmlUrl = pathToFileURL(path.join(root, 'out/webview/settingsHtml.js')).href;
 const promptsUrl = pathToFileURL(path.join(root, 'out/translation/prompts.js')).href;
 const { createSettingsHtmlNonce, renderSettingsHtml } = await import(`${settingsHtmlUrl}?t=${Date.now()}`);
@@ -116,7 +121,10 @@ function buildState(url) {
     baseUrl: 'https://openrouter.ai/api/v1',
     hasApiKey: url.searchParams.get('apiKey') !== 'missing',
     modelId: defaultModelId,
-    requestMode: url.searchParams.get('mode') ?? 'auto',
+    requestMode: url.searchParams.get('mode') ?? defaultRequestMode,
+    translationModelMaxBlocksPerRequest: Number.parseInt(url.searchParams.get('blocks') ?? String(defaultTranslationModelMaxBlocksPerRequest), 10),
+    translationModelConcurrency: Number.parseInt(url.searchParams.get('concurrency') ?? String(defaultTranslationModelConcurrency), 10),
+    translationModelMaxOutputTokens: Number.parseInt(url.searchParams.get('maxTokens') ?? String(defaultTranslationModelMaxOutputTokens), 10),
     targetLanguage: usesCustomLanguage ? 'Custom...' : '简体中文',
     targetLanguageCustom: usesCustomLanguage ? 'Brazilian Portuguese' : '',
     systemPrompt: resolveSystemPrompt('', usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文'),

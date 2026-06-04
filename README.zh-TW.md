@@ -84,9 +84,10 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 - **Translation Mode（翻譯模式）**
   - 設定項：`marklingo.translation.requestMode`
-  - 預設值：`auto`
-  - `auto` 對通用 chat model 使用 Chat JSON 模式，對已知 Hy-MT 模型 ID 使用 Translation Model 模式。
-  - Translation Model 模式使用小批量同結構 JSON、自適應拆分重試與可選並行。進階設定：`marklingo.translation.translationModelMaxBlocksPerRequest` 與 `marklingo.translation.translationModelConcurrency`。
+  - 預設值：`chatJson`
+  - 通用 chat model 使用 `Chat JSON`。不穩定遵循 chat-style JSON 指令的專用翻譯模型使用 `Translation Model`。
+  - `auto` 只是針對 Hy-MT 等已知翻譯模型 ID 的便利模式；它無法識別所有翻譯模型或自訂 alias。
+  - Translation Model 模式使用小批量同結構 JSON、失敗 block 自適應重試與可選並行。進階設定：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency` 與 `marklingo.translation.translationModelMaxOutputTokens`。
 
 - **Target Language（目標語言）**
   - 設定項：`marklingo.translation.targetLanguage`
@@ -115,7 +116,8 @@ llama-server \
   --host 127.0.0.1 \
   --port 8080 \
   --alias hy-mt2 \
-  --ctx-size 4096 \
+  --parallel 2 \
+  --ctx-size 8192 \
   --api-key local-hy-secret
 ```
 
@@ -124,7 +126,9 @@ llama-server \
 - Base URL：`http://127.0.0.1:8080/v1`
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
-- Translation Mode：`Auto` 或 `Translation Model`
+- Translation Mode：`Translation Model`
+
+本機吞吐量取決於模型、量化方式與硬體。調參時可先保持 `translationModelMaxOutputTokens` 為 `0`，讓 MarkLingo 根據模型 context window 估算輸出預算；然後逐步增大 `translationModelMaxBlocksPerRequest`，直到 debug 中繼資料開始出現拆分重試或 block warning。`translationModelConcurrency` 不應高於 `llama-server --parallel` 的 slot 數；額外的用戶端並行通常只會排隊，不會更快。
 
 ## 輸出檔案
 

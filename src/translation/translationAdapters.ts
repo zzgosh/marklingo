@@ -4,9 +4,14 @@ import type { TranslationRequestBlock } from './requestPlanner.js';
 export type TranslationRequestMode = 'auto' | 'chatJson' | 'translationModel';
 export type TranslationAdapterMode = 'chatJson' | 'translationModel';
 
-export const DEFAULT_TRANSLATION_REQUEST_MODE: TranslationRequestMode = 'auto';
+export const DEFAULT_TRANSLATION_REQUEST_MODE: TranslationRequestMode = 'chatJson';
 export const DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST = 12;
-export const DEFAULT_TRANSLATION_MODEL_CONCURRENCY = 2;
+export const DEFAULT_TRANSLATION_MODEL_CONCURRENCY = 1;
+export const DEFAULT_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS = 0;
+export const MAX_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST = 24;
+export const MAX_TRANSLATION_MODEL_CONCURRENCY = 4;
+export const MAX_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS = 32768;
+export const AUTO_TRANSLATION_MODEL_MAX_OUTPUT_TOKEN_CAP = 8192;
 
 const TRANSLATION_REQUEST_MODES = new Set<TranslationRequestMode>([
   'auto',
@@ -18,6 +23,56 @@ export function coerceTranslationRequestMode(value: unknown): TranslationRequest
   return TRANSLATION_REQUEST_MODES.has(value as TranslationRequestMode)
     ? value as TranslationRequestMode
     : DEFAULT_TRANSLATION_REQUEST_MODE;
+}
+
+function coerceIntegerInRange(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+export function coerceTranslationModelMaxBlocksPerRequest(value: unknown): number {
+  return coerceIntegerInRange(
+    value,
+    DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST,
+    1,
+    MAX_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST,
+  );
+}
+
+export function coerceTranslationModelConcurrency(value: unknown): number {
+  return coerceIntegerInRange(
+    value,
+    DEFAULT_TRANSLATION_MODEL_CONCURRENCY,
+    1,
+    MAX_TRANSLATION_MODEL_CONCURRENCY,
+  );
+}
+
+export function coerceTranslationModelMaxOutputTokens(value: unknown): number {
+  return coerceIntegerInRange(
+    value,
+    DEFAULT_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS,
+    0,
+    MAX_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS,
+  );
+}
+
+export function resolveTranslationModelMaxOutputTokens(options: {
+  configuredMaxOutputTokens: number;
+  modelContextLength?: number;
+  estimatedPromptTokens: number;
+}): number {
+  if (options.configuredMaxOutputTokens > 0) return options.configuredMaxOutputTokens;
+
+  if (options.modelContextLength && options.modelContextLength > 0) {
+    const available = Math.floor(options.modelContextLength * 0.95) - options.estimatedPromptTokens - 32;
+    if (available >= 256) {
+      return Math.min(AUTO_TRANSLATION_MODEL_MAX_OUTPUT_TOKEN_CAP, available);
+    }
+  }
+
+  return 4096;
 }
 
 function isKnownTranslationModelId(modelId: string): boolean {

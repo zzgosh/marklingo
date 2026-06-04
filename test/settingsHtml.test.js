@@ -10,7 +10,10 @@ function getState(overrides = {}) {
     baseUrl: 'https://openrouter.ai/api/v1',
     hasApiKey: true,
     modelId: 'openrouter/example-model',
-    requestMode: 'auto',
+    requestMode: 'chatJson',
+    translationModelMaxBlocksPerRequest: 12,
+    translationModelConcurrency: 1,
+    translationModelMaxOutputTokens: 0,
     targetLanguage: '简体中文',
     targetLanguageCustom: '',
     systemPrompt: 'You are a precise Markdown translation assistant.',
@@ -45,9 +48,15 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, />Edit<\/button>/);
   assert.match(html, /System Instructions/);
   assert.match(html, /Translation Mode/);
-  assert.match(html, /<option value="auto" selected>Auto<\/option>/);
-  assert.match(html, /<option value="chatJson">Chat JSON<\/option>/);
+  assert.match(html, /<option value="auto">Auto<\/option>/);
+  assert.match(html, /<option value="chatJson" selected>Chat JSON<\/option>/);
   assert.match(html, /<option value="translationModel">Translation Model<\/option>/);
+  assert.match(html, /Model Blocks/);
+  assert.match(html, /id="translationModelMaxBlocksPerRequest" type="number" min="1" max="24" step="1" value="12"/);
+  assert.match(html, /Model Concurrency/);
+  assert.match(html, /id="translationModelConcurrency" type="number" min="1" max="4" step="1" value="1"/);
+  assert.match(html, /Max Output Tokens/);
+  assert.match(html, /id="translationModelMaxOutputTokens" type="number" min="0" max="32768" step="1" value="0"/);
   assert.match(html, /Copy system instructions/);
   assert.match(html, /You are a precise Markdown translation assistant\./);
   assert.match(html, /Translation Metadata Folder/);

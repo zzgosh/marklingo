@@ -8,6 +8,7 @@ export const MARKLINGO_CONFIGURATION_KEYS = [
   'translation.maxContextUsageRatio',
   'translation.translationModelMaxBlocksPerRequest',
   'translation.translationModelConcurrency',
+  'translation.translationModelMaxOutputTokens',
   'translation.systemPrompt',
   'translation.customPrompt',
 ] as const;

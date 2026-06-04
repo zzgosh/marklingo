@@ -162,14 +162,14 @@
         },
         "marklingo.translation.requestMode": {
           "type": "string",
-          "default": "auto",
+          "default": "chatJson",
           "enum": [
             "auto",
             "chatJson",
             "translationModel"
           ],
           "enumDescriptions": [
-            "Automatically choose the request mode from the configured model ID.",
+            "Automatically choose Translation Model for known translation-model IDs; otherwise use Chat JSON.",
             "Ask chat models to return a JSON object keyed by block ID.",
             "Ask translation models to translate Markdown fields in small same-shape JSON batches."
           ],
@@ -184,10 +184,17 @@
         },
         "marklingo.translation.translationModelConcurrency": {
           "type": "number",
-          "default": 2,
+          "default": 1,
           "minimum": 1,
           "maximum": 4,
           "description": "Maximum concurrent requests for translation-model mode."
+        },
+        "marklingo.translation.translationModelMaxOutputTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 32768,
+          "description": "Maximum output tokens per request for translation-model mode. Use 0 to estimate from the model context window."
         },
         "marklingo.translation.targetLanguage": {
           "type": "string",

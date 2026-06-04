@@ -20,6 +20,9 @@ export type SettingsState = {
   hasApiKey: boolean;
   modelId: string;
   requestMode: string;
+  translationModelMaxBlocksPerRequest: number;
+  translationModelConcurrency: number;
+  translationModelMaxOutputTokens: number;
   targetLanguage: string;
   targetLanguageCustom: string;
   systemPrompt: string;
@@ -630,6 +633,33 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <span class="select-wrap"><select id="requestMode">${renderTranslationModeOptions(state.requestMode)}</select></span>
             </div>
           </div>
+          <div class="row">
+            <div>
+              <div class="label">Model Blocks</div>
+            </div>
+            <div class="inline">
+              <input id="translationModelMaxBlocksPerRequest" type="number" min="1" max="24" step="1" value="${state.translationModelMaxBlocksPerRequest}">
+              <button class="save-btn" type="button" data-field="translationModelMaxBlocksPerRequest" data-key="translation.translationModelMaxBlocksPerRequest" disabled>Save</button>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="label">Model Concurrency</div>
+            </div>
+            <div class="inline">
+              <input id="translationModelConcurrency" type="number" min="1" max="4" step="1" value="${state.translationModelConcurrency}">
+              <button class="save-btn" type="button" data-field="translationModelConcurrency" data-key="translation.translationModelConcurrency" disabled>Save</button>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="label">Max Output Tokens</div>
+            </div>
+            <div class="inline">
+              <input id="translationModelMaxOutputTokens" type="number" min="0" max="32768" step="1" value="${state.translationModelMaxOutputTokens}">
+              <button class="save-btn" type="button" data-field="translationModelMaxOutputTokens" data-key="translation.translationModelMaxOutputTokens" disabled>Save</button>
+            </div>
+          </div>
         </section>
 
         <h2>Translation</h2>
@@ -806,7 +836,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       if (text) {
         if (saveId !== undefined && text.pendingSaveId !== saveId) return;
         const pendingValue = text.pendingValue;
-        const savedValue = typeof value === 'string' ? value : pendingValue;
+        const savedValue = value === undefined || value === null ? pendingValue : String(value);
         text.pendingSaveId = undefined;
         text.pendingValue = undefined;
         text.baseline = savedValue;

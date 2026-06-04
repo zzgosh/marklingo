@@ -84,9 +84,10 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 
 - **Translation Mode（翻訳モード）**
   - 設定：`marklingo.translation.requestMode`
-  - デフォルト：`auto`
-  - `auto` は一般的な chat model には Chat JSON モードを使い、既知の Hy-MT モデル ID には Translation Model モードを使います。
-  - Translation Model モードは、小さな同一形状の JSON バッチ、適応的な分割リトライ、任意の並行実行を使います。詳細設定：`marklingo.translation.translationModelMaxBlocksPerRequest` と `marklingo.translation.translationModelConcurrency`。
+  - デフォルト：`chatJson`
+  - 一般的な chat model には `Chat JSON` を使用します。chat-style JSON 指示に安定して従わない専用翻訳モデルには `Translation Model` を使用します。
+  - `auto` は Hy-MT など既知の翻訳モデル ID 向けの便利モードです。すべての翻訳モデルやカスタム alias を検出できるわけではありません。
+  - Translation Model モードは、小さな同一形状の JSON バッチ、失敗 block の適応的リトライ、任意の並行実行を使います。詳細設定：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency`、`marklingo.translation.translationModelMaxOutputTokens`。
 
 - **Target Language（ターゲット言語）**
   - 設定：`marklingo.translation.targetLanguage`
@@ -115,7 +116,8 @@ llama-server \
   --host 127.0.0.1 \
   --port 8080 \
   --alias hy-mt2 \
-  --ctx-size 4096 \
+  --parallel 2 \
+  --ctx-size 8192 \
   --api-key local-hy-secret
 ```
 
@@ -124,7 +126,9 @@ llama-server \
 - Base URL：`http://127.0.0.1:8080/v1`
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
-- Translation Mode：`Auto` または `Translation Model`
+- Translation Mode：`Translation Model`
+
+ローカルのスループットは、モデル、量子化方式、ハードウェアに依存します。調整するときは、まず `translationModelMaxOutputTokens` を `0` のままにして MarkLingo がモデルの context window から出力予算を推定できるようにし、その後 `translationModelMaxBlocksPerRequest` を段階的に上げて、debug metadata に分割リトライや block warning が出始める位置を確認してください。`translationModelConcurrency` は `llama-server --parallel` の slot 数を超えないようにしてください。余分なクライアント並行実行は通常キューに入るだけで、速くはなりません。
 
 ## 出力ファイル
 

@@ -2,9 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildTranslationModelPrompt,
+  coerceTranslationModelConcurrency,
+  coerceTranslationModelMaxBlocksPerRequest,
+  coerceTranslationModelMaxOutputTokens,
   coerceTranslationRequestMode,
   parseTranslatedBlockMap,
   resolveTranslationAdapterMode,
+  resolveTranslationModelMaxOutputTokens,
 } from '../out/translation/translationAdapters.js';
 
 const blocks = [
@@ -17,7 +21,33 @@ test('auto mode routes Hy-MT model IDs to translation-model mode', () => {
   assert.equal(resolveTranslationAdapterMode('auto', 'tencent/Hy-MT2-1.8B-GGUF:Q4_K_M'), 'translationModel');
   assert.equal(resolveTranslationAdapterMode('auto', 'google/gemini-3.1-flash-lite'), 'chatJson');
   assert.equal(resolveTranslationAdapterMode('chatJson', 'hy-mt2'), 'chatJson');
-  assert.equal(coerceTranslationRequestMode('bad'), 'auto');
+  assert.equal(coerceTranslationRequestMode('bad'), 'chatJson');
+});
+
+test('clamps translation-model tuning settings', () => {
+  assert.equal(coerceTranslationModelMaxBlocksPerRequest(999), 24);
+  assert.equal(coerceTranslationModelMaxBlocksPerRequest(0), 1);
+  assert.equal(coerceTranslationModelConcurrency(999), 4);
+  assert.equal(coerceTranslationModelConcurrency(0), 1);
+  assert.equal(coerceTranslationModelMaxOutputTokens(999999), 32768);
+  assert.equal(coerceTranslationModelMaxOutputTokens(-1), 0);
+});
+
+test('resolves translation-model max output tokens from context when set to auto', () => {
+  assert.equal(resolveTranslationModelMaxOutputTokens({
+    configuredMaxOutputTokens: 2048,
+    modelContextLength: 8192,
+    estimatedPromptTokens: 1000,
+  }), 2048);
+  assert.equal(resolveTranslationModelMaxOutputTokens({
+    configuredMaxOutputTokens: 0,
+    modelContextLength: 8192,
+    estimatedPromptTokens: 1000,
+  }), 6750);
+  assert.equal(resolveTranslationModelMaxOutputTokens({
+    configuredMaxOutputTokens: 0,
+    estimatedPromptTokens: 1000,
+  }), 4096);
 });
 
 test('builds translation-model prompts around same-shape JSON blocks', () => {

@@ -42,6 +42,18 @@ test('compacts placeholder tokens while preserving restoration values', () => {
   assert.equal(restoreMarkdown('__M0__ 和 [docs](__M1__)', compacted.placeholders), '`code` 和 [docs](https://example.com)');
 });
 
+test('compacted placeholder aliases avoid tokens inside original protected values', () => {
+  const protectedMarkdown = protectMarkdown('`literal __M0__ token` and `second`', 'b0');
+  const compacted = compactPlaceholderTokens(protectedMarkdown);
+
+  assert.equal(compacted.text, '__M1__ and __M2__');
+  assert.deepEqual(compacted.placeholders, {
+    __M1__: '`literal __M0__ token`',
+    __M2__: '`second`',
+  });
+  assert.equal(restoreMarkdown('__M1__ 和 __M2__', compacted.placeholders), '`literal __M0__ token` 和 `second`');
+});
+
 test('skips placeholder parsing for plain text blocks', () => {
   const source = 'Plain translatable text without code, links, HTML, or images.';
   const protectedResult = protectMarkdown(source, 'b0');

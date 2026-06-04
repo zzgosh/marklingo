@@ -25,6 +25,7 @@ export type TranslationRequestDebug = {
   index: number;
   blockCount: number;
   estimatedPromptTokens: number;
+  maxTokens?: number;
   durationMs?: number;
   status?: "success" | "error";
 };
@@ -69,7 +70,8 @@ export type TranslationMetaDebug = {
     maxContextUsageRatio?: number;
     translationModelMaxBlocksPerRequest?: number;
     translationModelConcurrency?: number;
-    systemPromptSource?: "default" | "custom";
+    translationModelMaxOutputTokens?: number;
+    systemPromptSource?: "default" | "custom" | "none";
     systemPromptHash?: string;
     customPromptSet?: boolean;
     customPromptHash?: string;
@@ -80,6 +82,7 @@ export type TranslationMetaDebug = {
       topK?: number;
       repeatPenalty?: number;
       maxTokens?: number;
+      maxTokensMode?: "auto" | "fixed";
       responseFormat?: string;
       reasoning?: {
         effort: "none";
