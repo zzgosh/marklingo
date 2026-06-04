@@ -133,7 +133,13 @@ function buildState(url) {
   const isOpenAiCompatible = providerType === 'openaiCompatible';
   const modelId = url.searchParams.get('model') ?? (isOpenAiCompatible ? '' : defaultModelId);
   const baseUrl = isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? '') : defaultBaseUrl;
-  const currentProviderHasApiKey = url.searchParams.get('apiKey') !== 'missing';
+  const currentProviderHasApiKey = url.searchParams.get('apiKey') === 'present';
+  const openRouterHasApiKey = isOpenAiCompatible
+    ? url.searchParams.get('openrouterKey') === 'present'
+    : currentProviderHasApiKey;
+  const verifiedAdapterMode = currentProviderHasApiKey && url.searchParams.get('verified') !== '0'
+    ? (url.searchParams.get('capability') ?? 'chatJson')
+    : undefined;
   return {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
@@ -144,15 +150,15 @@ function buildState(url) {
     baseUrl,
     openRouterBaseUrl: defaultBaseUrl,
     openRouterModelId: isOpenAiCompatible ? defaultModelId : modelId,
-    openRouterHasApiKey: isOpenAiCompatible ? url.searchParams.get('openrouterKey') !== 'missing' : currentProviderHasApiKey,
+    openRouterHasApiKey,
+    openRouterVerifiedAdapterMode: openRouterHasApiKey ? (url.searchParams.get('openrouterCapability') ?? 'chatJson') : undefined,
     openAiCompatibleBaseUrl: isOpenAiCompatible ? baseUrl : '',
     openAiCompatibleModelId: isOpenAiCompatible ? modelId : '',
     openAiCompatibleHasApiKey: isOpenAiCompatible && currentProviderHasApiKey,
+    openAiCompatibleVerifiedAdapterMode: isOpenAiCompatible && currentProviderHasApiKey ? verifiedAdapterMode : undefined,
     hasApiKey: currentProviderHasApiKey,
     modelId,
-    verifiedAdapterMode: url.searchParams.get('verified') === '0'
-      ? undefined
-      : (url.searchParams.get('capability') ?? 'chatJson'),
+    verifiedAdapterMode,
     requestMode: url.searchParams.get('mode') ?? defaultRequestMode,
     translationModelMaxBlocksPerRequest: Number.parseInt(url.searchParams.get('blocks') ?? String(defaultTranslationModelMaxBlocksPerRequest), 10),
     translationModelConcurrency: Number.parseInt(url.searchParams.get('concurrency') ?? String(defaultTranslationModelConcurrency), 10),

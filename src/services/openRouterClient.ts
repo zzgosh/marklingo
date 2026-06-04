@@ -135,6 +135,10 @@ function getApiKeySecretName(origin: string): string {
   return `${OPENROUTER_API_KEY_SECRET_PREFIX}${digest}`;
 }
 
+function resolveApiKeyOrigin(baseUrl?: string): string {
+  return baseUrl ? parseOpenRouterBaseUrl(baseUrl).origin : resolveConfiguredProvider().origin;
+}
+
 function getApiKeyOrigins(context: vscode.ExtensionContext): string[] {
   const value = context.globalState.get<unknown>(OPENROUTER_API_KEY_ORIGINS_STATE);
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
@@ -151,9 +155,7 @@ export async function getStoredOpenRouterApiKey(
   baseUrl?: string,
   options: { includeLegacy?: boolean } = {},
 ): Promise<string | undefined> {
-  const { origin } = baseUrl
-    ? resolveProviderBaseUrl('openaiCompatible', baseUrl)
-    : resolveConfiguredProvider();
+  const origin = resolveApiKeyOrigin(baseUrl);
   const fromOriginSecret = await context.secrets.get(getApiKeySecretName(origin));
   if (fromOriginSecret?.trim()) return fromOriginSecret.trim();
   if (options.includeLegacy) {
@@ -253,9 +255,7 @@ export async function storeOpenRouterApiKey(
   apiKey: string,
   baseUrl?: string,
 ): Promise<void> {
-  const { origin } = baseUrl
-    ? resolveProviderBaseUrl('openaiCompatible', baseUrl)
-    : resolveConfiguredProvider();
+  const origin = resolveApiKeyOrigin(baseUrl);
   await context.secrets.store(getApiKeySecretName(origin), apiKey.trim());
   await rememberApiKeyOrigin(context, origin);
   await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
@@ -286,9 +286,7 @@ export async function hasOpenRouterApiKey(
   baseUrl?: string,
   options: { includeLegacy?: boolean } = {},
 ): Promise<boolean> {
-  const { origin } = baseUrl
-    ? resolveProviderBaseUrl('openaiCompatible', baseUrl)
-    : resolveConfiguredProvider();
+  const origin = resolveApiKeyOrigin(baseUrl);
   const fromSecret = await context.secrets.get(getApiKeySecretName(origin));
   if (fromSecret?.trim()) return true;
   if (!options.includeLegacy) return false;

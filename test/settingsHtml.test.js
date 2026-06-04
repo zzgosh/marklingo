@@ -12,9 +12,11 @@ function getState(overrides = {}) {
     openRouterBaseUrl: 'https://openrouter.ai/api/v1',
     openRouterModelId: 'google/gemini-3.1-flash-lite',
     openRouterHasApiKey: true,
+    openRouterVerifiedAdapterMode: 'chatJson',
     openAiCompatibleBaseUrl: '',
     openAiCompatibleModelId: '',
     openAiCompatibleHasApiKey: false,
+    openAiCompatibleVerifiedAdapterMode: undefined,
     hasApiKey: true,
     modelId: 'openrouter/example-model',
     verifiedAdapterMode: 'chatJson',
@@ -141,6 +143,23 @@ test('renders empty API key input when no key is on file', () => {
   assert.ok(!html.includes('Enter API key'));
 });
 
+test('does not present cached model capability as verified when the API key is missing', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({
+      hasApiKey: false,
+      openRouterHasApiKey: false,
+      verifiedAdapterMode: 'chatJson',
+    }),
+  });
+
+  assert.match(html, /<input id="apiKey" type="password" autocomplete="off">/);
+  assert.match(html, /hasApiKey: false,\s+verifiedAdapterMode: "",/);
+  assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
+  assert.ok(!html.includes('data-masked="true"'));
+});
+
 test('renders OpenAI-compatible provider with Base URL visible', () => {
   const html = renderSettingsHtml({
     cspSource: "'self'",
@@ -152,6 +171,7 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
       modelId: 'hy-mt2',
       openAiCompatibleModelId: 'hy-mt2',
       openAiCompatibleHasApiKey: true,
+      openAiCompatibleVerifiedAdapterMode: 'translationModel',
       verifiedAdapterMode: 'translationModel',
     }),
   });
