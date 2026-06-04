@@ -35,11 +35,11 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 首先，取得一個 OpenRouter API 金鑰：在 [openrouter.ai/keys](https://openrouter.ai/keys) 登入並建立一個金鑰。費用由 OpenRouter 依請求計費，實際金額取決於你選擇的模型。
 
-1. 開啟一個已儲存的 Markdown 檔案。
-2. 從命令選擇區執行 `MarkLingo: Translate Current Markdown`。
-3. 選擇目標語言。
-4. 在提示時貼上你的 OpenRouter API 金鑰。它會儲存在 VS Code 的 `SecretStorage` 中，絕不會存入工作區檔案。
-5. 確認模型 ID，或按 Enter 使用預設模型（`google/gemini-3.1-flash-lite`）。
+1. 執行 `MarkLingo: Open Settings`。
+2. 保持 Provider 為 `OpenRouter`，貼上 API key，選擇 Model ID，然後點擊 `Save and Verify`。
+3. 開啟一個已儲存的 Markdown 檔案。
+4. 從命令選擇區執行 `MarkLingo: Translate Current Markdown`。
+5. 選擇目標語言。
 
 預設快捷鍵：
 
@@ -59,7 +59,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 | `MarkLingo: Translate This Markdown File` | 翻譯從資源管理器右鍵選單中選取的 Markdown 檔案。 |
 | `MarkLingo: Translate Selected Markdown Files` | 將資源管理器中選取的檔案和資料夾收集到的 Markdown 檔案作為一批翻譯，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 翻譯所選資料夾及其子資料夾中的來源 Markdown 檔案，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
-| `MarkLingo: Open Settings` | 開啟 MarkLingo 設定，管理提供方、API 金鑰、翻譯模式、目標語言、自訂指令、快捷鍵狀態與清理操作。 |
+| `MarkLingo: Open Settings` | 開啟 MarkLingo 設定，管理提供方驗證、API 金鑰、目標語言、自訂指令、快捷鍵狀態與清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 將 `*_mdt.md` 加入目前儲存庫的本機 Git 排除檔案中。 |
 | `MarkLingo: Delete Current Project Translated Files` | 刪除本專案中由擴充功能追蹤的翻譯輸出，同時保留私有翻譯中繼資料/快取。 |
 
@@ -67,27 +67,36 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 大多數使用者需要的設定，可透過 `MarkLingo: Open Settings` 存取。
 
+- **Provider（提供方）**
+  - 設定項：`marklingo.openrouter.provider`
+  - 預設值：`openrouter`
+  - `OpenRouter` 使用官方 OpenRouter 端點並隱藏 Base URL。`OpenAI Compatible` 會顯示 Base URL，用於 llama.cpp server 等自訂端點。
+
 - **Base URL（基礎 URL）**
   - 設定項：`marklingo.openrouter.baseUrl`
   - 預設值：`https://openrouter.ai/api/v1`
-  - 自訂端點必須使用 HTTPS，localhost 偵錯除外。
+  - 僅在 Provider 為 `OpenAI Compatible` 時使用。自訂端點必須使用 HTTPS，localhost 偵錯除外。
 
 - **API Key（API 金鑰）**
   - 儲存：VS Code `SecretStorage`
   - 預設值：無
-  - 輸入你的 OpenRouter API 金鑰。MarkLingo 不會將其存入 VS Code 設定或工作區檔案。
+  - 輸入所選 Provider 的 API 金鑰。金鑰會依 endpoint origin 分開儲存，不會寫入 VS Code 設定或工作區檔案。
 
 - **Model ID（模型 ID）**
   - 設定項：`marklingo.openrouter.modelId`
   - 預設值：`google/gemini-3.1-flash-lite`
-  - 使用一個 OpenRouter 模型 ID。
+  - 使用 OpenRouter 模型 ID，或 OpenAI-compatible 端點暴露的模型 alias。
 
-- **Translation Mode（翻譯模式）**
+- **Save and Verify（儲存並驗證）**
+  - 只有輕量驗證請求成功後，才會儲存 Provider、API Key 與 Model ID。
+  - 驗證會檢查連線能力，以及模型是否能完成一個很小的 chat-style JSON 任務。
+  - 驗證通過的模型使用 `Chat JSON`。端點可達、有內容返回但不能完成 JSON 任務的模型，會快取為 `Translation Model`。
+
+- **Advanced Request Mode（進階請求模式）**
   - 設定項：`marklingo.translation.requestMode`
-  - 預設值：`chatJson`
-  - 通用 chat model 使用 `Chat JSON`。不穩定遵循 chat-style JSON 指令的專用翻譯模型使用 `Translation Model`。
-  - `auto` 只是針對 Hy-MT 等已知翻譯模型 ID 的便利模式；它無法識別所有翻譯模型或自訂 alias。
-  - Translation Model 模式使用小批量同結構 JSON、失敗 block 自適應重試與可選並行。進階設定：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency` 與 `marklingo.translation.translationModelMaxOutputTokens`。
+  - 預設值：`auto`
+  - 通常由 `Save and Verify` 管理。`auto` 會優先使用已驗證的能力快取；沒有快取時回退到 `Chat JSON`。
+  - 用於診斷的進階 settings.json 設定仍然可用：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency` 與 `marklingo.translation.translationModelMaxOutputTokens`。
 
 - **Target Language（目標語言）**
   - 設定項：`marklingo.translation.targetLanguage`
@@ -102,9 +111,9 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 - **Custom Instructions（自訂指令）**
   - 設定項：`marklingo.translation.customPrompt`
   - 預設值：空
-  - 附加在 MarkLingo 內建的 Markdown 保護提示之後的額外術語、語氣或風格指令。
+  - 對 Chat JSON 模型，附加在 MarkLingo 內建的 Markdown 保護提示之後。已驗證為 Translation Model 的配接器不會收到這些自訂指令。
 
-設定頁面會立即儲存下拉選單的變更。自由文字欄位使用各自的行內 `Save` 按鈕。API 金鑰操作與清除資料操作在確認後立即生效。
+設定頁面透過 `Save and Verify` 儲存 Provider 憑證。其他下拉選單會立即儲存；Provider 之外的自由文字欄位使用各自的行內 `Save` 按鈕。
 
 ### 使用 llama.cpp 本機執行 Hy-MT
 
@@ -123,12 +132,13 @@ llama-server \
 
 使用這些設定：
 
+- Provider：`OpenAI Compatible`
 - Base URL：`http://127.0.0.1:8080/v1`
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
-- Translation Mode：`Translation Model`
+- 然後點擊 `Save and Verify`。Hy-MT 應會被驗證為 `Translation Model`。
 
-本機吞吐量取決於模型、量化方式與硬體。調參時可先保持 `translationModelMaxOutputTokens` 為 `0`，讓 MarkLingo 根據模型 context window 估算輸出預算；然後逐步增大 `translationModelMaxBlocksPerRequest`，直到 debug 中繼資料開始出現拆分重試或 block warning。`translationModelConcurrency` 不應高於 `llama-server --parallel` 的 slot 數；額外的用戶端並行通常只會排隊，不會更快。
+本機吞吐量主要取決於模型、量化方式與硬體。MarkLingo 不會替你下載、啟動或調校 llama.cpp；用戶端並行只有在 `llama-server` 有匹配的 `--parallel` slot 時才有幫助。普通設定頁會隱藏模型批次調參項，但用於診斷的 settings.json 進階覆寫仍然保留。
 
 ## 輸出檔案
 
@@ -147,18 +157,18 @@ README_zh-CN_mdt.md
 
 ## 隱私與資料
 
-MarkLingo 是一個本機 VS Code 擴充功能，但翻譯需要將文件內容傳送到 OpenRouter，或在你變更 Base URL 時傳送到受信任的、相容 OpenRouter 的自訂端點。
+MarkLingo 是一個本機 VS Code 擴充功能，但翻譯需要將文件內容傳送到 OpenRouter，或在你選擇對應 Provider 時傳送到受信任的 OpenAI-compatible 自訂端點。
 
 - Markdown 內容會被傳送到設定的端點進行翻譯。
 - 預設使用官方的 OpenRouter 端點。
-- 你需要自己的 OpenRouter API 金鑰。
-- 翻譯請求為非串流。Chat JSON 模式會透過 `reasoning.exclude: true` 與 `reasoning.effort: none` 請求排除推理過程；Translation Model 模式會省略 reasoning 欄位。
-- API 金鑰儲存在 VS Code 的 `SecretStorage` 中。
+- 你需要所選 Provider 接受的 API 金鑰或 token。
+- 翻譯請求為非串流。Chat JSON 模式會透過 `reasoning.exclude: true` 與 `reasoning.effort: none` 請求排除推理過程；Translation Model 模式會省略 reasoning 欄位，並忽略 Custom Instructions。
+- API 金鑰依 endpoint origin 分開儲存在 VS Code 的 `SecretStorage` 中。
 - API 金鑰不會存入工作區檔案、VS Code 設定、翻譯中繼資料或記錄檔。
 - 翻譯中繼資料儲存在 VS Code 的 `globalStorageUri` 下，而非工作區中。
 - 不包含任何遙測 SDK。
 
-變更 `marklingo.openrouter.baseUrl` 會改變後續翻譯請求把已儲存的 API 金鑰傳往何處。請僅使用你信任的端點。
+變更 Provider 或 Base URL 會改變後續翻譯請求把 Markdown 內容傳送到哪裡。請僅使用你信任的端點。
 
 ## 清理
 

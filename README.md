@@ -35,11 +35,11 @@ You can also install a packaged `.vsix` from the [releases page](https://github.
 
 First, get an OpenRouter API key: sign in at [openrouter.ai/keys](https://openrouter.ai/keys) and create a key. Usage is billed by OpenRouter per request, based on the model you choose.
 
-1. Open a saved Markdown file.
-2. Run `MarkLingo: Translate Current Markdown` from the Command Palette.
-3. Select the target language.
-4. Paste your OpenRouter API key when prompted. It is stored in VS Code `SecretStorage`, never in workspace files.
-5. Confirm the model ID, or press Enter to use the default (`google/gemini-3.1-flash-lite`).
+1. Run `MarkLingo: Open Settings`.
+2. Keep Provider as `OpenRouter`, paste your API key, choose a Model ID, then click `Save and Verify`.
+3. Open a saved Markdown file.
+4. Run `MarkLingo: Translate Current Markdown` from the Command Palette.
+5. Select the target language.
 
 Default shortcut:
 
@@ -59,7 +59,7 @@ Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Ri
 | `MarkLingo: Translate This Markdown File` | Translate the Markdown file selected from the Explorer context menu. |
 | `MarkLingo: Translate Selected Markdown Files` | Translate Markdown files gathered from selected Explorer files and folders as one batch, opening the first translated output and writing the rest next to their sources. |
 | `MarkLingo: Translate All Markdown in This Folder` | Translate source Markdown files in the selected folder and subfolders, opening the first translated output and writing the rest next to their sources. |
-| `MarkLingo: Open Settings` | Open MarkLingo settings for provider, API key, translation mode, target language, custom instructions, shortcut status, and cleanup. |
+| `MarkLingo: Open Settings` | Open MarkLingo settings for provider verification, API key, target language, custom instructions, shortcut status, and cleanup. |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
 | `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |
 
@@ -67,27 +67,36 @@ Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Ri
 
 Use `MarkLingo: Open Settings` for the settings most users need.
 
+- **Provider**
+  - Setting: `marklingo.openrouter.provider`
+  - Default: `openrouter`
+  - `OpenRouter` uses the official OpenRouter endpoint and hides Base URL. `OpenAI Compatible` exposes Base URL for custom endpoints such as llama.cpp server.
+
 - **Base URL**
   - Setting: `marklingo.openrouter.baseUrl`
   - Default: `https://openrouter.ai/api/v1`
-  - Custom endpoints must use HTTPS, except localhost debugging.
+  - Used only when Provider is `OpenAI Compatible`. Custom endpoints must use HTTPS, except localhost debugging.
 
 - **API Key**
   - Storage: VS Code `SecretStorage`
   - Default: none
-  - Enter your OpenRouter API key. MarkLingo does not store it in VS Code settings or workspace files.
+  - Enter the API key for the selected provider. Keys are stored separately by endpoint origin and are never stored in VS Code settings or workspace files.
 
 - **Model ID**
   - Setting: `marklingo.openrouter.modelId`
   - Default: `google/gemini-3.1-flash-lite`
-  - Use an OpenRouter model ID.
+  - Use an OpenRouter model ID, or the model alias exposed by an OpenAI-compatible endpoint.
 
-- **Translation Mode**
+- **Save and Verify**
+  - Saves the Provider, API key, and Model ID only after a lightweight verification request succeeds.
+  - The verification checks connectivity and whether the model can follow a small chat-style JSON task.
+  - Models that pass use `Chat JSON`. Reachable models that return content but do not follow the JSON task are cached as `Translation Model`.
+
+- **Advanced Request Mode**
   - Setting: `marklingo.translation.requestMode`
-  - Default: `chatJson`
-  - Use `Chat JSON` for general chat models. Use `Translation Model` for dedicated translation models that do not reliably follow chat-style JSON instructions.
-  - `auto` is a convenience mode for known translation-model IDs such as Hy-MT; it cannot detect every translation model or custom alias.
-  - Translation Model mode uses small same-shape JSON batches, adaptive retry for failed blocks, and optional concurrency. Advanced knobs: `marklingo.translation.translationModelMaxBlocksPerRequest`, `marklingo.translation.translationModelConcurrency`, and `marklingo.translation.translationModelMaxOutputTokens`.
+  - Default: `auto`
+  - Normally managed by `Save and Verify`. In `auto`, MarkLingo uses the verified capability cache when available and otherwise falls back to `Chat JSON`.
+  - Advanced settings.json knobs remain available for diagnostics: `marklingo.translation.translationModelMaxBlocksPerRequest`, `marklingo.translation.translationModelConcurrency`, and `marklingo.translation.translationModelMaxOutputTokens`.
 
 - **Target Language**
   - Setting: `marklingo.translation.targetLanguage`
@@ -102,9 +111,9 @@ Use `MarkLingo: Open Settings` for the settings most users need.
 - **Custom Instructions**
   - Setting: `marklingo.translation.customPrompt`
   - Default: empty
-  - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt.
+  - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt for Chat JSON models. These instructions are not sent to verified Translation Model adapters.
 
-The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and cleanup actions take effect immediately after confirmation.
+The settings page saves Provider credentials through `Save and Verify`. Other dropdown changes save immediately, and free-text fields outside Provider use their own inline `Save` buttons.
 
 ### Local Hy-MT with llama.cpp
 
@@ -123,12 +132,13 @@ llama-server \
 
 Use these settings:
 
+- Provider: `OpenAI Compatible`
 - Base URL: `http://127.0.0.1:8080/v1`
 - API Key: `local-hy-secret`
 - Model ID: `hy-mt2`
-- Translation Mode: `Translation Model`
+- Then click `Save and Verify`. Hy-MT should be verified as `Translation Model`.
 
-Local throughput depends on the model, quantization, and hardware. For tuning, keep `translationModelMaxOutputTokens` at `0` so MarkLingo estimates the output budget from the model context window, then try larger `translationModelMaxBlocksPerRequest` values until debug metadata starts showing split retries or block warnings. Set `translationModelConcurrency` no higher than the `llama-server --parallel` slot count; extra client concurrency will usually queue instead of running faster.
+Local throughput depends mainly on the model, quantization, and hardware. MarkLingo does not download, start, or tune llama.cpp for you; client concurrency only helps when `llama-server` has matching `--parallel` slots. The UI keeps model-batching knobs hidden for normal use, but advanced settings.json overrides remain available for diagnostics.
 
 ## Output Files
 
@@ -147,18 +157,18 @@ Running translation again rebuilds the translated file from the current source M
 
 ## Privacy and Data
 
-MarkLingo is a local VS Code extension, but translation requires sending document content to OpenRouter, or to a trusted OpenRouter-compatible custom endpoint if you change the Base URL.
+MarkLingo is a local VS Code extension, but translation requires sending document content to OpenRouter, or to a trusted OpenAI-compatible custom endpoint if you select that Provider.
 
 - Markdown content is sent to the configured endpoint for translation.
 - The official OpenRouter endpoint is used by default.
-- You need your own OpenRouter API key.
-- Translation requests are non-streaming. Chat JSON mode requests reasoning exclusion with `reasoning.exclude: true` and `reasoning.effort: none`; Translation Model mode omits reasoning fields.
-- API keys are stored in VS Code `SecretStorage`.
+- You need an API key or token accepted by the selected Provider.
+- Translation requests are non-streaming. Chat JSON mode requests reasoning exclusion with `reasoning.exclude: true` and `reasoning.effort: none`; Translation Model mode omits reasoning fields and ignores Custom Instructions.
+- API keys are stored in VS Code `SecretStorage`, separated by endpoint origin.
 - API keys are not stored in workspace files, VS Code settings, translation metadata, or logs.
 - Translation metadata is stored under VS Code `globalStorageUri`, not in the workspace.
 - No telemetry SDK is included.
 
-Changing `marklingo.openrouter.baseUrl` changes where future translation requests send the saved API key. Only use endpoints you trust.
+Changing Provider or Base URL changes where future translation requests send Markdown content. Only use endpoints you trust.
 
 ## Cleanup
 

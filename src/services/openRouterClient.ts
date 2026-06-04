@@ -1,7 +1,11 @@
 import * as vscode from 'vscode';
+import { createHash } from 'node:crypto';
 import { hasOpenRouterModelAccepted, markOpenRouterModelAccepted } from '../onboardingState.js';
 
+export type ProviderType = 'openrouter' | 'openaiCompatible';
+
 export type OpenRouterSettings = {
+  providerType: ProviderType;
   baseUrl: string;
   modelId: string;
   apiKey: string;
@@ -43,22 +47,29 @@ export type ReasoningOptions = {
 };
 
 export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
+export const DEFAULT_PROVIDER_TYPE: ProviderType = 'openrouter';
+export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = 'http://127.0.0.1:8080/v1';
 
-// A single API key is stored regardless of the configured Base URL. The key is sent to whatever
-// endpoint Base URL points at; a bad key or mismatched endpoint simply fails at request time.
-const OPENROUTER_API_KEY_SECRET = 'marklingo.openrouter.apiKey';
+const LEGACY_OPENROUTER_API_KEY_SECRET = 'marklingo.openrouter.apiKey';
+const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey.v2.';
+const OPENROUTER_API_KEY_ORIGINS_STATE = 'marklingo.openrouter.apiKeyOrigins';
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
-const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const MODEL_CONTEXT_CACHE_TTL_MS = 30 * 60 * 1000;
+const PROVIDER_TYPES = new Set<ProviderType>(['openrouter', 'openaiCompatible']);
 
 const modelContextCache = new Map<string, { expiresAt: number; contextLength: number | undefined }>();
 
-function normalizeBaseUrl(baseUrl: string): string {
+export function coerceProviderType(value: unknown): ProviderType {
+  return PROVIDER_TYPES.has(value as ProviderType) ? value as ProviderType : DEFAULT_PROVIDER_TYPE;
+}
+
+export function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
   return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
 }
 
-function parseBaseUrl(baseUrl: string): URL {
+export function parseOpenRouterBaseUrl(baseUrl: string): URL {
   const normalized = normalizeBaseUrl(baseUrl || DEFAULT_OPENROUTER_BASE_URL);
   let url: URL;
   try {
@@ -80,28 +91,106 @@ function getConfiguration() {
   return vscode.workspace.getConfiguration('marklingo');
 }
 
-function resolveBaseUrl(): { baseUrl: string; origin: string } {
-  const cfg = getConfiguration();
-  const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? DEFAULT_OPENROUTER_BASE_URL;
-  const url = parseBaseUrl(rawBaseUrl);
+function hasExplicitProviderConfiguration(cfg: vscode.WorkspaceConfiguration): boolean {
+  const inspected = cfg.inspect<string>('openrouter.provider');
+  return [inspected?.globalValue, inspected?.workspaceValue, inspected?.workspaceFolderValue]
+    .some((value) => typeof value === 'string' && value.trim().length > 0);
+}
+
+export function hasExplicitOpenRouterProviderConfiguration(): boolean {
+  return hasExplicitProviderConfiguration(getConfiguration());
+}
+
+function getConfiguredProviderType(cfg: vscode.WorkspaceConfiguration): ProviderType {
+  if (!hasExplicitProviderConfiguration(cfg)) {
+    const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? DEFAULT_OPENROUTER_BASE_URL;
+    if (normalizeBaseUrl(rawBaseUrl) !== DEFAULT_OPENROUTER_BASE_URL) return 'openaiCompatible';
+  }
+  return coerceProviderType(cfg.get<string>('openrouter.provider') ?? DEFAULT_PROVIDER_TYPE);
+}
+
+export function getProviderDefaultBaseUrl(providerType: ProviderType): string {
+  return providerType === 'openrouter' ? DEFAULT_OPENROUTER_BASE_URL : DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
+}
+
+export function resolveProviderBaseUrl(providerType: ProviderType, rawBaseUrl?: string): { baseUrl: string; origin: string } {
+  const fallbackBaseUrl = getProviderDefaultBaseUrl(providerType);
+  const candidate = providerType === 'openrouter'
+    ? DEFAULT_OPENROUTER_BASE_URL
+    : (rawBaseUrl && normalizeBaseUrl(rawBaseUrl) !== DEFAULT_OPENROUTER_BASE_URL ? rawBaseUrl : fallbackBaseUrl);
+  const url = parseOpenRouterBaseUrl(candidate);
   return { baseUrl: normalizeBaseUrl(url.toString()), origin: url.origin };
 }
 
-async function resolveApiKey(context: vscode.ExtensionContext): Promise<string> {
-  const fromSecret = await context.secrets.get(OPENROUTER_API_KEY_SECRET);
+export function resolveConfiguredProvider(): { providerType: ProviderType; baseUrl: string; origin: string } {
+  const cfg = getConfiguration();
+  const providerType = getConfiguredProviderType(cfg);
+  const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? getProviderDefaultBaseUrl(providerType);
+  const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
+  return { providerType, baseUrl, origin };
+}
+
+function getApiKeySecretName(origin: string): string {
+  const digest = createHash('sha256').update(origin).digest('hex').slice(0, 24);
+  return `${OPENROUTER_API_KEY_SECRET_PREFIX}${digest}`;
+}
+
+function getApiKeyOrigins(context: vscode.ExtensionContext): string[] {
+  const value = context.globalState.get<unknown>(OPENROUTER_API_KEY_ORIGINS_STATE);
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+}
+
+async function rememberApiKeyOrigin(context: vscode.ExtensionContext, origin: string): Promise<void> {
+  const origins = new Set(getApiKeyOrigins(context));
+  origins.add(origin);
+  await context.globalState.update(OPENROUTER_API_KEY_ORIGINS_STATE, [...origins].sort());
+}
+
+export async function getStoredOpenRouterApiKey(
+  context: vscode.ExtensionContext,
+  baseUrl?: string,
+  options: { includeLegacy?: boolean } = {},
+): Promise<string | undefined> {
+  const { origin } = baseUrl
+    ? resolveProviderBaseUrl('openaiCompatible', baseUrl)
+    : resolveConfiguredProvider();
+  const fromOriginSecret = await context.secrets.get(getApiKeySecretName(origin));
+  if (fromOriginSecret?.trim()) return fromOriginSecret.trim();
+  if (options.includeLegacy) {
+    const legacySecret = await context.secrets.get(LEGACY_OPENROUTER_API_KEY_SECRET);
+    if (legacySecret?.trim()) return legacySecret.trim();
+  }
+  return undefined;
+}
+
+async function resolveApiKey(
+  context: vscode.ExtensionContext,
+  options: { origin: string; allowLegacyMigration: boolean },
+): Promise<string> {
+  const fromSecret = await context.secrets.get(getApiKeySecretName(options.origin));
   if (fromSecret?.trim()) return fromSecret.trim();
 
+  const legacySecret = await context.secrets.get(LEGACY_OPENROUTER_API_KEY_SECRET);
+  if (options.allowLegacyMigration && legacySecret?.trim()) {
+    const apiKey = legacySecret.trim();
+    await context.secrets.store(getApiKeySecretName(options.origin), apiKey);
+    await rememberApiKeyOrigin(context, options.origin);
+    await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
+    return apiKey;
+  }
+
   const input = await vscode.window.showInputBox({
-    title: 'MarkLingo: OpenRouter API Key',
-    prompt: 'Enter your OpenRouter API key. It will be stored in VS Code SecretStorage.',
+    title: 'MarkLingo: Provider API Key',
+    prompt: 'Enter the API key for the configured provider. It will be stored in VS Code SecretStorage.',
     password: true,
     ignoreFocusOut: true,
   });
   if (!input?.trim()) {
-    throw new Error('Missing OpenRouter API key. Save it from MarkLingo settings or run translation again.');
+    throw new Error('Missing Provider API key. Save and verify it from MarkLingo settings or run translation again.');
   }
   const apiKey = input.trim();
-  await context.secrets.store(OPENROUTER_API_KEY_SECRET, apiKey);
+  await context.secrets.store(getApiKeySecretName(options.origin), apiKey);
+  await rememberApiKeyOrigin(context, options.origin);
   return apiKey;
 }
 
@@ -146,15 +235,30 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 }
 
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
-  const { baseUrl } = resolveBaseUrl();
-  const apiKey = await resolveApiKey(context);
+  const cfg = getConfiguration();
+  const providerType = getConfiguredProviderType(cfg);
+  const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? getProviderDefaultBaseUrl(providerType);
+  const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
+  const apiKey = await resolveApiKey(context, {
+    origin,
+    allowLegacyMigration: !hasExplicitProviderConfiguration(cfg),
+  });
   const modelId = await resolveModelId(context);
 
-  return { baseUrl, modelId, apiKey };
+  return { providerType, baseUrl, modelId, apiKey };
 }
 
-export async function storeOpenRouterApiKey(context: vscode.ExtensionContext, apiKey: string): Promise<void> {
-  await context.secrets.store(OPENROUTER_API_KEY_SECRET, apiKey.trim());
+export async function storeOpenRouterApiKey(
+  context: vscode.ExtensionContext,
+  apiKey: string,
+  baseUrl?: string,
+): Promise<void> {
+  const { origin } = baseUrl
+    ? resolveProviderBaseUrl('openaiCompatible', baseUrl)
+    : resolveConfiguredProvider();
+  await context.secrets.store(getApiKeySecretName(origin), apiKey.trim());
+  await rememberApiKeyOrigin(context, origin);
+  await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
 }
 
 export async function seedOpenRouterApiKeyForTest(context: vscode.ExtensionContext, apiKey: string): Promise<string> {
@@ -165,21 +269,39 @@ export async function seedOpenRouterApiKeyForTest(context: vscode.ExtensionConte
   if (!trimmedApiKey) {
     throw new Error('OpenRouter test credential seeding requires a non-empty API key.');
   }
-  await context.secrets.store(OPENROUTER_API_KEY_SECRET, trimmedApiKey);
-  return resolveBaseUrl().origin;
+  const { origin } = resolveConfiguredProvider();
+  await context.secrets.store(getApiKeySecretName(origin), trimmedApiKey);
+  await rememberApiKeyOrigin(context, origin);
+  return origin;
 }
 
 export async function deleteOpenRouterApiKey(context: vscode.ExtensionContext): Promise<void> {
-  await context.secrets.delete(OPENROUTER_API_KEY_SECRET);
+  const { origin } = resolveConfiguredProvider();
+  await context.secrets.delete(getApiKeySecretName(origin));
+  await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
 }
 
-export async function hasOpenRouterApiKey(context: vscode.ExtensionContext): Promise<boolean> {
-  const fromSecret = await context.secrets.get(OPENROUTER_API_KEY_SECRET);
-  return Boolean(fromSecret?.trim());
+export async function hasOpenRouterApiKey(
+  context: vscode.ExtensionContext,
+  baseUrl?: string,
+  options: { includeLegacy?: boolean } = {},
+): Promise<boolean> {
+  const { origin } = baseUrl
+    ? resolveProviderBaseUrl('openaiCompatible', baseUrl)
+    : resolveConfiguredProvider();
+  const fromSecret = await context.secrets.get(getApiKeySecretName(origin));
+  if (fromSecret?.trim()) return true;
+  if (!options.includeLegacy) return false;
+  const legacySecret = await context.secrets.get(LEGACY_OPENROUTER_API_KEY_SECRET);
+  return Boolean(legacySecret?.trim());
 }
 
 export async function resetOpenRouterSecretsAndState(context: vscode.ExtensionContext): Promise<void> {
-  await context.secrets.delete(OPENROUTER_API_KEY_SECRET);
+  await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
+  for (const origin of getApiKeyOrigins(context)) {
+    await context.secrets.delete(getApiKeySecretName(origin));
+  }
+  await context.globalState.update(OPENROUTER_API_KEY_ORIGINS_STATE, undefined);
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, undefined);
 }
 

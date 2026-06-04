@@ -7,9 +7,12 @@ function getState(overrides = {}) {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
     shortcutWarning: '',
+    providerType: 'openrouter',
     baseUrl: 'https://openrouter.ai/api/v1',
+    openAiCompatibleDefaultBaseUrl: 'http://127.0.0.1:8080/v1',
     hasApiKey: true,
     modelId: 'openrouter/example-model',
+    verifiedAdapterMode: 'chatJson',
     requestMode: 'chatJson',
     translationModelMaxBlocksPerRequest: 12,
     translationModelConcurrency: 1,
@@ -47,16 +50,16 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /Translate Current Markdown/);
   assert.match(html, />Edit<\/button>/);
   assert.match(html, /System Instructions/);
-  assert.match(html, /Translation Mode/);
-  assert.match(html, /<option value="auto">Auto<\/option>/);
-  assert.match(html, /<option value="chatJson" selected>Chat JSON<\/option>/);
-  assert.match(html, /<option value="translationModel">Translation Model<\/option>/);
-  assert.match(html, /Model Blocks/);
-  assert.match(html, /id="translationModelMaxBlocksPerRequest" type="number" min="1" max="24" step="1" value="12"/);
-  assert.match(html, /Model Concurrency/);
-  assert.match(html, /id="translationModelConcurrency" type="number" min="1" max="4" step="1" value="1"/);
-  assert.match(html, /Max Output Tokens/);
-  assert.match(html, /id="translationModelMaxOutputTokens" type="number" min="0" max="32768" step="1" value="0"/);
+  assert.match(html, /<h2>Provider<\/h2>/);
+  assert.match(html, /<option value="openrouter" selected>OpenRouter<\/option>/);
+  assert.match(html, /<option value="openaiCompatible">OpenAI Compatible<\/option>/);
+  assert.match(html, /id="baseUrlRow" hidden/);
+  assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
+  assert.match(html, /Verified: Chat JSON/);
+  assert.ok(!html.includes('<div class="label">Translation Mode</div>'));
+  assert.ok(!html.includes('Model Blocks'));
+  assert.ok(!html.includes('Model Concurrency'));
+  assert.ok(!html.includes('Max Output Tokens'));
   assert.match(html, /Copy system instructions/);
   assert.match(html, /You are a precise Markdown translation assistant\./);
   assert.match(html, /Translation Metadata Folder/);
@@ -83,6 +86,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /window\.acquireVsCodeApi/);
   assert.match(html, /id="apiKey" type="password" autocomplete="off" value="•{32}" data-masked="true"/);
   assert.match(html, /showApiKeyMask\(\)/);
+  assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
   assert.ok(!html.includes('Enter API key'));
   assert.ok(!html.includes('masked-secret'));
@@ -119,6 +123,25 @@ test('renders empty API key input when no key is on file', () => {
   assert.ok(!html.includes('data-masked="true"'));
   assert.ok(!html.includes('API key saved · type to replace'));
   assert.ok(!html.includes('Enter API key'));
+});
+
+test('renders OpenAI-compatible provider with Base URL visible', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({
+      providerType: 'openaiCompatible',
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      modelId: 'hy-mt2',
+      verifiedAdapterMode: 'translationModel',
+    }),
+  });
+
+  assert.match(html, /<option value="openaiCompatible" selected>OpenAI Compatible<\/option>/);
+  assert.match(html, /id="baseUrlRow">/);
+  assert.match(html, /value="http:\/\/127\.0\.0\.1:8080\/v1"/);
+  assert.match(html, /Verified: Translation Model/);
+  assert.match(html, /<textarea id="customPrompt" disabled>/);
 });
 
 test('escapes settings state before rendering into HTML', () => {

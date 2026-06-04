@@ -7,6 +7,7 @@ import {
   type ChatCompletionOptions,
   type OpenRouterSettings,
 } from '../services/openRouterClient.js';
+import { readVerifiedTranslationAdapterMode } from '../services/modelCapabilities.js';
 import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
 import { getMetaFileUri, getOutputLocation, getTranslatedFileUri } from '../storage/paths.js';
 import { restoreTranslatedBlock } from '../translation/blockResults.js';
@@ -378,7 +379,10 @@ function buildAdapterPrompt(
   options: { targetLanguage: string; systemPrompt: string; customPrompt: string },
 ) {
   if (adapterMode === 'translationModel') {
-    return buildTranslationModelPrompt(blocks, options);
+    return buildTranslationModelPrompt(blocks, {
+      targetLanguage: options.targetLanguage,
+      systemPrompt: options.systemPrompt,
+    });
   }
   return buildChatJsonPrompt({ blocks }, options);
 }
@@ -455,37 +459,18 @@ function isCancellationError(error: unknown): boolean {
   return error instanceof vscode.CancellationError;
 }
 
-const USE_TRANSLATION_MODEL_MODE_ACTION = 'Use Translation Model';
-const USE_CHAT_JSON_MODE_ACTION = 'Use Chat JSON';
 const OPEN_SETTINGS_ACTION = 'Open Settings';
 
 function buildTranslationFailureMessage(message: string, runtime?: TranslationRuntime | null): string {
-  const currentMode = runtime?.requestMode ? ` Current Translation Mode: ${runtime.requestMode}.` : '';
+  const provider = runtime?.settings.providerType ? ` Current Provider: ${runtime.settings.providerType}.` : '';
   return (
     `MarkLingo: Translation failed. ${message}` +
-    `${currentMode} If the configured model is a dedicated translation model, use Translation Model. ` +
-    'For general chat models, use Chat JSON.'
+    `${provider} Open Settings and run Save and Verify to check connectivity and model capability.`
   );
 }
 
 async function showTranslationFailureMessage(message: string, runtime?: TranslationRuntime | null): Promise<void> {
-  const actions: string[] = [];
-  if (runtime?.requestMode !== 'translationModel') actions.push(USE_TRANSLATION_MODEL_MODE_ACTION);
-  if (runtime?.requestMode !== 'chatJson') actions.push(USE_CHAT_JSON_MODE_ACTION);
-  actions.push(OPEN_SETTINGS_ACTION);
-
-  const picked = await vscode.window.showErrorMessage(buildTranslationFailureMessage(message, runtime), ...actions);
-  const cfg = vscode.workspace.getConfiguration('marklingo');
-  if (picked === USE_TRANSLATION_MODEL_MODE_ACTION) {
-    await cfg.update('translation.requestMode', 'translationModel', vscode.ConfigurationTarget.Global);
-    await vscode.window.showInformationMessage('MarkLingo: Translation Mode set to Translation Model. Run translation again.');
-    return;
-  }
-  if (picked === USE_CHAT_JSON_MODE_ACTION) {
-    await cfg.update('translation.requestMode', 'chatJson', vscode.ConfigurationTarget.Global);
-    await vscode.window.showInformationMessage('MarkLingo: Translation Mode set to Chat JSON. Run translation again.');
-    return;
-  }
+  const picked = await vscode.window.showErrorMessage(buildTranslationFailureMessage(message, runtime), OPEN_SETTINGS_ACTION);
   if (picked === OPEN_SETTINGS_ACTION) {
     await vscode.commands.executeCommand('marklingo.openSettings');
   }
@@ -536,7 +521,8 @@ async function resolveTranslationRuntime(context: vscode.ExtensionContext): Prom
   const settings = await getOpenRouterSettings(context);
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const requestMode = coerceTranslationRequestMode(cfg.get<string>('translation.requestMode') ?? DEFAULT_TRANSLATION_REQUEST_MODE);
-  const adapterMode = resolveTranslationAdapterMode(requestMode, settings.modelId);
+  const verifiedAdapterMode = await readVerifiedTranslationAdapterMode(context, settings);
+  const adapterMode = resolveTranslationAdapterMode(requestMode, verifiedAdapterMode);
   const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
   const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
   const translationModelMaxBlocksPerRequest = coerceTranslationModelMaxBlocksPerRequest(
@@ -609,6 +595,7 @@ async function translateMarkdownDocument(
     metaUri = currentMetaUri;
 
     debug.settings = {
+      providerType: settings.providerType,
       baseUrl: settings.baseUrl,
       modelId: settings.modelId,
       targetLanguage,
@@ -623,6 +610,7 @@ async function translateMarkdownDocument(
       systemPromptSource: systemPrompt ? 'custom' : (effectiveSystemPrompt ? 'default' : 'none'),
       systemPromptHash: sha256(effectiveSystemPrompt),
       customPromptSet: Boolean(customPrompt),
+      customPromptUsed: adapterMode === 'chatJson' && Boolean(customPrompt),
       customPromptHash: customPrompt ? sha256(customPrompt) : undefined,
       request: adapterMode === 'translationModel'
         ? {
@@ -1347,7 +1335,7 @@ async function translateMarkdownFilesBatch(
   if (summary.failed.length > 0) {
     await vscode.window.showErrorMessage(
       `MarkLingo: Batch translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}. ` +
-        'See the MarkLingo output for details. If failures mention JSON or incomplete model output, check Translation Mode.',
+        'See the MarkLingo output for details. If failures mention JSON or incomplete model output, open Settings and run Save and Verify.',
     );
     return;
   }

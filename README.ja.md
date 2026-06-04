@@ -35,11 +35,11 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 
 まず、OpenRouter の API キーを取得します。[openrouter.ai/keys](https://openrouter.ai/keys) でサインインし、キーを作成してください。料金は、選択したモデルに応じて OpenRouter からリクエストごとに請求されます。
 
-1. 保存済みの Markdown ファイルを開きます。
-2. コマンドパレットから `MarkLingo: Translate Current Markdown` を実行します。
-3. ターゲット言語を選択します。
-4. プロンプトが表示されたら、OpenRouter の API キーを貼り付けます。キーは VS Code の `SecretStorage` に保存され、ワークスペースのファイルには保存されません。
-5. モデル ID を確認するか、Enter キーを押してデフォルト（`google/gemini-3.1-flash-lite`）を使用します。
+1. `MarkLingo: Open Settings` を実行します。
+2. Provider を `OpenRouter` のままにし、API key を貼り付け、Model ID を選択して `Save and Verify` をクリックします。
+3. 保存済みの Markdown ファイルを開きます。
+4. コマンドパレットから `MarkLingo: Translate Current Markdown` を実行します。
+5. ターゲット言語を選択します。
 
 デフォルトのショートカット：
 
@@ -59,7 +59,7 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 | `MarkLingo: Translate This Markdown File` | エクスプローラーのコンテキストメニューで選択した Markdown ファイルを翻訳します。 |
 | `MarkLingo: Translate Selected Markdown Files` | エクスプローラーで選択したファイルやフォルダーから集めた Markdown ファイルを 1 つのバッチとして翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
-| `MarkLingo: Open Settings` | プロバイダー、API キー、翻訳モード、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
+| `MarkLingo: Open Settings` | プロバイダー検証、API キー、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
 | `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力を削除し、プライベートな翻訳メタデータ/キャッシュは保持します。 |
 
@@ -67,27 +67,36 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 
 ほとんどのユーザーに必要な設定は、`MarkLingo: Open Settings` から利用できます。
 
+- **Provider（プロバイダー）**
+  - 設定：`marklingo.openrouter.provider`
+  - デフォルト：`openrouter`
+  - `OpenRouter` は公式 OpenRouter エンドポイントを使用し、Base URL を非表示にします。`OpenAI Compatible` は llama.cpp server などのカスタムエンドポイント向けに Base URL を表示します。
+
 - **Base URL（ベース URL）**
   - 設定：`marklingo.openrouter.baseUrl`
   - デフォルト：`https://openrouter.ai/api/v1`
-  - カスタムエンドポイントは、localhost でのデバッグを除き、HTTPS を使用する必要があります。
+  - Provider が `OpenAI Compatible` の場合のみ使用されます。カスタムエンドポイントは、localhost でのデバッグを除き、HTTPS を使用する必要があります。
 
 - **API Key（API キー）**
   - 保存先：VS Code `SecretStorage`
   - デフォルト：なし
-  - OpenRouter の API キーを入力します。MarkLingo はこれを VS Code の設定やワークスペースのファイルには保存しません。
+  - 選択した Provider の API キーを入力します。キーは endpoint origin ごとに分けて保存され、VS Code の設定やワークスペースのファイルには保存されません。
 
 - **Model ID（モデル ID）**
   - 設定：`marklingo.openrouter.modelId`
   - デフォルト：`google/gemini-3.1-flash-lite`
-  - OpenRouter のモデル ID を使用します。
+  - OpenRouter のモデル ID、または OpenAI-compatible エンドポイントが公開するモデル alias を使用します。
 
-- **Translation Mode（翻訳モード）**
+- **Save and Verify（保存して検証）**
+  - 軽量な検証リクエストが成功した場合のみ、Provider、API Key、Model ID を保存します。
+  - 検証では接続性と、モデルが小さな chat-style JSON タスクに従えるかを確認します。
+  - 検証を通過したモデルは `Chat JSON` を使用します。エンドポイントに到達でき、内容は返すものの JSON タスクに従えないモデルは `Translation Model` としてキャッシュされます。
+
+- **Advanced Request Mode（詳細リクエストモード）**
   - 設定：`marklingo.translation.requestMode`
-  - デフォルト：`chatJson`
-  - 一般的な chat model には `Chat JSON` を使用します。chat-style JSON 指示に安定して従わない専用翻訳モデルには `Translation Model` を使用します。
-  - `auto` は Hy-MT など既知の翻訳モデル ID 向けの便利モードです。すべての翻訳モデルやカスタム alias を検出できるわけではありません。
-  - Translation Model モードは、小さな同一形状の JSON バッチ、失敗 block の適応的リトライ、任意の並行実行を使います。詳細設定：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency`、`marklingo.translation.translationModelMaxOutputTokens`。
+  - デフォルト：`auto`
+  - 通常は `Save and Verify` によって管理されます。`auto` は検証済みの capability キャッシュを優先し、キャッシュがない場合は `Chat JSON` に戻ります。
+  - 診断向けの詳細 settings.json 設定は引き続き利用できます：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency`、`marklingo.translation.translationModelMaxOutputTokens`。
 
 - **Target Language（ターゲット言語）**
   - 設定：`marklingo.translation.targetLanguage`
@@ -102,9 +111,9 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 - **Custom Instructions（カスタム指示）**
   - 設定：`marklingo.translation.customPrompt`
   - デフォルト：空
-  - MarkLingo に内蔵された Markdown 保護プロンプトの後に追加される、用語・トーン・スタイルに関する追加の指示です。
+  - Chat JSON モデルでは、MarkLingo に内蔵された Markdown 保護プロンプトの後に追加されます。Translation Model として検証されたアダプターには送信されません。
 
-設定ページでは、ドロップダウンの変更は即座に保存されます。自由入力フィールドには、それぞれ独自のインライン `Save` ボタンがあります。API キーの操作とデータ消去の操作は、確認後すぐに反映されます。
+設定ページでは、Provider の認証情報は `Save and Verify` で保存されます。その他のドロップダウンは即座に保存され、Provider 以外の自由入力フィールドにはそれぞれインライン `Save` ボタンがあります。
 
 ### llama.cpp でローカル Hy-MT を使う
 
@@ -123,12 +132,13 @@ llama-server \
 
 以下の設定を使用します。
 
+- Provider：`OpenAI Compatible`
 - Base URL：`http://127.0.0.1:8080/v1`
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
-- Translation Mode：`Translation Model`
+- その後 `Save and Verify` をクリックします。Hy-MT は `Translation Model` として検証されるはずです。
 
-ローカルのスループットは、モデル、量子化方式、ハードウェアに依存します。調整するときは、まず `translationModelMaxOutputTokens` を `0` のままにして MarkLingo がモデルの context window から出力予算を推定できるようにし、その後 `translationModelMaxBlocksPerRequest` を段階的に上げて、debug metadata に分割リトライや block warning が出始める位置を確認してください。`translationModelConcurrency` は `llama-server --parallel` の slot 数を超えないようにしてください。余分なクライアント並行実行は通常キューに入るだけで、速くはなりません。
+ローカルのスループットは主に、モデル、量子化方式、ハードウェアに依存します。MarkLingo は llama.cpp のダウンロード、起動、調整は行いません。クライアント側の並行実行は、`llama-server` に対応する `--parallel` slot がある場合にのみ有効です。通常の設定 UI ではモデルのバッチ調整項目を隠していますが、診断用の settings.json 詳細上書きは残しています。
 
 ## 出力ファイル
 
@@ -147,18 +157,18 @@ README_zh-CN_mdt.md
 
 ## プライバシーとデータ
 
-MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキュメントの内容を OpenRouter に送信する必要があります。Base URL を変更した場合は、信頼できる OpenRouter 互換のカスタムエンドポイントに送信されます。
+MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキュメントの内容を OpenRouter に送信する必要があります。該当する Provider を選択した場合は、信頼できる OpenAI-compatible カスタムエンドポイントに送信されます。
 
 - Markdown の内容は、翻訳のために設定されたエンドポイントに送信されます。
 - デフォルトでは公式の OpenRouter エンドポイントが使用されます。
-- ご自身の OpenRouter API キーが必要です。
-- 翻訳リクエストは非ストリーミングです。Chat JSON モードでは `reasoning.exclude: true` と `reasoning.effort: none` により推論の除外を要求し、Translation Model モードでは reasoning フィールドを省略します。
-- API キーは VS Code の `SecretStorage` に保存されます。
+- 選択した Provider が受け付ける API キーまたは token が必要です。
+- 翻訳リクエストは非ストリーミングです。Chat JSON モードでは `reasoning.exclude: true` と `reasoning.effort: none` により推論の除外を要求し、Translation Model モードでは reasoning フィールドを省略し、Custom Instructions を無視します。
+- API キーは endpoint origin ごとに分けて VS Code の `SecretStorage` に保存されます。
 - API キーは、ワークスペースのファイル、VS Code の設定、翻訳メタデータ、ログには保存されません。
 - 翻訳メタデータは、ワークスペースではなく VS Code の `globalStorageUri` の下に保存されます。
 - テレメトリ SDK は含まれていません。
 
-`marklingo.openrouter.baseUrl` を変更すると、以降の翻訳リクエストが保存済みの API キーを送信する先が変わります。信頼できるエンドポイントのみを使用してください。
+Provider または Base URL を変更すると、以降の翻訳リクエストが Markdown 内容を送信する先が変わります。信頼できるエンドポイントのみを使用してください。
 
 ## クリーンアップ
 

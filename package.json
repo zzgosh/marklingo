@@ -136,11 +136,24 @@
     "configuration": {
       "title": "MarkLingo",
       "properties": {
+        "marklingo.openrouter.provider": {
+          "type": "string",
+          "default": "openrouter",
+          "enum": [
+            "openrouter",
+            "openaiCompatible"
+          ],
+          "enumDescriptions": [
+            "Use OpenRouter's official API endpoint.",
+            "Use a custom OpenAI-compatible API endpoint, such as llama.cpp server."
+          ],
+          "description": "Provider used for translation requests."
+        },
         "marklingo.openrouter.baseUrl": {
           "type": "string",
           "scope": "application",
           "default": "https://openrouter.ai/api/v1",
-          "description": "OpenRouter API base URL."
+          "description": "Custom OpenAI-compatible API base URL. Ignored when provider is OpenRouter."
         },
         "marklingo.openrouter.modelId": {
           "type": "string",
@@ -162,18 +175,18 @@
         },
         "marklingo.translation.requestMode": {
           "type": "string",
-          "default": "chatJson",
+          "default": "auto",
           "enum": [
             "auto",
             "chatJson",
             "translationModel"
           ],
           "enumDescriptions": [
-            "Automatically choose Translation Model for known translation-model IDs; otherwise use Chat JSON.",
+            "Use the verified provider/model capability when available; otherwise use Chat JSON.",
             "Ask chat models to return a JSON object keyed by block ID.",
             "Ask translation models to translate Markdown fields in small same-shape JSON batches."
           ],
-          "description": "Translation request mode."
+          "description": "Advanced translation request mode. Normally managed by MarkLingo Settings Save and Verify."
         },
         "marklingo.translation.translationModelMaxBlocksPerRequest": {
           "type": "number",

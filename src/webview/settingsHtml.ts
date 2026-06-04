@@ -16,9 +16,12 @@ export type SettingsState = {
   shortcutLabel: string;
   shortcutStatus: string;
   shortcutWarning: string;
+  providerType: string;
   baseUrl: string;
+  openAiCompatibleDefaultBaseUrl: string;
   hasApiKey: boolean;
   modelId: string;
+  verifiedAdapterMode?: string;
   requestMode: string;
   translationModelMaxBlocksPerRequest: number;
   translationModelConcurrency: number;
@@ -64,6 +67,15 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 function renderOptions(selected: string): string {
   return TARGET_LANGUAGE_OPTIONS.map((option) => {
     const selectedAttr = option === selected ? ' selected' : '';
@@ -71,14 +83,13 @@ function renderOptions(selected: string): string {
   }).join('');
 }
 
-const TRANSLATION_MODE_OPTIONS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'chatJson', label: 'Chat JSON' },
-  { value: 'translationModel', label: 'Translation Model' },
+const PROVIDER_OPTIONS = [
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'openaiCompatible', label: 'OpenAI Compatible' },
 ];
 
-function renderTranslationModeOptions(selected: string): string {
-  return TRANSLATION_MODE_OPTIONS.map((option) => {
+function renderProviderOptions(selected: string): string {
+  return PROVIDER_OPTIONS.map((option) => {
     const selectedAttr = option.value === selected ? ' selected' : '';
     return `<option value="${escapeHtml(option.value)}"${selectedAttr}>${escapeHtml(option.label)}</option>`;
   }).join('');
@@ -115,6 +126,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const apiKeyInitialAttrs = state.hasApiKey
     ? ` value="${escapeHtml(API_KEY_MASK_VALUE)}" data-masked="true"`
     : '';
+  const providerBaseUrlHidden = state.providerType === 'openaiCompatible' ? '' : ' hidden';
+  const customPromptDisabled = state.verifiedAdapterMode === 'translationModel' ? ' disabled' : '';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
   const pluralize = (count: number, singular: string, plural: string): string =>
@@ -342,6 +355,22 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       justify-content: flex-end;
       align-items: center;
       gap: 10px;
+    }
+    .provider-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 16px;
+      min-width: 0;
+    }
+    .provider-status {
+      min-width: 0;
+      color: var(--muted);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    .provider-status.failed {
+      color: var(--danger);
     }
     button {
       min-height: 34px;
@@ -574,6 +603,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       .danger-row { grid-template-columns: 1fr; }
       .danger-action { justify-content: flex-start; }
       .shortcut-controls { justify-content: flex-start; }
+      .provider-actions { justify-content: flex-start; }
+      .provider-status { text-align: left; }
     }
   </style>
 </head>
@@ -600,64 +631,41 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         <section class="card">
           <div class="row">
             <div>
+              <div class="label">Provider</div>
+            </div>
+            <div class="control-full">
+              <span class="select-wrap"><select id="providerType">${renderProviderOptions(state.providerType)}</select></span>
+            </div>
+          </div>
+          <div class="row" id="baseUrlRow"${providerBaseUrlHidden}>
+            <div>
               <div class="label">Base URL</div>
             </div>
-            <div class="inline">
+            <div class="control-full">
               <input id="baseUrl" value="${escapeHtml(state.baseUrl)}">
-              <button class="save-btn" type="button" data-field="baseUrl" data-key="openrouter.baseUrl" disabled>Save</button>
             </div>
           </div>
           <div class="row">
             <div>
               <div class="label">API Key</div>
             </div>
-            <div class="inline">
+            <div class="control-full">
               <input id="apiKey" type="password" autocomplete="off"${apiKeyInitialAttrs}>
-              <button class="save-btn" type="button" id="save-key" disabled>Save</button>
             </div>
           </div>
           <div class="row">
             <div>
               <div class="label">Model ID</div>
             </div>
-            <div class="inline">
-              <input id="modelId" value="${escapeHtml(state.modelId)}">
-              <button class="save-btn" type="button" data-field="modelId" data-key="openrouter.modelId" disabled>Save</button>
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Translation Mode</div>
-            </div>
             <div class="control-full">
-              <span class="select-wrap"><select id="requestMode">${renderTranslationModeOptions(state.requestMode)}</select></span>
+              <input id="modelId" value="${escapeHtml(state.modelId)}">
             </div>
           </div>
           <div class="row">
-            <div>
-              <div class="label">Model Blocks</div>
-            </div>
-            <div class="inline">
-              <input id="translationModelMaxBlocksPerRequest" type="number" min="1" max="24" step="1" value="${state.translationModelMaxBlocksPerRequest}">
-              <button class="save-btn" type="button" data-field="translationModelMaxBlocksPerRequest" data-key="translation.translationModelMaxBlocksPerRequest" disabled>Save</button>
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Model Concurrency</div>
-            </div>
-            <div class="inline">
-              <input id="translationModelConcurrency" type="number" min="1" max="4" step="1" value="${state.translationModelConcurrency}">
-              <button class="save-btn" type="button" data-field="translationModelConcurrency" data-key="translation.translationModelConcurrency" disabled>Save</button>
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <div class="label">Max Output Tokens</div>
-            </div>
-            <div class="inline">
-              <input id="translationModelMaxOutputTokens" type="number" min="0" max="32768" step="1" value="${state.translationModelMaxOutputTokens}">
-              <button class="save-btn" type="button" data-field="translationModelMaxOutputTokens" data-key="translation.translationModelMaxOutputTokens" disabled>Save</button>
+            <div></div>
+            <div class="provider-actions">
+              <div class="provider-status" id="provider-status"></div>
+              <button class="save-btn" type="button" id="verify-provider">Save and Verify</button>
             </div>
           </div>
         </section>
@@ -703,7 +711,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <div class="label">Custom Instructions</div>
             </div>
             <div class="stack">
-              <textarea id="customPrompt">${escapeHtml(state.customPrompt)}</textarea>
+              <textarea id="customPrompt"${customPromptDisabled}>${escapeHtml(state.customPrompt)}</textarea>
               <div class="field-actions">
                 <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>Save</button>
               </div>
@@ -768,8 +776,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   ${beforeMainScript}
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const CUSTOM_LANGUAGE_LABEL = ${JSON.stringify(CUSTOM_TARGET_LANGUAGE_LABEL)};
-    const SYSTEM_PROMPT = ${JSON.stringify(state.systemPrompt)};
+    const CUSTOM_LANGUAGE_LABEL = ${scriptJson(CUSTOM_TARGET_LANGUAGE_LABEL)};
+    const SYSTEM_PROMPT = ${scriptJson(state.systemPrompt)};
 
     function getShortcutWarningText(warning) {
       if (!warning) return '';
@@ -828,8 +836,139 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     registerInstant('targetLanguage', 'translation.targetLanguage');
-    registerInstant('requestMode', 'translation.requestMode');
     syncCustomLanguageVisibility(false);
+
+    const API_KEY_MASK_VALUE = ${scriptJson(API_KEY_MASK_VALUE)};
+    const PROVIDER_OPENAI_COMPATIBLE_DEFAULT_BASE_URL = ${scriptJson(state.openAiCompatibleDefaultBaseUrl)};
+    const providerTypeSelect = document.getElementById('providerType');
+    const baseUrlRow = document.getElementById('baseUrlRow');
+    const baseUrlInput = document.getElementById('baseUrl');
+    const modelIdInput = document.getElementById('modelId');
+    const apiKeyInput = document.getElementById('apiKey');
+    const verifyProviderBtn = document.getElementById('verify-provider');
+    const providerStatus = document.getElementById('provider-status');
+    let nextProviderSaveId = 1;
+    let providerPending; // { saveId, providerType, baseUrl, modelId, apiKeyWasMasked }
+    const providerBaseline = {
+      providerType: ${scriptJson(state.providerType)},
+      baseUrl: ${scriptJson(state.baseUrl)},
+      modelId: ${scriptJson(state.modelId)},
+      hasApiKey: ${scriptJson(state.hasApiKey)},
+      verifiedAdapterMode: ${scriptJson(state.verifiedAdapterMode ?? '')},
+    };
+
+    function isApiKeyMasked() {
+      return apiKeyInput.dataset.masked === 'true';
+    }
+
+    function showApiKeyMask() {
+      apiKeyInput.value = API_KEY_MASK_VALUE;
+      apiKeyInput.dataset.masked = 'true';
+      apiKeyInput.scrollLeft = 0;
+    }
+
+    function clearApiKeyMaskForEntry() {
+      if (!isApiKeyMasked()) return;
+      apiKeyInput.dataset.masked = 'false';
+      apiKeyInput.value = '';
+      updateProviderVerificationState();
+    }
+
+    function getProviderValues() {
+      return {
+        providerType: providerTypeSelect.value,
+        baseUrl: baseUrlInput.value.trim(),
+        modelId: modelIdInput.value.trim(),
+      };
+    }
+
+    function syncProviderBaseUrlVisibility() {
+      const isOpenAiCompatible = providerTypeSelect.value === 'openaiCompatible';
+      if (baseUrlRow) baseUrlRow.hidden = !isOpenAiCompatible;
+      if (isOpenAiCompatible && (!baseUrlInput.value.trim() || baseUrlInput.value.includes('openrouter.ai'))) {
+        baseUrlInput.value = PROVIDER_OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
+      }
+    }
+
+    function isProviderDirty() {
+      const values = getProviderValues();
+      const apiKeyChanged = !isApiKeyMasked() && apiKeyInput.value.trim().length > 0;
+      return (
+        values.providerType !== providerBaseline.providerType ||
+        values.baseUrl !== providerBaseline.baseUrl ||
+        values.modelId !== providerBaseline.modelId ||
+        apiKeyChanged ||
+        !providerBaseline.verifiedAdapterMode
+      );
+    }
+
+    function setProviderStatus(text, failed) {
+      providerStatus.textContent = text || '';
+      providerStatus.title = text || '';
+      providerStatus.classList.toggle('failed', Boolean(failed));
+    }
+
+    function updateProviderVerificationState() {
+      if (providerPending) return;
+      const dirty = isProviderDirty();
+      verifyProviderBtn.disabled = !dirty;
+      verifyProviderBtn.textContent = dirty ? 'Save and Verify' : 'Saved and Verified';
+      verifyProviderBtn.classList.toggle('saved', !dirty && Boolean(providerBaseline.verifiedAdapterMode));
+      if (dirty) {
+        setProviderStatus('', false);
+      } else if (providerBaseline.verifiedAdapterMode) {
+        setProviderStatus(providerBaseline.verifiedAdapterMode === 'translationModel' ? 'Verified: Translation Model' : 'Verified: Chat JSON', false);
+      }
+    }
+
+    function handleProviderInput() {
+      syncProviderBaseUrlVisibility();
+      updateProviderVerificationState();
+    }
+
+    providerTypeSelect.addEventListener('change', () => {
+      apiKeyInput.dataset.masked = 'false';
+      apiKeyInput.value = '';
+      handleProviderInput();
+    });
+    baseUrlInput.addEventListener('input', handleProviderInput);
+    modelIdInput.addEventListener('input', handleProviderInput);
+    apiKeyInput.addEventListener('beforeinput', clearApiKeyMaskForEntry);
+    apiKeyInput.addEventListener('paste', clearApiKeyMaskForEntry);
+    apiKeyInput.addEventListener('keydown', (event) => {
+      if (!isApiKeyMasked()) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+        clearApiKeyMaskForEntry();
+      }
+    });
+    apiKeyInput.addEventListener('input', updateProviderVerificationState);
+    verifyProviderBtn.addEventListener('click', () => {
+      if (providerPending) return;
+      const values = getProviderValues();
+      const saveId = nextProviderSaveId++;
+      providerPending = {
+        saveId,
+        providerType: values.providerType,
+        baseUrl: values.baseUrl,
+        modelId: values.modelId,
+        apiKeyWasMasked: isApiKeyMasked(),
+      };
+      verifyProviderBtn.textContent = 'Verifying...';
+      verifyProviderBtn.disabled = true;
+      verifyProviderBtn.classList.remove('saved');
+      setProviderStatus('', false);
+      vscode.postMessage({
+        type: 'verifyProvider',
+        providerType: values.providerType,
+        baseUrl: values.baseUrl,
+        apiKey: isApiKeyMasked() ? '' : apiKeyInput.value.trim(),
+        modelId: values.modelId,
+        saveId,
+      });
+    });
+    syncProviderBaseUrlVisibility();
+    updateProviderVerificationState();
 
     function handleSaved(key, saveId, value) {
       const text = textByKey.get(key);
@@ -871,111 +1010,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       text.button.disabled = text.input.value === text.baseline;
     }
 
-    // API key: inline password entry. The value is posted once and never stored in webview state.
-    // When a key is on file the input shows fixed-length dots (type="password" masks each char).
-    const API_KEY_MASK_VALUE = ${JSON.stringify(API_KEY_MASK_VALUE)};
-    const apiKeyInput = document.getElementById('apiKey');
-    const saveKeyBtn = document.getElementById('save-key');
-    let apiKeySavedTimer;
-    let apiKeyPending; // { saveId, raw } — raw is the input.value at click time
-    let nextApiKeySaveId = 1;
-
-    function clearApiKeySavedTimer() {
-      if (apiKeySavedTimer) {
-        clearTimeout(apiKeySavedTimer);
-        apiKeySavedTimer = undefined;
-      }
-    }
-
-    function isApiKeyMasked() {
-      return apiKeyInput.dataset.masked === 'true';
-    }
-
-    function showApiKeyMask() {
-      apiKeyInput.value = API_KEY_MASK_VALUE;
-      apiKeyInput.dataset.masked = 'true';
-      apiKeyInput.scrollLeft = 0;
-      saveKeyBtn.disabled = true;
-    }
-
-    function clearApiKeyMaskForEntry() {
-      if (!isApiKeyMasked()) return;
-      clearApiKeySavedTimer();
-      apiKeyInput.dataset.masked = 'false';
-      apiKeyInput.value = '';
-      saveKeyBtn.textContent = 'Save';
-      saveKeyBtn.classList.remove('saved');
-      saveKeyBtn.disabled = true;
-    }
-
-    function resetApiKeySaveButton() {
-      saveKeyBtn.textContent = 'Save';
-      saveKeyBtn.classList.remove('saved');
-      saveKeyBtn.disabled = isApiKeyMasked() || apiKeyInput.value.trim().length === 0;
-    }
-
-    function applyApiKeyStatus(hasKey, saveId) {
-      // Stale-ack guard: ignore replies for a save the user has since superseded.
-      if (saveId !== undefined && (!apiKeyPending || apiKeyPending.saveId !== saveId)) return;
-      const pending = apiKeyPending;
-      apiKeyPending = undefined;
-      clearApiKeySavedTimer();
-      // If the user kept typing after clicking Save, do not wipe their in-progress entry.
-      const userKeptTyping = pending && apiKeyInput.value !== '' && apiKeyInput.value !== pending.raw;
-      if (userKeptTyping) {
-        resetApiKeySaveButton();
-        return;
-      }
-      saveKeyBtn.disabled = true;
-      if (hasKey) {
-        showApiKeyMask();
-        saveKeyBtn.textContent = 'Saved';
-        saveKeyBtn.classList.add('saved');
-        apiKeySavedTimer = setTimeout(() => {
-          saveKeyBtn.textContent = 'Save';
-          saveKeyBtn.classList.remove('saved');
-          apiKeySavedTimer = undefined;
-        }, 2500);
-      } else {
-        clearApiKeyMaskForEntry();
-        saveKeyBtn.textContent = 'Save';
-        saveKeyBtn.classList.remove('saved');
-      }
-    }
-
-    function handleApiKeySaveFailed(saveId) {
-      if (saveId !== undefined && (!apiKeyPending || apiKeyPending.saveId !== saveId)) return;
-      apiKeyPending = undefined;
-      clearApiKeySavedTimer();
-      resetApiKeySaveButton();
-    }
-
-    apiKeyInput.addEventListener('beforeinput', clearApiKeyMaskForEntry);
-    apiKeyInput.addEventListener('paste', clearApiKeyMaskForEntry);
-    apiKeyInput.addEventListener('keydown', (event) => {
-      if (!isApiKeyMasked()) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
-        clearApiKeyMaskForEntry();
-      }
-    });
-    apiKeyInput.addEventListener('input', () => {
-      clearApiKeySavedTimer();
-      saveKeyBtn.classList.remove('saved');
-      saveKeyBtn.textContent = 'Save';
-      saveKeyBtn.disabled = isApiKeyMasked() || apiKeyInput.value.trim().length === 0;
-    });
-    saveKeyBtn.addEventListener('click', () => {
-      if (isApiKeyMasked()) return;
-      const trimmed = apiKeyInput.value.trim();
-      if (!trimmed) return;
-      const saveId = nextApiKeySaveId++;
-      apiKeyPending = { saveId, raw: apiKeyInput.value };
-      saveKeyBtn.textContent = 'Saving...';
-      saveKeyBtn.disabled = true;
-      vscode.postMessage({ type: 'setApiKey', value: trimmed, saveId });
-    });
-
     const clearCurrentProjectDataBtn = document.getElementById('clear-current-project-data');
     clearCurrentProjectDataBtn.addEventListener('click', () => {
       vscode.postMessage({ type: 'clearCurrentProjectData' });
@@ -1016,12 +1050,29 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         handleSaveFailed(msg.key, msg.saveId);
         return;
       }
-      if (msg.type === 'apiKeyStatus') {
-        applyApiKeyStatus(Boolean(msg.hasKey), msg.saveId);
-        return;
-      }
-      if (msg.type === 'apiKeySaveFailed') {
-        handleApiKeySaveFailed(msg.saveId);
+      if (msg.type === 'providerVerification') {
+        if (!providerPending || (msg.saveId !== undefined && providerPending.saveId !== msg.saveId)) return;
+        const pending = providerPending;
+        providerPending = undefined;
+        if (msg.ok) {
+          providerBaseline.providerType = msg.providerType || pending.providerType;
+          providerBaseline.baseUrl = msg.baseUrl || pending.baseUrl;
+          providerBaseline.modelId = msg.modelId || pending.modelId;
+          providerBaseline.hasApiKey = Boolean(msg.hasKey);
+          providerBaseline.verifiedAdapterMode = msg.adapterMode || '';
+          if (providerTypeSelect.value === pending.providerType) {
+            baseUrlInput.value = providerBaseline.baseUrl;
+            modelIdInput.value = providerBaseline.modelId;
+            if (providerBaseline.hasApiKey) showApiKeyMask();
+          }
+          syncProviderBaseUrlVisibility();
+          updateProviderVerificationState();
+          return;
+        }
+        verifyProviderBtn.textContent = 'Save and Verify';
+        verifyProviderBtn.disabled = false;
+        verifyProviderBtn.classList.remove('saved');
+        setProviderStatus('Verification Failed', true);
         return;
       }
       if (msg.type === 'shortcutState') {

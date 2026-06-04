@@ -16,12 +16,13 @@ const blocks = [
   { id: 'b1', markdown: 'See __MDT_b1_URL_0__.' },
 ];
 
-test('auto mode routes Hy-MT model IDs to translation-model mode', () => {
-  assert.equal(resolveTranslationAdapterMode('auto', 'hy-mt2'), 'translationModel');
-  assert.equal(resolveTranslationAdapterMode('auto', 'tencent/Hy-MT2-1.8B-GGUF:Q4_K_M'), 'translationModel');
-  assert.equal(resolveTranslationAdapterMode('auto', 'google/gemini-3.1-flash-lite'), 'chatJson');
-  assert.equal(resolveTranslationAdapterMode('chatJson', 'hy-mt2'), 'chatJson');
-  assert.equal(coerceTranslationRequestMode('bad'), 'chatJson');
+test('auto mode uses verified capability and otherwise falls back to chat JSON', () => {
+  assert.equal(resolveTranslationAdapterMode('auto', 'translationModel'), 'translationModel');
+  assert.equal(resolveTranslationAdapterMode('auto', 'chatJson'), 'chatJson');
+  assert.equal(resolveTranslationAdapterMode('auto'), 'chatJson');
+  assert.equal(resolveTranslationAdapterMode('chatJson', 'translationModel'), 'chatJson');
+  assert.equal(resolveTranslationAdapterMode('translationModel', 'chatJson'), 'translationModel');
+  assert.equal(coerceTranslationRequestMode('bad'), 'auto');
 });
 
 test('clamps translation-model tuning settings', () => {
@@ -54,14 +55,13 @@ test('builds translation-model prompts around same-shape JSON blocks', () => {
   const prompt = buildTranslationModelPrompt(blocks, {
     targetLanguage: '简体中文',
     systemPrompt: '',
-    customPrompt: 'Keep MarkLingo untranslated.',
   });
 
   assert.equal(prompt.messages.length, 1);
   assert.equal(prompt.messages[0].role, 'user');
   assert.match(prompt.messages[0].content, /same top-level "blocks" array shape/);
   assert.match(prompt.messages[0].content, /Do not output example ids/);
-  assert.match(prompt.messages[0].content, /Keep MarkLingo untranslated/);
+  assert.doesNotMatch(prompt.messages[0].content, /Additional custom instructions/);
   assert.match(prompt.messages[0].content, /"blocks"/);
 });
 

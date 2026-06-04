@@ -60,6 +60,7 @@ export type TranslationMetaDebug = {
     cacheHits?: number;
   };
   settings?: {
+    providerType?: string;
     baseUrl: string;
     modelId: string;
     targetLanguage?: string;
@@ -74,6 +75,7 @@ export type TranslationMetaDebug = {
     systemPromptSource?: "default" | "custom" | "none";
     systemPromptHash?: string;
     customPromptSet?: boolean;
+    customPromptUsed?: boolean;
     customPromptHash?: string;
     request: {
       stream: false;

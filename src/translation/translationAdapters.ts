@@ -4,7 +4,7 @@ import type { TranslationRequestBlock } from './requestPlanner.js';
 export type TranslationRequestMode = 'auto' | 'chatJson' | 'translationModel';
 export type TranslationAdapterMode = 'chatJson' | 'translationModel';
 
-export const DEFAULT_TRANSLATION_REQUEST_MODE: TranslationRequestMode = 'chatJson';
+export const DEFAULT_TRANSLATION_REQUEST_MODE: TranslationRequestMode = 'auto';
 export const DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST = 12;
 export const DEFAULT_TRANSLATION_MODEL_CONCURRENCY = 1;
 export const DEFAULT_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS = 0;
@@ -75,14 +75,13 @@ export function resolveTranslationModelMaxOutputTokens(options: {
   return 4096;
 }
 
-function isKnownTranslationModelId(modelId: string): boolean {
-  const normalized = modelId.trim().toLowerCase();
-  return /(^|[/_-])hy[-_]?mt\d?($|[/_.:-])/.test(normalized) || normalized.includes('hunyuan-mt');
-}
-
-export function resolveTranslationAdapterMode(mode: TranslationRequestMode, modelId: string): TranslationAdapterMode {
+export function resolveTranslationAdapterMode(
+  mode: TranslationRequestMode,
+  verifiedAdapterMode?: TranslationAdapterMode,
+): TranslationAdapterMode {
   if (mode === 'chatJson' || mode === 'translationModel') return mode;
-  return isKnownTranslationModelId(modelId) ? 'translationModel' : 'chatJson';
+  if (verifiedAdapterMode) return verifiedAdapterMode;
+  return 'chatJson';
 }
 
 export function getTranslationAdapterLabel(mode: TranslationAdapterMode): string {
@@ -110,9 +109,8 @@ export function buildChatJsonPrompt(
 
 export function buildTranslationModelPrompt(
   blocks: TranslationRequestBlock[],
-  options: { targetLanguage: string; systemPrompt: string; customPrompt: string },
+  options: { targetLanguage: string; systemPrompt: string },
 ): { messages: ChatMessage[]; estimatePrompt: { system: string; user: string } } {
-  const customPrompt = options.customPrompt.trim();
   const lines = [
     `Translate each "markdown" value in the JSON below into ${options.targetLanguage}.`,
     'Return only one valid JSON object with the same top-level "blocks" array shape as the input.',
@@ -120,10 +118,6 @@ export function buildTranslationModelPrompt(
     'Keep every object key, block order, and placeholder token unchanged.',
     'Translate natural-language text only. Preserve Markdown syntax, code, URLs, image paths, file paths, versions, identifiers, and frontmatter keys.',
   ];
-
-  if (customPrompt) {
-    lines.push('', 'Additional custom instructions:', customPrompt);
-  }
 
   lines.push('', 'JSON input:', JSON.stringify({ blocks }));
   const user = lines.join('\n');

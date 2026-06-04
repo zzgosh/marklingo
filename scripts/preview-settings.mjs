@@ -28,6 +28,8 @@ if (compile.status !== 0) {
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const configProperties = packageJson.contributes.configuration.properties;
+const defaultProviderType = configProperties['marklingo.openrouter.provider'].default;
+const defaultBaseUrl = configProperties['marklingo.openrouter.baseUrl'].default;
 const defaultModelId = configProperties['marklingo.openrouter.modelId'].default;
 const defaultRequestMode = configProperties['marklingo.translation.requestMode'].default;
 const defaultTranslationModelMaxBlocksPerRequest = configProperties['marklingo.translation.translationModelMaxBlocksPerRequest'].default;
@@ -84,9 +86,23 @@ function getPreviewBridgeScript(nonce) {
           reply({ type: 'saved', key: message.key, value: message.value, saveId: message.saveId });
           return;
         }
-        if (message.type === 'setApiKey') {
-          const value = typeof message.value === 'string' ? message.value : '';
-          reply({ type: 'apiKeyStatus', hasKey: Boolean(value), saveId: message.saveId });
+        if (message.type === 'verifyProvider') {
+          if (window.location.search.includes('verify=fail')) {
+            reply({ type: 'providerVerification', ok: false, message: 'Verification failed.', saveId: message.saveId });
+            return;
+          }
+          const adapterMode = window.location.search.includes('capability=translationModel') ? 'translationModel' : 'chatJson';
+          reply({
+            type: 'providerVerification',
+            ok: true,
+            hasKey: true,
+            providerType: message.providerType,
+            baseUrl: message.providerType === 'openaiCompatible' ? message.baseUrl : ${JSON.stringify(defaultBaseUrl)},
+            modelId: message.modelId,
+            adapterMode,
+            message: adapterMode === 'translationModel' ? 'Verified as Translation Model.' : 'Verified as Chat JSON.',
+            saveId: message.saveId,
+          });
           return;
         }
         if (message.type === 'clearCurrentProjectData') {
@@ -112,15 +128,22 @@ function getPreviewBridgeScript(nonce) {
 
 function buildState(url) {
   const usesCustomLanguage = url.searchParams.get('custom') === '1';
+  const providerType = url.searchParams.get('provider') ?? defaultProviderType;
+  const isOpenAiCompatible = providerType === 'openaiCompatible';
   return {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
     shortcutWarning: url.searchParams.get('warning') === '1'
       ? 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.'
       : '',
-    baseUrl: 'https://openrouter.ai/api/v1',
+    providerType,
+    baseUrl: isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? 'http://127.0.0.1:8080/v1') : defaultBaseUrl,
+    openAiCompatibleDefaultBaseUrl: 'http://127.0.0.1:8080/v1',
     hasApiKey: url.searchParams.get('apiKey') !== 'missing',
-    modelId: defaultModelId,
+    modelId: url.searchParams.get('model') ?? (isOpenAiCompatible ? 'hy-mt2' : defaultModelId),
+    verifiedAdapterMode: url.searchParams.get('verified') === '0'
+      ? undefined
+      : (url.searchParams.get('capability') ?? 'chatJson'),
     requestMode: url.searchParams.get('mode') ?? defaultRequestMode,
     translationModelMaxBlocksPerRequest: Number.parseInt(url.searchParams.get('blocks') ?? String(defaultTranslationModelMaxBlocksPerRequest), 10),
     translationModelConcurrency: Number.parseInt(url.searchParams.get('concurrency') ?? String(defaultTranslationModelConcurrency), 10),

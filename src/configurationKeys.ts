@@ -1,4 +1,5 @@
 export const MARKLINGO_CONFIGURATION_KEYS = [
+  'openrouter.provider',
   'openrouter.baseUrl',
   'openrouter.modelId',
   'translation.targetLanguage',

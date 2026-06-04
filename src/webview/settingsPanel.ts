@@ -1,10 +1,21 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import {
+  coerceProviderType,
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  hasExplicitOpenRouterProviderConfiguration,
   hasOpenRouterApiKey,
+  getStoredOpenRouterApiKey,
+  resolveConfiguredProvider,
+  resolveProviderBaseUrl,
   storeOpenRouterApiKey,
   DEFAULT_OPENROUTER_MODEL_ID,
+  type OpenRouterSettings,
 } from '../services/openRouterClient.js';
+import {
+  readVerifiedTranslationAdapterMode,
+  verifyProviderConnectionAndCapability,
+} from '../services/modelCapabilities.js';
 import { clearExtensionDataScopes, type CleanupScopes } from '../commands/clearExtensionData.js';
 import {
   compactPrivateStorage,
@@ -42,12 +53,6 @@ import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, ren
 // dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
 // remain configurable via settings.json but are intentionally not surfaced here.
 const UPDATABLE_SETTING_KEYS = new Set<string>([
-  'openrouter.baseUrl',
-  'openrouter.modelId',
-  'translation.requestMode',
-  'translation.translationModelMaxBlocksPerRequest',
-  'translation.translationModelConcurrency',
-  'translation.translationModelMaxOutputTokens',
   'translation.targetLanguage',
   'translation.targetLanguageCustom',
   'translation.customPrompt',
@@ -164,11 +169,23 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
       ? targetLanguageCustom.trim()
       : targetLanguage;
   const systemPrompt = cfg.get<string>('translation.systemPrompt', '');
+  const provider = resolveConfiguredProvider();
+  const modelId = (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID;
+  const verifiedAdapterMode = await readVerifiedTranslationAdapterMode(context, {
+    providerType: provider.providerType,
+    baseUrl: provider.baseUrl,
+    modelId,
+  });
   return {
     ...shortcutState,
-    baseUrl: cfg.get<string>('openrouter.baseUrl', 'https://openrouter.ai/api/v1'),
-    hasApiKey: await hasOpenRouterApiKey(context),
-    modelId: (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID,
+    providerType: provider.providerType,
+    baseUrl: provider.baseUrl,
+    openAiCompatibleDefaultBaseUrl: DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+    hasApiKey: await hasOpenRouterApiKey(context, provider.baseUrl, {
+      includeLegacy: !hasExplicitOpenRouterProviderConfiguration(),
+    }),
+    modelId,
+    verifiedAdapterMode,
     requestMode: coerceTranslationRequestMode(cfg.get<string>('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE)),
     translationModelMaxBlocksPerRequest: coerceTranslationModelMaxBlocksPerRequest(
       cfg.get<number>('translation.translationModelMaxBlocksPerRequest', DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST),
@@ -265,11 +282,6 @@ async function pickCurrentProjectDataScopes(projectPath: string): Promise<Projec
 function coerceSettingValue(key: string, raw: unknown): unknown {
   const value = String(raw ?? '').trim();
   if (key === 'translation.targetLanguage') return value || '简体中文';
-  if (key === 'translation.requestMode') return coerceTranslationRequestMode(value);
-  if (key === 'translation.translationModelMaxBlocksPerRequest') return coerceTranslationModelMaxBlocksPerRequest(raw);
-  if (key === 'translation.translationModelConcurrency') return coerceTranslationModelConcurrency(raw);
-  if (key === 'translation.translationModelMaxOutputTokens') return coerceTranslationModelMaxOutputTokens(raw);
-  if (key === 'openrouter.modelId') return value || DEFAULT_OPENROUTER_MODEL_ID;
   return value;
 }
 
@@ -287,6 +299,46 @@ async function updateSingleSetting(context: vscode.ExtensionContext, key: string
     await markOpenRouterModelAccepted(context);
   }
   return value;
+}
+
+function readProviderVerificationInput(message: unknown): {
+  saveId: unknown;
+  settings: OpenRouterSettings;
+  apiKeyInput: string;
+} {
+  const value = message && typeof message === 'object' ? message as Record<string, unknown> : {};
+  const providerType = coerceProviderType(value.providerType);
+  const rawBaseUrl = typeof value.baseUrl === 'string' ? value.baseUrl : '';
+  const { baseUrl } = resolveProviderBaseUrl(providerType, rawBaseUrl);
+  const apiKeyInput = typeof value.apiKey === 'string' ? value.apiKey.trim() : '';
+  const modelId = (typeof value.modelId === 'string' ? value.modelId.trim() : '') || DEFAULT_OPENROUTER_MODEL_ID;
+  return {
+    saveId: value.saveId,
+    apiKeyInput,
+    settings: {
+      providerType,
+      baseUrl,
+      apiKey: apiKeyInput,
+      modelId,
+    },
+  };
+}
+
+async function saveVerifiedProviderSettings(
+  context: vscode.ExtensionContext,
+  settings: OpenRouterSettings,
+  apiKeyInput: string,
+): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  await cfg.update('openrouter.provider', settings.providerType, vscode.ConfigurationTarget.Global);
+  await cfg.update('openrouter.baseUrl', settings.baseUrl, vscode.ConfigurationTarget.Global);
+  await cfg.update('openrouter.modelId', settings.modelId, vscode.ConfigurationTarget.Global);
+  await cfg.update('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE, vscode.ConfigurationTarget.Global);
+  if (apiKeyInput) {
+    await storeOpenRouterApiKey(context, apiKeyInput, settings.baseUrl);
+  }
+  await markOpenRouterModelAccepted(context);
+  await acceptVisibleOnboardingDefaults(context);
 }
 
 function getHtml(webview: vscode.Webview, state: SettingsState): string {
@@ -446,24 +498,51 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         }
         return;
       }
-      if (message?.type === 'setApiKey') {
-        const value = typeof message.value === 'string' ? message.value.trim() : '';
-        const saveId = message.saveId;
-        if (!value) {
-          await panel.webview.postMessage({ type: 'apiKeySaveFailed', saveId });
+      if (message?.type === 'verifyProvider') {
+        const { apiKeyInput, saveId, settings } = readProviderVerificationInput(message);
+        const currentProvider = resolveConfiguredProvider();
+        const targetIsCurrentProvider =
+          currentProvider.providerType === settings.providerType && currentProvider.baseUrl === settings.baseUrl;
+        const includeLegacyKey = targetIsCurrentProvider && !hasExplicitOpenRouterProviderConfiguration();
+        const existingApiKey = apiKeyInput || await getStoredOpenRouterApiKey(
+          context,
+          settings.baseUrl,
+          { includeLegacy: includeLegacyKey },
+        );
+        if (!existingApiKey) {
+          await panel.webview.postMessage({
+            type: 'providerVerification',
+            ok: false,
+            message: 'Verification failed. API key is required.',
+            saveId,
+          });
           return;
         }
+
+        const verificationSettings = { ...settings, apiKey: existingApiKey };
         try {
-          await storeOpenRouterApiKey(context, value);
-          await acceptVisibleOnboardingDefaults(context);
+          const result = await verifyProviderConnectionAndCapability(context, verificationSettings);
+          await saveVerifiedProviderSettings(context, verificationSettings, apiKeyInput);
           await panel.webview.postMessage({
-            type: 'apiKeyStatus',
+            type: 'providerVerification',
+            ok: true,
             hasKey: await hasOpenRouterApiKey(context),
+            providerType: verificationSettings.providerType,
+            baseUrl: verificationSettings.baseUrl,
+            modelId: verificationSettings.modelId,
+            adapterMode: result.adapterMode,
+            message: result.message,
             saveId,
           });
         } catch (error) {
-          await panel.webview.postMessage({ type: 'apiKeySaveFailed', saveId });
-          throw error;
+          const messageText = error instanceof Error ? error.message : String(error);
+          console.warn('[marklingo] provider verification failed:', messageText);
+          await panel.webview.postMessage({
+            type: 'providerVerification',
+            ok: false,
+            message: messageText,
+            saveId,
+          });
         }
         return;
       }
