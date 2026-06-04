@@ -22,10 +22,16 @@ export type SettingsState = {
   openRouterModelId: string;
   openRouterHasApiKey: boolean;
   openRouterVerifiedAdapterMode?: string;
+  openRouterPromptInstructions: string;
+  openRouterPromptInstructionsEnhanced: boolean;
+  openRouterPromptInstructionsEnhancementNote?: string;
   openAiCompatibleBaseUrl: string;
   openAiCompatibleModelId: string;
   openAiCompatibleHasApiKey: boolean;
   openAiCompatibleVerifiedAdapterMode?: string;
+  openAiCompatiblePromptInstructions: string;
+  openAiCompatiblePromptInstructionsEnhanced: boolean;
+  openAiCompatiblePromptInstructionsEnhancementNote?: string;
   hasApiKey: boolean;
   modelId: string;
   verifiedAdapterMode?: string;
@@ -35,7 +41,10 @@ export type SettingsState = {
   translationModelMaxOutputTokens: number;
   targetLanguage: string;
   targetLanguageCustom: string;
-  systemPrompt: string;
+  promptInstructions: string;
+  promptInstructionsEnhanced: boolean;
+  promptInstructionsEnhancementNote?: string;
+  chatPromptInstructions: string;
   customPrompt: string;
   storageRoot: string;
   currentProjectPath?: string;
@@ -137,8 +146,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const verifiedAdapterMode = state.hasApiKey ? state.verifiedAdapterMode : undefined;
   const openRouterVerifiedAdapterMode = state.openRouterHasApiKey ? state.openRouterVerifiedAdapterMode : undefined;
   const openAiCompatibleVerifiedAdapterMode = state.openAiCompatibleHasApiKey ? state.openAiCompatibleVerifiedAdapterMode : undefined;
-  const customPromptDisabled = verifiedAdapterMode === 'translationModel' ? ' disabled' : '';
-  const customPromptNoteHidden = verifiedAdapterMode === 'translationModel' ? '' : ' hidden';
+  const customPromptRowHidden = verifiedAdapterMode === 'translationModel' ? ' hidden' : '';
+  const promptInstructionsEnhancementNote = state.promptInstructionsEnhancementNote || 'MarkLingo uses a model-specific optimized prompt for this translation model.';
+  const promptInstructionsBadge = state.promptInstructionsEnhanced
+    ? `<span class="prompt-enhanced-badge" title="${escapeHtml(promptInstructionsEnhancementNote)}" aria-label="${escapeHtml(promptInstructionsEnhancementNote)}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3.5l2.4 5.2 5.6.7-4.1 3.8 1.1 5.5-5-2.8-5 2.8 1.1-5.5-4.1-3.8 5.6-.7L12 3.5z"></path>
+        </svg>
+      </span>`
+    : '';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
   const pluralize = (count: number, singular: string, plural: string): string =>
@@ -243,6 +259,23 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .label {
       font-weight: 400;
       margin-bottom: 0;
+    }
+    .label-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prompt-enhanced-badge {
+      display: inline-grid;
+      width: 15px;
+      height: 15px;
+      place-items: center;
+      color: var(--button);
+    }
+    .prompt-enhanced-badge svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
     }
     .help {
       color: var(--muted);
@@ -722,10 +755,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           </div>
           <div class="row top-align">
             <div>
-              <div class="label">System Instructions</div>
+              <div class="label label-inline" id="promptInstructionsLabel">System Instructions${promptInstructionsBadge}</div>
             </div>
             <div class="readonly-wrap">
-              <div class="readonly-field" aria-label="System prompt">${escapeHtml(state.systemPrompt)}</div>
+              <div class="readonly-field" id="promptInstructions" aria-label="System instructions">${escapeHtml(state.promptInstructions)}</div>
               <button class="copy-icon" id="copy-system-prompt" type="button" aria-label="Copy system instructions" title="Copy system instructions">
                 <svg class="copy-glyph" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <rect x="9" y="9" width="13" height="13" rx="2"></rect>
@@ -737,13 +770,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               </button>
             </div>
           </div>
-          <div class="row top-align">
+          <div class="row top-align" id="customPromptRow"${customPromptRowHidden}>
             <div>
               <div class="label">Custom Instructions</div>
             </div>
             <div class="stack">
-              <textarea id="customPrompt"${customPromptDisabled}>${escapeHtml(state.customPrompt)}</textarea>
-              <div class="field-note" id="customPromptNote"${customPromptNoteHidden}>Custom Instructions are disabled for verified Translation Model providers because MarkLingo sends content-only translation requests to that adapter.</div>
+              <textarea id="customPrompt">${escapeHtml(state.customPrompt)}</textarea>
               <div class="field-actions">
                 <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>Save</button>
               </div>
@@ -809,7 +841,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const CUSTOM_LANGUAGE_LABEL = ${scriptJson(CUSTOM_TARGET_LANGUAGE_LABEL)};
-    const SYSTEM_PROMPT = ${scriptJson(state.systemPrompt)};
+    const CHAT_PROMPT_INSTRUCTIONS = ${scriptJson(state.chatPromptInstructions)};
+    let currentPromptInstructions = ${scriptJson(state.promptInstructions)};
 
     function getShortcutWarningText(warning) {
       if (!warning) return '';
@@ -878,8 +911,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const apiKeyInput = document.getElementById('apiKey');
     const verifyProviderBtn = document.getElementById('verify-provider');
     const providerStatus = document.getElementById('provider-status');
+    const promptInstructions = document.getElementById('promptInstructions');
+    const promptInstructionsLabel = document.getElementById('promptInstructionsLabel');
+    const customPromptRow = document.getElementById('customPromptRow');
     const customPromptInput = document.getElementById('customPrompt');
-    const customPromptNote = document.getElementById('customPromptNote');
     let nextProviderSaveId = 1;
     let providerPending; // { saveId, providerType, baseUrl, modelId }
     let providerSuccessTimer;
@@ -895,12 +930,18 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         modelId: ${scriptJson(state.openRouterModelId)},
         hasApiKey: ${scriptJson(state.openRouterHasApiKey)},
         verifiedAdapterMode: ${scriptJson(openRouterVerifiedAdapterMode ?? '')},
+        promptInstructions: ${scriptJson(state.openRouterPromptInstructions)},
+        promptInstructionsEnhanced: ${scriptJson(state.openRouterPromptInstructionsEnhanced)},
+        promptInstructionsEnhancementNote: ${scriptJson(state.openRouterPromptInstructionsEnhancementNote ?? '')},
       },
       openaiCompatible: {
         baseUrl: ${scriptJson(state.openAiCompatibleBaseUrl)},
         modelId: ${scriptJson(state.openAiCompatibleModelId)},
         hasApiKey: ${scriptJson(state.openAiCompatibleHasApiKey)},
         verifiedAdapterMode: ${scriptJson(openAiCompatibleVerifiedAdapterMode ?? '')},
+        promptInstructions: ${scriptJson(state.openAiCompatiblePromptInstructions)},
+        promptInstructionsEnhanced: ${scriptJson(state.openAiCompatiblePromptInstructionsEnhanced)},
+        promptInstructionsEnhancementNote: ${scriptJson(state.openAiCompatiblePromptInstructionsEnhancementNote ?? '')},
       },
     };
     const providerDrafts = {
@@ -1052,10 +1093,36 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       }, 2500);
     }
 
-    function syncCustomPromptAvailability(adapterMode) {
-      const disabled = adapterMode === 'translationModel';
-      if (customPromptInput) customPromptInput.disabled = disabled;
-      if (customPromptNote) customPromptNote.hidden = !disabled;
+    function renderPromptEnhancedBadge(note) {
+      const title = note || 'MarkLingo uses a model-specific optimized prompt for this translation model.';
+      return '<span class="prompt-enhanced-badge" title="' + escapeAttr(title) + '" aria-label="' + escapeAttr(title) + '">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.4 5.2 5.6.7-4.1 3.8 1.1 5.5-5-2.8-5 2.8 1.1-5.5-4.1-3.8 5.6-.7L12 3.5z"></path></svg>' +
+        '</span>';
+    }
+
+    function escapeAttr(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function syncTranslationPromptState(baseline) {
+      const adapterMode = baseline && baseline.verifiedAdapterMode;
+      const isTranslationModel = adapterMode === 'translationModel';
+      const nextPrompt = isTranslationModel && baseline.promptInstructions
+        ? baseline.promptInstructions
+        : CHAT_PROMPT_INSTRUCTIONS;
+      currentPromptInstructions = nextPrompt;
+      if (promptInstructions) promptInstructions.textContent = nextPrompt;
+      if (promptInstructionsLabel) {
+        promptInstructionsLabel.innerHTML = 'System Instructions' +
+          (isTranslationModel && baseline.promptInstructionsEnhanced
+            ? renderPromptEnhancedBadge(baseline.promptInstructionsEnhancementNote)
+            : '');
+      }
+      if (customPromptRow) customPromptRow.hidden = isTranslationModel;
     }
 
     function getProviderSuccessStatus(baseline) {
@@ -1074,13 +1141,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       verifyProviderBtn.classList.toggle('saved', !dirty && providerIsVerified && providerSuccessVisible);
       if (dirty) {
         setProviderStatus('', false);
-        syncCustomPromptAvailability('');
+        syncTranslationPromptState(undefined);
       } else if (providerIsVerified) {
         setProviderStatus(getProviderSuccessStatus(baseline), false);
-        syncCustomPromptAvailability(baseline.verifiedAdapterMode);
+        syncTranslationPromptState(baseline);
       } else {
         setProviderStatus('', false);
-        syncCustomPromptAvailability('');
+        syncTranslationPromptState(undefined);
       }
     }
 
@@ -1191,7 +1258,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const copySystemPromptBtn = document.getElementById('copy-system-prompt');
     let copySystemPromptTimer;
     copySystemPromptBtn.addEventListener('click', () => {
-      vscode.postMessage({ type: 'copySystemPrompt', value: SYSTEM_PROMPT });
+      vscode.postMessage({ type: 'copySystemPrompt', value: currentPromptInstructions });
       copySystemPromptBtn.classList.add('copied');
       copySystemPromptBtn.setAttribute('aria-label', 'System instructions copied');
       copySystemPromptBtn.setAttribute('title', 'Copied');
@@ -1235,6 +1302,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             modelId: verifiedModelId,
             hasApiKey: Boolean(msg.hasKey),
             verifiedAdapterMode: msg.adapterMode || '',
+            promptInstructions: msg.promptInstructions || CHAT_PROMPT_INSTRUCTIONS,
+            promptInstructionsEnhanced: Boolean(msg.promptInstructionsEnhanced),
+            promptInstructionsEnhancementNote: msg.promptInstructionsEnhancementNote || '',
           };
           providerDrafts[verifiedProviderType] = {
             baseUrl: verifiedBaseUrl,

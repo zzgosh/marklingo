@@ -10,6 +10,7 @@ import {
   resolveTranslationAdapterMode,
   resolveTranslationModelMaxOutputTokens,
 } from '../out/translation/translationAdapters.js';
+import { getTranslationModelPromptPreview } from '../out/translation/translationModelPrompts.js';
 
 const blocks = [
   { id: 'b0', markdown: '# Title' },
@@ -54,7 +55,7 @@ test('resolves translation-model max output tokens from context when set to auto
 test('builds translation-model prompts around same-shape JSON blocks', () => {
   const prompt = buildTranslationModelPrompt(blocks, {
     targetLanguage: '简体中文',
-    systemPrompt: '',
+    modelId: 'generic-translation-model',
   });
 
   assert.equal(prompt.messages.length, 1);
@@ -63,6 +64,38 @@ test('builds translation-model prompts around same-shape JSON blocks', () => {
   assert.match(prompt.messages[0].content, /Do not output example ids/);
   assert.doesNotMatch(prompt.messages[0].content, /Additional custom instructions/);
   assert.match(prompt.messages[0].content, /"blocks"/);
+});
+
+test('uses a Hy-MT2 structured-data prompt for matching model ids', () => {
+  const prompt = buildTranslationModelPrompt(blocks, {
+    targetLanguage: '简体中文',
+    modelId: 'tencent/Hy-MT2-1.8B-GGUF:Q4_K_M',
+  });
+
+  assert.equal(prompt.messages.length, 1);
+  assert.equal(prompt.messages[0].role, 'user');
+  assert.match(prompt.messages[0].content, /### Task/);
+  assert.match(prompt.messages[0].content, /### Output Contract/);
+  assert.match(prompt.messages[0].content, /Each item must be an object, never an array/);
+  assert.match(prompt.messages[0].content, /### Input JSON/);
+  assert.doesNotMatch(prompt.messages[0].content, /Additional custom instructions/);
+});
+
+test('identifies Hy-MT2 prompt profiles by model id independent of provider', () => {
+  const hyMt2Preview = getTranslationModelPromptPreview({
+    targetLanguage: '简体中文',
+    modelId: 'openrouter/tencent/Hy-MT2-1.8B',
+  });
+  const genericPreview = getTranslationModelPromptPreview({
+    targetLanguage: '简体中文',
+    modelId: 'tower-translation-model',
+  });
+
+  assert.equal(hyMt2Preview.enhanced, true);
+  assert.equal(hyMt2Preview.label, 'Hy-MT2');
+  assert.match(hyMt2Preview.prompt, /### Task/);
+  assert.equal(genericPreview.enhanced, false);
+  assert.match(genericPreview.prompt, /same top-level "blocks" array shape/);
 });
 
 test('parses top-level block-id mapping responses', () => {

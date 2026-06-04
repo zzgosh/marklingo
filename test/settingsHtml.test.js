@@ -13,10 +13,16 @@ function getState(overrides = {}) {
     openRouterModelId: 'google/gemini-3.1-flash-lite',
     openRouterHasApiKey: true,
     openRouterVerifiedAdapterMode: 'chatJson',
+    openRouterPromptInstructions: 'You are a precise Markdown translation assistant.',
+    openRouterPromptInstructionsEnhanced: false,
+    openRouterPromptInstructionsEnhancementNote: undefined,
     openAiCompatibleBaseUrl: '',
     openAiCompatibleModelId: '',
     openAiCompatibleHasApiKey: false,
     openAiCompatibleVerifiedAdapterMode: undefined,
+    openAiCompatiblePromptInstructions: 'You are a precise Markdown translation assistant.',
+    openAiCompatiblePromptInstructionsEnhanced: false,
+    openAiCompatiblePromptInstructionsEnhancementNote: undefined,
     hasApiKey: true,
     modelId: 'openrouter/example-model',
     verifiedAdapterMode: 'chatJson',
@@ -26,7 +32,10 @@ function getState(overrides = {}) {
     translationModelMaxOutputTokens: 0,
     targetLanguage: '简体中文',
     targetLanguageCustom: '',
-    systemPrompt: 'You are a precise Markdown translation assistant.',
+    promptInstructions: 'You are a precise Markdown translation assistant.',
+    promptInstructionsEnhanced: false,
+    promptInstructionsEnhancementNote: undefined,
+    chatPromptInstructions: 'You are a precise Markdown translation assistant.',
     customPrompt: '',
     storageRoot: '/tmp/marklingo/projects',
     currentProjectPath: '/Users/example/project',
@@ -74,6 +83,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('Max Output Tokens'));
   assert.match(html, /Copy system instructions/);
   assert.match(html, /You are a precise Markdown translation assistant\./);
+  assert.match(html, /CHAT_PROMPT_INSTRUCTIONS/);
   assert.match(html, /Translation Metadata Folder/);
   assert.match(html, /Stores translation metadata and cached translations\./);
   assert.match(html, /Metadata Storage/);
@@ -175,7 +185,14 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
       openAiCompatibleModelId: 'hy-mt2',
       openAiCompatibleHasApiKey: true,
       openAiCompatibleVerifiedAdapterMode: 'translationModel',
+      openAiCompatiblePromptInstructions: '### Task\nTranslate the user-facing text in each `blocks[i].markdown` value.',
+      openAiCompatiblePromptInstructionsEnhanced: true,
+      openAiCompatiblePromptInstructionsEnhancementNote: 'MarkLingo uses a model-specific optimized prompt for Hy-MT2 translation models.',
       verifiedAdapterMode: 'translationModel',
+      promptInstructions: '### Task\nTranslate the user-facing text in each `blocks[i].markdown` value.',
+      promptInstructionsEnhanced: true,
+      promptInstructionsEnhancementNote: 'MarkLingo uses a model-specific optimized prompt for Hy-MT2 translation models.',
+      chatPromptInstructions: 'You are a precise Markdown translation assistant.',
     }),
   });
 
@@ -183,8 +200,12 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
   assert.match(html, /id="baseUrlRow">/);
   assert.match(html, /value="http:\/\/127\.0\.0\.1:8080\/v1"/);
   assert.ok(!html.includes('Verified: Translation Model'));
-  assert.match(html, /<textarea id="customPrompt" disabled>/);
-  assert.match(html, /Custom Instructions are disabled for verified Translation Model providers/);
+  assert.match(html, /id="customPromptRow" hidden/);
+  assert.doesNotMatch(html, /Custom Instructions are disabled for verified Translation Model providers/);
+  assert.match(html, /prompt-enhanced-badge/);
+  assert.match(html, /model-specific optimized prompt for Hy-MT2/);
+  assert.match(html, /### Task/);
+  assert.match(html, /const CHAT_PROMPT_INSTRUCTIONS = "You are a precise Markdown translation assistant\."/);
 });
 
 test('escapes settings state before rendering into HTML', () => {

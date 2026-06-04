@@ -370,18 +370,18 @@ function isLocalHttpBaseUrl(baseUrl: string): boolean {
 
 function getEffectiveSystemPrompt(adapterMode: TranslationAdapterMode, systemPrompt: string, targetLanguage: string): string {
   if (adapterMode === 'chatJson') return resolveSystemPrompt(systemPrompt, targetLanguage);
-  return systemPrompt ? resolveSystemPrompt(systemPrompt, targetLanguage) : '';
+  return '';
 }
 
 function buildAdapterPrompt(
   adapterMode: TranslationAdapterMode,
   blocks: TranslationRequestBlock[],
-  options: { targetLanguage: string; systemPrompt: string; customPrompt: string },
+  options: { targetLanguage: string; systemPrompt: string; customPrompt: string; modelId: string },
 ) {
   if (adapterMode === 'translationModel') {
     return buildTranslationModelPrompt(blocks, {
       targetLanguage: options.targetLanguage,
-      systemPrompt: options.systemPrompt,
+      modelId: options.modelId,
     });
   }
   return buildChatJsonPrompt({ blocks }, options);
@@ -607,7 +607,9 @@ async function translateMarkdownDocument(
       translationModelMaxBlocksPerRequest,
       translationModelConcurrency,
       translationModelMaxOutputTokens,
-      systemPromptSource: systemPrompt ? 'custom' : (effectiveSystemPrompt ? 'default' : 'none'),
+      systemPromptSource: adapterMode === 'translationModel'
+        ? 'none'
+        : (systemPrompt ? 'custom' : (effectiveSystemPrompt ? 'default' : 'none')),
       systemPromptHash: sha256(effectiveSystemPrompt),
       customPromptSet: Boolean(customPrompt),
       customPromptUsed: adapterMode === 'chatJson' && Boolean(customPrompt),
@@ -692,7 +694,12 @@ async function translateMarkdownDocument(
         const modelContextLength = await getOpenRouterModelContextLength(settings);
         const translationModelBlockLimit = Math.min(maxBlocksPerRequest, translationModelMaxBlocksPerRequest);
         const buildPrompt = (blocks: TranslationRequestBlock[]) =>
-          buildAdapterPrompt(adapterMode, blocks, { targetLanguage, systemPrompt: effectiveSystemPrompt, customPrompt }).estimatePrompt;
+          buildAdapterPrompt(adapterMode, blocks, {
+            targetLanguage,
+            systemPrompt: effectiveSystemPrompt,
+            customPrompt,
+            modelId: settings.modelId,
+          }).estimatePrompt;
         const plan = planTranslationRequests(protectedBlocks, {
           modelContextLength,
           maxContextUsageRatio,
@@ -740,6 +747,7 @@ async function translateMarkdownDocument(
             targetLanguage,
             systemPrompt: effectiveSystemPrompt,
             customPrompt,
+            modelId: settings.modelId,
           });
           const estimatedPrompt = estimatePromptTokens(prompt.estimatePrompt);
           const requestOptions = buildChatCompletionOptions({

@@ -111,7 +111,7 @@ Use `MarkLingo: Open Settings` for the settings most users need.
 - **Custom Instructions**
   - Setting: `marklingo.translation.customPrompt`
   - Default: empty
-  - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt for Chat JSON models. These instructions are not sent to verified Translation Model adapters.
+  - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt for Chat JSON models. This field is hidden and not sent for verified Translation Model adapters.
 
 The settings page saves Provider credentials through `Save and Verify`. Other dropdown changes save immediately, and free-text fields outside Provider use their own inline `Save` buttons.
 
@@ -137,6 +137,8 @@ Use these settings:
 - API Key: `local-hy-secret`
 - Model ID: `hy-mt2`
 - Then click `Save and Verify`. Hy-MT should be verified as `Translation Model`.
+
+For Hy-MT2 model IDs, MarkLingo uses an internal model-specific structured-data prompt for Translation Model mode. Other Translation Model adapters keep the generic, conservative Translation Model prompt unless MarkLingo has a dedicated prompt profile for that model.
 
 Local throughput depends mainly on the model, quantization, and hardware. MarkLingo does not download, start, or tune llama.cpp for you; doing that would require a separate local runtime manager for model downloads, binary setup, port allocation, process lifecycle, and hardware probing. Client concurrency only helps when `llama-server` has matching `--parallel` slots; if the server has one slot, extra client requests usually just queue and do not make translation faster. The UI keeps model-batching knobs hidden for normal use and uses conservative defaults: `translationModelMaxBlocksPerRequest: 12`, `translationModelConcurrency: 1`, and `translationModelMaxOutputTokens: 0` for context-based auto output budgeting. Advanced settings.json overrides remain available for diagnostics.
 

@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../services/openRouterClient.js';
 import type { TranslationRequestBlock } from './requestPlanner.js';
+import { buildTranslationModelUserPrompt } from './translationModelPrompts.js';
 
 export type TranslationRequestMode = 'auto' | 'chatJson' | 'translationModel';
 export type TranslationAdapterMode = 'chatJson' | 'translationModel';
@@ -109,27 +110,16 @@ export function buildChatJsonPrompt(
 
 export function buildTranslationModelPrompt(
   blocks: TranslationRequestBlock[],
-  options: { targetLanguage: string; systemPrompt: string },
+  options: { targetLanguage: string; modelId: string },
 ): { messages: ChatMessage[]; estimatePrompt: { system: string; user: string } } {
-  const lines = [
-    `Translate each "markdown" value in the JSON below into ${options.targetLanguage}.`,
-    'Return only one valid JSON object with the same top-level "blocks" array shape as the input.',
-    'Copy every block id exactly from the input. Do not output example ids, ellipses, or placeholder values.',
-    'Keep every object key, block order, and placeholder token unchanged.',
-    'Translate natural-language text only. Preserve Markdown syntax, code, URLs, image paths, file paths, versions, identifiers, and frontmatter keys.',
-  ];
-
-  lines.push('', 'JSON input:', JSON.stringify({ blocks }));
-  const user = lines.join('\n');
-  const system = options.systemPrompt.trim();
+  const user = buildTranslationModelUserPrompt({
+    blocks,
+    targetLanguage: options.targetLanguage,
+    modelId: options.modelId,
+  });
   return {
-    messages: system
-      ? [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ]
-      : [{ role: 'user', content: user }],
-    estimatePrompt: { system, user },
+    messages: [{ role: 'user', content: user }],
+    estimatePrompt: { system: '', user },
   };
 }
 

@@ -35,6 +35,7 @@ import {
   DEFAULT_TRANSLATION_MODEL_MAX_OUTPUT_TOKENS,
   DEFAULT_TRANSLATION_REQUEST_MODE,
 } from '../translation/translationAdapters.js';
+import { getTranslationModelPromptPreview } from '../translation/translationModelPrompts.js';
 import {
   acceptVisibleOnboardingDefaults,
   markOpenRouterModelAccepted,
@@ -165,6 +166,34 @@ function hasExplicitStringSetting(cfg: vscode.WorkspaceConfiguration, key: strin
     .some((value) => typeof value === 'string');
 }
 
+function getTranslationPromptState(options: {
+  adapterMode?: string;
+  modelId: string;
+  systemPrompt: string;
+  targetLanguage: string;
+}): {
+  promptInstructions: string;
+  promptInstructionsEnhanced: boolean;
+  promptInstructionsEnhancementNote?: string;
+} {
+  if (options.adapterMode === 'translationModel') {
+    const preview = getTranslationModelPromptPreview({
+      modelId: options.modelId,
+      targetLanguage: options.targetLanguage,
+    });
+    return {
+      promptInstructions: preview.prompt,
+      promptInstructionsEnhanced: preview.enhanced,
+      promptInstructionsEnhancementNote: preview.enhancementNote,
+    };
+  }
+
+  return {
+    promptInstructions: resolveSystemPrompt(options.systemPrompt, options.targetLanguage),
+    promptInstructionsEnhanced: false,
+  };
+}
+
 async function readSettingsState(context: vscode.ExtensionContext, projectUri?: vscode.Uri): Promise<SettingsState> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const shortcutState = await getShortcutState(context);
@@ -181,6 +210,7 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
   const configuredModelId = (cfg.get<string>('openrouter.modelId') ?? '').trim();
   const configuredBaseUrl = (cfg.get<string>('openrouter.baseUrl') ?? '').trim();
   const modelId = configuredModelId || (provider.providerType === 'openrouter' ? DEFAULT_OPENROUTER_MODEL_ID : '');
+  const chatPromptInstructions = resolveSystemPrompt(systemPrompt, resolvedTargetLanguage);
   const openAiCompatibleBaseUrl = provider.providerType === 'openaiCompatible' && hasExplicitBaseUrl && configuredBaseUrl !== DEFAULT_OPENROUTER_BASE_URL
     ? provider.baseUrl
     : '';
@@ -220,6 +250,24 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
   const verifiedAdapterMode = provider.providerType === 'openrouter'
     ? openRouterVerifiedAdapterMode
     : openAiCompatibleVerifiedAdapterMode;
+  const currentPromptState = getTranslationPromptState({
+    adapterMode: verifiedAdapterMode,
+    modelId,
+    systemPrompt,
+    targetLanguage: resolvedTargetLanguage,
+  });
+  const openRouterPromptState = getTranslationPromptState({
+    adapterMode: openRouterVerifiedAdapterMode,
+    modelId: openRouterModelId,
+    systemPrompt,
+    targetLanguage: resolvedTargetLanguage,
+  });
+  const openAiCompatiblePromptState = getTranslationPromptState({
+    adapterMode: openAiCompatibleVerifiedAdapterMode,
+    modelId: openAiCompatibleModelId,
+    systemPrompt,
+    targetLanguage: resolvedTargetLanguage,
+  });
   return {
     ...shortcutState,
     providerType: provider.providerType,
@@ -228,10 +276,16 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     openRouterModelId,
     openRouterHasApiKey,
     openRouterVerifiedAdapterMode,
+    openRouterPromptInstructions: openRouterPromptState.promptInstructions,
+    openRouterPromptInstructionsEnhanced: openRouterPromptState.promptInstructionsEnhanced,
+    openRouterPromptInstructionsEnhancementNote: openRouterPromptState.promptInstructionsEnhancementNote,
     openAiCompatibleBaseUrl,
     openAiCompatibleModelId,
     openAiCompatibleHasApiKey,
     openAiCompatibleVerifiedAdapterMode,
+    openAiCompatiblePromptInstructions: openAiCompatiblePromptState.promptInstructions,
+    openAiCompatiblePromptInstructionsEnhanced: openAiCompatiblePromptState.promptInstructionsEnhanced,
+    openAiCompatiblePromptInstructionsEnhancementNote: openAiCompatiblePromptState.promptInstructionsEnhancementNote,
     hasApiKey,
     modelId,
     verifiedAdapterMode,
@@ -247,7 +301,10 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     ),
     targetLanguage,
     targetLanguageCustom,
-    systemPrompt: resolveSystemPrompt(systemPrompt, resolvedTargetLanguage),
+    promptInstructions: currentPromptState.promptInstructions,
+    promptInstructionsEnhanced: currentPromptState.promptInstructionsEnhanced,
+    promptInstructionsEnhancementNote: currentPromptState.promptInstructionsEnhancementNote,
+    chatPromptInstructions,
     customPrompt: cfg.get<string>('translation.customPrompt', ''),
     storageRoot: getProjectsStorageRoot(context).fsPath,
     currentProjectPath: getCurrentProjectDirectoryPath(projectUri),
@@ -617,6 +674,19 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         try {
           const result = await verifyProviderConnectionAndCapability(context, verificationSettings);
           await saveVerifiedProviderSettings(context, verificationSettings);
+          const cfg = vscode.workspace.getConfiguration('marklingo');
+          const targetLanguage = cfg.get<string>('translation.targetLanguage', '简体中文');
+          const targetLanguageCustom = cfg.get<string>('translation.targetLanguageCustom', '');
+          const resolvedTargetLanguage =
+            targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL && targetLanguageCustom.trim()
+              ? targetLanguageCustom.trim()
+              : targetLanguage;
+          const promptState = getTranslationPromptState({
+            adapterMode: result.adapterMode,
+            modelId: verificationSettings.modelId,
+            systemPrompt: cfg.get<string>('translation.systemPrompt', ''),
+            targetLanguage: resolvedTargetLanguage,
+          });
           await panel.webview.postMessage({
             type: 'providerVerification',
             ok: true,
@@ -625,6 +695,9 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
             baseUrl: verificationSettings.baseUrl,
             modelId: verificationSettings.modelId,
             adapterMode: result.adapterMode,
+            promptInstructions: promptState.promptInstructions,
+            promptInstructionsEnhanced: promptState.promptInstructionsEnhanced,
+            promptInstructionsEnhancementNote: promptState.promptInstructionsEnhancementNote,
             message: result.message,
             saveId,
           });
