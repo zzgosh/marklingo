@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import {
   coerceProviderType,
+  DEFAULT_OPENAI_COMPATIBLE_MODEL_ID,
   DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  DEFAULT_OPENROUTER_BASE_URL,
   hasExplicitOpenRouterProviderConfiguration,
   hasOpenRouterApiKey,
   getStoredOpenRouterApiKey,
@@ -171,6 +173,16 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
   const systemPrompt = cfg.get<string>('translation.systemPrompt', '');
   const provider = resolveConfiguredProvider();
   const modelId = (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID;
+  const openAiCompatibleBaseUrl = provider.providerType === 'openaiCompatible'
+    ? provider.baseUrl
+    : DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
+  const openAiCompatibleModelId = provider.providerType === 'openaiCompatible'
+    ? modelId
+    : DEFAULT_OPENAI_COMPATIBLE_MODEL_ID;
+  const openRouterModelId = provider.providerType === 'openrouter'
+    ? modelId
+    : DEFAULT_OPENROUTER_MODEL_ID;
+  const includeLegacyKey = !hasExplicitOpenRouterProviderConfiguration();
   const verifiedAdapterMode = await readVerifiedTranslationAdapterMode(context, {
     providerType: provider.providerType,
     baseUrl: provider.baseUrl,
@@ -180,10 +192,20 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     ...shortcutState,
     providerType: provider.providerType,
     baseUrl: provider.baseUrl,
-    openAiCompatibleDefaultBaseUrl: DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
-    hasApiKey: await hasOpenRouterApiKey(context, provider.baseUrl, {
-      includeLegacy: !hasExplicitOpenRouterProviderConfiguration(),
+    openRouterBaseUrl: DEFAULT_OPENROUTER_BASE_URL,
+    openRouterModelId,
+    openRouterHasApiKey: await hasOpenRouterApiKey(context, DEFAULT_OPENROUTER_BASE_URL, {
+      includeLegacy: includeLegacyKey,
     }),
+    openAiCompatibleDefaultBaseUrl: DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+    openAiCompatibleBaseUrl,
+    openAiCompatibleModelId,
+    openAiCompatibleHasApiKey: await hasOpenRouterApiKey(context, openAiCompatibleBaseUrl, {
+      includeLegacy: false,
+    }),
+    hasApiKey: provider.providerType === 'openrouter'
+      ? await hasOpenRouterApiKey(context, DEFAULT_OPENROUTER_BASE_URL, { includeLegacy: includeLegacyKey })
+      : await hasOpenRouterApiKey(context, provider.baseUrl, { includeLegacy: false }),
     modelId,
     verifiedAdapterMode,
     requestMode: coerceTranslationRequestMode(cfg.get<string>('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE)),
@@ -311,7 +333,8 @@ function readProviderVerificationInput(message: unknown): {
   const rawBaseUrl = typeof value.baseUrl === 'string' ? value.baseUrl : '';
   const { baseUrl } = resolveProviderBaseUrl(providerType, rawBaseUrl);
   const apiKeyInput = typeof value.apiKey === 'string' ? value.apiKey.trim() : '';
-  const modelId = (typeof value.modelId === 'string' ? value.modelId.trim() : '') || DEFAULT_OPENROUTER_MODEL_ID;
+  const rawModelId = typeof value.modelId === 'string' ? value.modelId.trim() : '';
+  const modelId = rawModelId || (providerType === 'openrouter' ? DEFAULT_OPENROUTER_MODEL_ID : '');
   return {
     saveId: value.saveId,
     apiKeyInput,
@@ -514,6 +537,15 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
             type: 'providerVerification',
             ok: false,
             message: 'Verification failed. API key is required.',
+            saveId,
+          });
+          return;
+        }
+        if (!settings.modelId.trim()) {
+          await panel.webview.postMessage({
+            type: 'providerVerification',
+            ok: false,
+            message: 'Verification failed. Model ID is required.',
             saveId,
           });
           return;

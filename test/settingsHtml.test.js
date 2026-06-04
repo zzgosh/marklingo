@@ -9,7 +9,13 @@ function getState(overrides = {}) {
     shortcutWarning: '',
     providerType: 'openrouter',
     baseUrl: 'https://openrouter.ai/api/v1',
+    openRouterBaseUrl: 'https://openrouter.ai/api/v1',
+    openRouterModelId: 'google/gemini-3.1-flash-lite',
+    openRouterHasApiKey: true,
     openAiCompatibleDefaultBaseUrl: 'http://127.0.0.1:8080/v1',
+    openAiCompatibleBaseUrl: 'http://127.0.0.1:8080/v1',
+    openAiCompatibleModelId: 'hy-mt2',
+    openAiCompatibleHasApiKey: false,
     hasApiKey: true,
     modelId: 'openrouter/example-model',
     verifiedAdapterMode: 'chatJson',
@@ -54,6 +60,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /<option value="openrouter" selected>OpenRouter<\/option>/);
   assert.match(html, /<option value="openaiCompatible">OpenAI Compatible<\/option>/);
   assert.match(html, /id="baseUrlRow" hidden/);
+  assert.match(html, /\[hidden\] \{ display: none !important; \}/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
   assert.match(html, /Verified: Chat JSON/);
   assert.ok(!html.includes('<div class="label">Translation Mode</div>'));
@@ -85,7 +92,10 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);
   assert.match(html, /id="apiKey" type="password" autocomplete="off" value="•{32}" data-masked="true"/);
+  assert.match(html, /modelId: "google\/gemini-3\.1-flash-lite"/);
   assert.match(html, /showApiKeyMask\(\)/);
+  assert.match(html, /providerDrafts/);
+  assert.match(html, /selectedProviderType/);
   assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
   assert.ok(!html.includes('Enter API key'));
@@ -142,6 +152,7 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
   assert.match(html, /value="http:\/\/127\.0\.0\.1:8080\/v1"/);
   assert.match(html, /Verified: Translation Model/);
   assert.match(html, /<textarea id="customPrompt" disabled>/);
+  assert.match(html, /Custom Instructions are disabled for verified Translation Model providers/);
 });
 
 test('escapes settings state before rendering into HTML', () => {

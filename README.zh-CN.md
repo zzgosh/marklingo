@@ -138,7 +138,7 @@ llama-server \
 - Model ID：`hy-mt2`
 - 然后点击 `Save and Verify`。Hy-MT 应会被验证为 `Translation Model`。
 
-本地吞吐量主要取决于模型、量化方式和硬件。MarkLingo 不会替你下载、启动或调优 llama.cpp；客户端并发只有在 `llama-server` 有匹配的 `--parallel` slot 时才有帮助。普通设置页会隐藏模型批处理调参项，但用于诊断的 settings.json 高级覆盖仍然保留。
+本地吞吐量主要取决于模型、量化方式和硬件。MarkLingo 不会替你下载、启动或调优 llama.cpp；那会变成单独的本地 runtime 管理器，需要处理模型下载、二进制安装、端口分配、进程生命周期和硬件探测。客户端并发只有在 `llama-server` 有匹配的 `--parallel` slot 时才有帮助；如果 server 只有一个 slot，额外的客户端请求通常只是排队，不会让翻译更快。普通设置页会隐藏模型批处理调参项，并使用保守默认值：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（按 context 自动估算输出预算）。用于诊断的 settings.json 高级覆盖仍然保留。
 
 ## 输出文件
 

@@ -31,6 +31,8 @@ const configProperties = packageJson.contributes.configuration.properties;
 const defaultProviderType = configProperties['marklingo.openrouter.provider'].default;
 const defaultBaseUrl = configProperties['marklingo.openrouter.baseUrl'].default;
 const defaultModelId = configProperties['marklingo.openrouter.modelId'].default;
+const defaultOpenAiCompatibleBaseUrl = 'http://127.0.0.1:8080/v1';
+const defaultOpenAiCompatibleModelId = 'hy-mt2';
 const defaultRequestMode = configProperties['marklingo.translation.requestMode'].default;
 const defaultTranslationModelMaxBlocksPerRequest = configProperties['marklingo.translation.translationModelMaxBlocksPerRequest'].default;
 const defaultTranslationModelConcurrency = configProperties['marklingo.translation.translationModelConcurrency'].default;
@@ -130,6 +132,8 @@ function buildState(url) {
   const usesCustomLanguage = url.searchParams.get('custom') === '1';
   const providerType = url.searchParams.get('provider') ?? defaultProviderType;
   const isOpenAiCompatible = providerType === 'openaiCompatible';
+  const modelId = url.searchParams.get('model') ?? (isOpenAiCompatible ? defaultOpenAiCompatibleModelId : defaultModelId);
+  const currentProviderHasApiKey = url.searchParams.get('apiKey') !== 'missing';
   return {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
@@ -137,10 +141,16 @@ function buildState(url) {
       ? 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.'
       : '',
     providerType,
-    baseUrl: isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? 'http://127.0.0.1:8080/v1') : defaultBaseUrl,
-    openAiCompatibleDefaultBaseUrl: 'http://127.0.0.1:8080/v1',
-    hasApiKey: url.searchParams.get('apiKey') !== 'missing',
-    modelId: url.searchParams.get('model') ?? (isOpenAiCompatible ? 'hy-mt2' : defaultModelId),
+    baseUrl: isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? defaultOpenAiCompatibleBaseUrl) : defaultBaseUrl,
+    openRouterBaseUrl: defaultBaseUrl,
+    openRouterModelId: isOpenAiCompatible ? defaultModelId : modelId,
+    openRouterHasApiKey: isOpenAiCompatible ? url.searchParams.get('openrouterKey') !== 'missing' : currentProviderHasApiKey,
+    openAiCompatibleDefaultBaseUrl: defaultOpenAiCompatibleBaseUrl,
+    openAiCompatibleBaseUrl: isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? defaultOpenAiCompatibleBaseUrl) : defaultOpenAiCompatibleBaseUrl,
+    openAiCompatibleModelId: isOpenAiCompatible ? (url.searchParams.get('model') ?? defaultOpenAiCompatibleModelId) : defaultOpenAiCompatibleModelId,
+    openAiCompatibleHasApiKey: isOpenAiCompatible && currentProviderHasApiKey,
+    hasApiKey: currentProviderHasApiKey,
+    modelId,
     verifiedAdapterMode: url.searchParams.get('verified') === '0'
       ? undefined
       : (url.searchParams.get('capability') ?? 'chatJson'),

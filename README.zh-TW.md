@@ -138,7 +138,7 @@ llama-server \
 - Model ID：`hy-mt2`
 - 然後點擊 `Save and Verify`。Hy-MT 應會被驗證為 `Translation Model`。
 
-本機吞吐量主要取決於模型、量化方式與硬體。MarkLingo 不會替你下載、啟動或調校 llama.cpp；用戶端並行只有在 `llama-server` 有匹配的 `--parallel` slot 時才有幫助。普通設定頁會隱藏模型批次調參項，但用於診斷的 settings.json 進階覆寫仍然保留。
+本機吞吐量主要取決於模型、量化方式與硬體。MarkLingo 不會替你下載、啟動或調校 llama.cpp；那會變成單獨的本機 runtime 管理器，需要處理模型下載、二進位安裝、連接埠分配、行程生命週期與硬體探測。用戶端並行只有在 `llama-server` 有匹配的 `--parallel` slot 時才有幫助；如果 server 只有一個 slot，額外的用戶端請求通常只是排隊，不會讓翻譯更快。普通設定頁會隱藏模型批次調參項，並使用保守預設值：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（依 context 自動估算輸出預算）。用於診斷的 settings.json 進階覆寫仍然保留。
 
 ## 輸出檔案
 

@@ -138,7 +138,7 @@ llama-server \
 - Model ID：`hy-mt2`
 - その後 `Save and Verify` をクリックします。Hy-MT は `Translation Model` として検証されるはずです。
 
-ローカルのスループットは主に、モデル、量子化方式、ハードウェアに依存します。MarkLingo は llama.cpp のダウンロード、起動、調整は行いません。クライアント側の並行実行は、`llama-server` に対応する `--parallel` slot がある場合にのみ有効です。通常の設定 UI ではモデルのバッチ調整項目を隠していますが、診断用の settings.json 詳細上書きは残しています。
+ローカルのスループットは主に、モデル、量子化方式、ハードウェアに依存します。MarkLingo は llama.cpp のダウンロード、起動、調整は行いません。それを行うには、モデルのダウンロード、バイナリのセットアップ、ポート割り当て、プロセスのライフサイクル、ハードウェア検出を扱う別のローカル runtime 管理機能が必要になります。クライアント側の並行実行は、`llama-server` に対応する `--parallel` slot がある場合にのみ有効です。server が 1 slot の場合、追加のクライアントリクエストは通常キューに入るだけで、翻訳は速くなりません。通常の設定 UI ではモデルのバッチ調整項目を隠し、保守的なデフォルト値を使います：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（context から出力予算を自動推定）。診断用の settings.json 詳細上書きは残しています。
 
 ## 出力ファイル
 

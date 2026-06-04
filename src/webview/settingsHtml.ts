@@ -18,7 +18,13 @@ export type SettingsState = {
   shortcutWarning: string;
   providerType: string;
   baseUrl: string;
+  openRouterBaseUrl: string;
+  openRouterModelId: string;
+  openRouterHasApiKey: boolean;
   openAiCompatibleDefaultBaseUrl: string;
+  openAiCompatibleBaseUrl: string;
+  openAiCompatibleModelId: string;
+  openAiCompatibleHasApiKey: boolean;
   hasApiKey: boolean;
   modelId: string;
   verifiedAdapterMode?: string;
@@ -128,6 +134,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     : '';
   const providerBaseUrlHidden = state.providerType === 'openaiCompatible' ? '' : ' hidden';
   const customPromptDisabled = state.verifiedAdapterMode === 'translationModel' ? ' disabled' : '';
+  const customPromptNoteHidden = state.verifiedAdapterMode === 'translationModel' ? '' : ' hidden';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
   const pluralize = (count: number, singular: string, plural: string): string =>
@@ -177,6 +184,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       --accent: var(--vscode-focusBorder);
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body {
       margin: 0;
       background: var(--bg);
@@ -355,6 +363,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       justify-content: flex-end;
       align-items: center;
       gap: 10px;
+    }
+    .field-note {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
     }
     .provider-actions {
       display: flex;
@@ -712,6 +725,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             </div>
             <div class="stack">
               <textarea id="customPrompt"${customPromptDisabled}>${escapeHtml(state.customPrompt)}</textarea>
+              <div class="field-note" id="customPromptNote"${customPromptNoteHidden}>Custom Instructions are disabled for verified Translation Model providers because MarkLingo sends content-only translation requests to that adapter.</div>
               <div class="field-actions">
                 <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>Save</button>
               </div>
@@ -839,7 +853,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     syncCustomLanguageVisibility(false);
 
     const API_KEY_MASK_VALUE = ${scriptJson(API_KEY_MASK_VALUE)};
-    const PROVIDER_OPENAI_COMPATIBLE_DEFAULT_BASE_URL = ${scriptJson(state.openAiCompatibleDefaultBaseUrl)};
     const providerTypeSelect = document.getElementById('providerType');
     const baseUrlRow = document.getElementById('baseUrlRow');
     const baseUrlInput = document.getElementById('baseUrl');
@@ -847,8 +860,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const apiKeyInput = document.getElementById('apiKey');
     const verifyProviderBtn = document.getElementById('verify-provider');
     const providerStatus = document.getElementById('provider-status');
+    const customPromptInput = document.getElementById('customPrompt');
+    const customPromptNote = document.getElementById('customPromptNote');
     let nextProviderSaveId = 1;
-    let providerPending; // { saveId, providerType, baseUrl, modelId, apiKeyWasMasked }
+    let providerPending; // { saveId, providerType, baseUrl, modelId }
     const providerBaseline = {
       providerType: ${scriptJson(state.providerType)},
       baseUrl: ${scriptJson(state.baseUrl)},
@@ -856,6 +871,19 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       hasApiKey: ${scriptJson(state.hasApiKey)},
       verifiedAdapterMode: ${scriptJson(state.verifiedAdapterMode ?? '')},
     };
+    const providerDrafts = {
+      openrouter: {
+        baseUrl: ${scriptJson(state.openRouterBaseUrl)},
+        modelId: ${scriptJson(state.openRouterModelId)},
+        hasApiKey: ${scriptJson(state.openRouterHasApiKey)},
+      },
+      openaiCompatible: {
+        baseUrl: ${scriptJson(state.openAiCompatibleBaseUrl || state.openAiCompatibleDefaultBaseUrl)},
+        modelId: ${scriptJson(state.openAiCompatibleModelId)},
+        hasApiKey: ${scriptJson(state.openAiCompatibleHasApiKey)},
+      },
+    };
+    let selectedProviderType = providerBaseline.providerType;
 
     function isApiKeyMasked() {
       return apiKeyInput.dataset.masked === 'true';
@@ -867,10 +895,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       apiKeyInput.scrollLeft = 0;
     }
 
+    function showEmptyApiKey() {
+      apiKeyInput.value = '';
+      apiKeyInput.dataset.masked = 'false';
+      apiKeyInput.scrollLeft = 0;
+    }
+
     function clearApiKeyMaskForEntry() {
       if (!isApiKeyMasked()) return;
-      apiKeyInput.dataset.masked = 'false';
-      apiKeyInput.value = '';
+      showEmptyApiKey();
       updateProviderVerificationState();
     }
 
@@ -885,9 +918,34 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     function syncProviderBaseUrlVisibility() {
       const isOpenAiCompatible = providerTypeSelect.value === 'openaiCompatible';
       if (baseUrlRow) baseUrlRow.hidden = !isOpenAiCompatible;
-      if (isOpenAiCompatible && (!baseUrlInput.value.trim() || baseUrlInput.value.includes('openrouter.ai'))) {
-        baseUrlInput.value = PROVIDER_OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
+    }
+
+    function saveProviderDraft(providerType) {
+      const draft = providerDrafts[providerType];
+      if (!draft) return;
+      draft.baseUrl = baseUrlInput.value.trim();
+      draft.modelId = modelIdInput.value.trim();
+      if (!isApiKeyMasked() && apiKeyInput.value.trim()) {
+        draft.hasApiKey = false;
       }
+    }
+
+    function saveCurrentProviderDraft() {
+      saveProviderDraft(selectedProviderType);
+    }
+
+    function loadProviderDraft(providerType) {
+      const draft = providerDrafts[providerType] || providerDrafts.openrouter;
+      selectedProviderType = providerType;
+      providerTypeSelect.value = providerType;
+      baseUrlInput.value = draft.baseUrl;
+      modelIdInput.value = draft.modelId;
+      if (draft.hasApiKey) {
+        showApiKeyMask();
+      } else {
+        showEmptyApiKey();
+      }
+      syncProviderBaseUrlVisibility();
     }
 
     function isProviderDirty() {
@@ -908,6 +966,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       providerStatus.classList.toggle('failed', Boolean(failed));
     }
 
+    function syncCustomPromptAvailability(adapterMode) {
+      const disabled = adapterMode === 'translationModel';
+      if (customPromptInput) customPromptInput.disabled = disabled;
+      if (customPromptNote) customPromptNote.hidden = !disabled;
+    }
+
     function updateProviderVerificationState() {
       if (providerPending) return;
       const dirty = isProviderDirty();
@@ -916,20 +980,26 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       verifyProviderBtn.classList.toggle('saved', !dirty && Boolean(providerBaseline.verifiedAdapterMode));
       if (dirty) {
         setProviderStatus('', false);
+        syncCustomPromptAvailability('');
       } else if (providerBaseline.verifiedAdapterMode) {
         setProviderStatus(providerBaseline.verifiedAdapterMode === 'translationModel' ? 'Verified: Translation Model' : 'Verified: Chat JSON', false);
+        syncCustomPromptAvailability(providerBaseline.verifiedAdapterMode);
+      } else {
+        syncCustomPromptAvailability('');
       }
     }
 
     function handleProviderInput() {
+      saveCurrentProviderDraft();
       syncProviderBaseUrlVisibility();
       updateProviderVerificationState();
     }
 
     providerTypeSelect.addEventListener('change', () => {
-      apiKeyInput.dataset.masked = 'false';
-      apiKeyInput.value = '';
-      handleProviderInput();
+      const nextProviderType = providerTypeSelect.value;
+      saveCurrentProviderDraft();
+      loadProviderDraft(nextProviderType);
+      updateProviderVerificationState();
     });
     baseUrlInput.addEventListener('input', handleProviderInput);
     modelIdInput.addEventListener('input', handleProviderInput);
@@ -952,7 +1022,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         providerType: values.providerType,
         baseUrl: values.baseUrl,
         modelId: values.modelId,
-        apiKeyWasMasked: isApiKeyMasked(),
       };
       verifyProviderBtn.textContent = 'Verifying...';
       verifyProviderBtn.disabled = true;
@@ -967,7 +1036,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         saveId,
       });
     });
-    syncProviderBaseUrlVisibility();
+    loadProviderDraft(providerBaseline.providerType);
     updateProviderVerificationState();
 
     function handleSaved(key, saveId, value) {
@@ -1055,14 +1124,22 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         const pending = providerPending;
         providerPending = undefined;
         if (msg.ok) {
-          providerBaseline.providerType = msg.providerType || pending.providerType;
-          providerBaseline.baseUrl = msg.baseUrl || pending.baseUrl;
-          providerBaseline.modelId = msg.modelId || pending.modelId;
+          const verifiedProviderType = msg.providerType || pending.providerType;
+          const verifiedBaseUrl = msg.baseUrl || pending.baseUrl;
+          const verifiedModelId = msg.modelId || pending.modelId;
+          providerBaseline.providerType = verifiedProviderType;
+          providerBaseline.baseUrl = verifiedBaseUrl;
+          providerBaseline.modelId = verifiedModelId;
           providerBaseline.hasApiKey = Boolean(msg.hasKey);
           providerBaseline.verifiedAdapterMode = msg.adapterMode || '';
-          if (providerTypeSelect.value === pending.providerType) {
-            baseUrlInput.value = providerBaseline.baseUrl;
-            modelIdInput.value = providerBaseline.modelId;
+          providerDrafts[verifiedProviderType] = {
+            baseUrl: verifiedBaseUrl,
+            modelId: verifiedModelId,
+            hasApiKey: providerBaseline.hasApiKey,
+          };
+          if (providerTypeSelect.value === verifiedProviderType) {
+            baseUrlInput.value = verifiedBaseUrl;
+            modelIdInput.value = verifiedModelId;
             if (providerBaseline.hasApiKey) showApiKeyMask();
           }
           syncProviderBaseUrlVisibility();

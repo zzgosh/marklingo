@@ -138,7 +138,7 @@ Use these settings:
 - Model ID: `hy-mt2`
 - Then click `Save and Verify`. Hy-MT should be verified as `Translation Model`.
 
-Local throughput depends mainly on the model, quantization, and hardware. MarkLingo does not download, start, or tune llama.cpp for you; client concurrency only helps when `llama-server` has matching `--parallel` slots. The UI keeps model-batching knobs hidden for normal use, but advanced settings.json overrides remain available for diagnostics.
+Local throughput depends mainly on the model, quantization, and hardware. MarkLingo does not download, start, or tune llama.cpp for you; doing that would require a separate local runtime manager for model downloads, binary setup, port allocation, process lifecycle, and hardware probing. Client concurrency only helps when `llama-server` has matching `--parallel` slots; if the server has one slot, extra client requests usually just queue and do not make translation faster. The UI keeps model-batching knobs hidden for normal use and uses conservative defaults: `translationModelMaxBlocksPerRequest: 12`, `translationModelConcurrency: 1`, and `translationModelMaxOutputTokens: 0` for context-based auto output budgeting. Advanced settings.json overrides remain available for diagnostics.
 
 ## Output Files
 
