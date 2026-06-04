@@ -261,6 +261,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--fg);
       padding-right: 42px;
     }
+    select option {
+      background: var(--input);
+      color: var(--fg);
+    }
     textarea {
       height: 104px;
       min-height: 104px;
