@@ -19,6 +19,7 @@ Do not edit generated `out/` or `dist/` files manually. Use the package scripts.
 - `npm test`: compile, then run Node test files under `test/**/*.test.js`.
 - `npm run check`: compile and run tests.
 - `npm run test:vscode`: build the extension, launch an isolated VS Code Extension Host, and run integration tests under `test/integration/`.
+- `npm run test:vscode:clean`: remove `.vscode-test`, then rerun `npm run test:vscode`.
 - `npm run check:integration`: run `npm run check`, then `npm run test:vscode`.
 - `npm run benchmark:postprocessing`: run the local Markdown postprocessing benchmark.
 - `npm run preview:settings`: compile, then serve a mocked Settings webview preview for browser-based UI iteration.
@@ -110,6 +111,8 @@ To reset only the installed extension package before reinstalling, uninstall thr
 ## Integration Testing Notes
 
 The VS Code integration test runner uses `@vscode/test-electron`, a temporary workspace under `.vscode-test/workspace`, a temporary user data directory, and a local mock OpenRouter server. It must not use the developer's real VS Code profile, installed VSIX settings, or real OpenRouter API key.
+
+If `npm run test:vscode` is killed by the system or blocked because the cached VS Code test install under `.vscode-test` is corrupted or partially downloaded, use `npm run test:vscode:clean`. It redownloads the VS Code test dependency, so it is slower, but it is the preferred recovery path for those environment failures.
 
 Test-only commands are registered only when `context.extensionMode === vscode.ExtensionMode.Test`. Keep them out of `package.json` `contributes.commands` so normal users cannot discover them from the Command Palette.
 

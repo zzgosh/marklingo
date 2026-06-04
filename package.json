@@ -249,6 +249,7 @@
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node --test test/*.test.js",
     "test:vscode": "npm run package && node scripts/run-vscode-tests.mjs",
+    "test:vscode:clean": "rm -rf .vscode-test && npm run test:vscode",
     "check:integration": "npm run check && npm run test:vscode",
     "check": "npm run compile && npm test",
     "benchmark:postprocessing": "npm run compile && node scripts/benchmark-postprocessing.mjs",
