@@ -59,9 +59,9 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 | `MarkLingo: Translate This Markdown File` | エクスプローラーのコンテキストメニューで選択した Markdown ファイルを翻訳します。 |
 | `MarkLingo: Translate Selected Markdown Files` | エクスプローラーで選択したファイルやフォルダーから集めた Markdown ファイルを 1 つのバッチとして翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
-| `MarkLingo: Open Settings` | OpenRouter、API キー、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
+| `MarkLingo: Open Settings` | プロバイダー、API キー、翻訳モード、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
-| `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力と、プライベートな翻訳メタデータ/キャッシュを削除します。 |
+| `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力を削除し、プライベートな翻訳メタデータ/キャッシュは保持します。 |
 
 ## 設定
 
@@ -82,6 +82,12 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
   - デフォルト：`google/gemini-3.1-flash-lite`
   - OpenRouter のモデル ID を使用します。
 
+- **Translation Mode（翻訳モード）**
+  - 設定：`marklingo.translation.requestMode`
+  - デフォルト：`auto`
+  - `auto` は一般的な chat model には Chat JSON モードを使い、既知の Hy-MT モデル ID には Translation Model モードを使います。
+  - Translation Model モードは、小さな同一形状の JSON バッチ、適応的な分割リトライ、任意の並行実行を使います。詳細設定：`marklingo.translation.translationModelMaxBlocksPerRequest` と `marklingo.translation.translationModelConcurrency`。
+
 - **Target Language（ターゲット言語）**
   - 設定：`marklingo.translation.targetLanguage`
   - デフォルト：`简体中文`
@@ -98,6 +104,27 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
   - MarkLingo に内蔵された Markdown 保護プロンプトの後に追加される、用語・トーン・スタイルに関する追加の指示です。
 
 設定ページでは、ドロップダウンの変更は即座に保存されます。自由入力フィールドには、それぞれ独自のインライン `Save` ボタンがあります。API キーの操作とデータ消去の操作は、確認後すぐに反映されます。
+
+### llama.cpp でローカル Hy-MT を使う
+
+MarkLingo は、ローカルの OpenAI-compatible な `llama-server` エンドポイントで Hy-MT モデルを使用できます。
+
+```sh
+llama-server \
+  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --alias hy-mt2 \
+  --ctx-size 4096 \
+  --api-key local-hy-secret
+```
+
+以下の設定を使用します。
+
+- Base URL：`http://127.0.0.1:8080/v1`
+- API Key：`local-hy-secret`
+- Model ID：`hy-mt2`
+- Translation Mode：`Auto` または `Translation Model`
 
 ## 出力ファイル
 
@@ -121,7 +148,7 @@ MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキ�
 - Markdown の内容は、翻訳のために設定されたエンドポイントに送信されます。
 - デフォルトでは公式の OpenRouter エンドポイントが使用されます。
 - ご自身の OpenRouter API キーが必要です。
-- 翻訳リクエストは非ストリーミングで、`reasoning.exclude: true` と `reasoning.effort: none` により推論の除外を要求します。
+- 翻訳リクエストは非ストリーミングです。Chat JSON モードでは `reasoning.exclude: true` と `reasoning.effort: none` により推論の除外を要求し、Translation Model モードでは reasoning フィールドを省略します。
 - API キーは VS Code の `SecretStorage` に保存されます。
 - API キーは、ワークスペースのファイル、VS Code の設定、翻訳メタデータ、ログには保存されません。
 - 翻訳メタデータは、ワークスペースではなく VS Code の `globalStorageUri` の下に保存されます。

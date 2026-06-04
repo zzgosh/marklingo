@@ -14,6 +14,7 @@ import {
 import { getProjectRootUri, getProjectsStorageRoot } from '../storage/paths.js';
 import { deleteProjectTranslationData, type ProjectTranslationDataScopes } from '../commands/deleteTranslatedFiles.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
+import { coerceTranslationRequestMode, DEFAULT_TRANSLATION_REQUEST_MODE } from '../translation/translationAdapters.js';
 import {
   acceptVisibleOnboardingDefaults,
   markOpenRouterModelAccepted,
@@ -34,6 +35,7 @@ import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, ren
 const UPDATABLE_SETTING_KEYS = new Set<string>([
   'openrouter.baseUrl',
   'openrouter.modelId',
+  'translation.requestMode',
   'translation.targetLanguage',
   'translation.targetLanguageCustom',
   'translation.customPrompt',
@@ -155,6 +157,7 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     baseUrl: cfg.get<string>('openrouter.baseUrl', 'https://openrouter.ai/api/v1'),
     hasApiKey: await hasOpenRouterApiKey(context),
     modelId: (cfg.get<string>('openrouter.modelId', DEFAULT_OPENROUTER_MODEL_ID) ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID,
+    requestMode: coerceTranslationRequestMode(cfg.get<string>('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE)),
     targetLanguage,
     targetLanguageCustom,
     systemPrompt: resolveSystemPrompt(systemPrompt, resolvedTargetLanguage),
@@ -241,6 +244,7 @@ async function pickCurrentProjectDataScopes(projectPath: string): Promise<Projec
 function coerceSettingValue(key: string, raw: unknown): unknown {
   const value = String(raw ?? '').trim();
   if (key === 'translation.targetLanguage') return value || '简体中文';
+  if (key === 'translation.requestMode') return coerceTranslationRequestMode(value);
   if (key === 'openrouter.modelId') return value || DEFAULT_OPENROUTER_MODEL_ID;
   return value;
 }

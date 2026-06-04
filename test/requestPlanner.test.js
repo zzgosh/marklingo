@@ -63,6 +63,24 @@ test('splits requests by estimated prompt budget', () => {
   }
 });
 
+test('respects a max block cap when context budget is available', () => {
+  const blocks = Array.from({ length: 25 }, (_, index) => ({
+    id: `b${index}`,
+    markdown: `Short markdown block ${index}.`,
+  }));
+
+  const plan = planTranslationRequests(blocks, {
+    modelContextLength: 128_000,
+    maxContextUsageRatio: 0.5,
+    fallbackMaxBlocksPerRequest: 24,
+    maxBlocksPerRequest: 12,
+    buildPrompt,
+  });
+
+  assert.equal(plan.strategy, 'contextWindow');
+  assert.deepEqual(plan.chunks.map((chunk) => chunk.blocks.length), [12, 12, 1]);
+});
+
 test('plans large block sets in linear time', () => {
   const blocks = Array.from({ length: 12_000 }, (_, index) => ({
     id: `b${index}`,

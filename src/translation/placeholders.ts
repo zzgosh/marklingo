@@ -185,3 +185,24 @@ export function restoreMarkdown(translated: string, placeholders: PlaceholderMap
   }
   return out;
 }
+
+export function compactPlaceholderTokens(protectedResult: ProtectResult): ProtectResult {
+  const entries = Object.entries(protectedResult.placeholders);
+  if (entries.length === 0) return protectedResult;
+
+  let text = protectedResult.text;
+  const placeholders: PlaceholderMap = {};
+  let nextIndex = 0;
+
+  for (const [token, original] of entries) {
+    let alias = '';
+    do {
+      alias = `__M${nextIndex++}__`;
+    } while (text.includes(alias) || Object.hasOwn(protectedResult.placeholders, alias));
+
+    text = text.split(token).join(alias);
+    placeholders[alias] = original;
+  }
+
+  return { text, placeholders };
+}

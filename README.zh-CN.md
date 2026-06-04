@@ -59,9 +59,9 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 | `MarkLingo: Translate This Markdown File` | 翻译从资源管理器右键菜单中选中的 Markdown 文件。 |
 | `MarkLingo: Translate Selected Markdown Files` | 将资源管理器中选中的文件和文件夹收集到的 Markdown 文件作为一批翻译，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 翻译所选文件夹及其子文件夹中的源 Markdown 文件，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
-| `MarkLingo: Open Settings` | 打开 MarkLingo 设置，管理 OpenRouter、API 密钥、目标语言、自定义指令、快捷键状态和清理操作。 |
+| `MarkLingo: Open Settings` | 打开 MarkLingo 设置，管理提供方、API 密钥、翻译模式、目标语言、自定义指令、快捷键状态和清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 将 `*_mdt.md` 添加到当前仓库的本地 Git 排除文件中。 |
-| `MarkLingo: Delete Current Project Translated Files` | 删除本项目中由扩展跟踪的翻译输出，以及私有的翻译元数据/缓存。 |
+| `MarkLingo: Delete Current Project Translated Files` | 删除本项目中由扩展跟踪的翻译输出，同时保留私有翻译元数据/缓存。 |
 
 ## 设置
 
@@ -82,6 +82,12 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
   - 默认值：`google/gemini-3.1-flash-lite`
   - 使用一个 OpenRouter 模型 ID。
 
+- **Translation Mode（翻译模式）**
+  - 设置项：`marklingo.translation.requestMode`
+  - 默认值：`auto`
+  - `auto` 对通用 chat model 使用 Chat JSON 模式，对已知 Hy-MT 模型 ID 使用 Translation Model 模式。
+  - Translation Model 模式使用小批量同结构 JSON、自适应拆分重试和可选并发。高级设置：`marklingo.translation.translationModelMaxBlocksPerRequest` 与 `marklingo.translation.translationModelConcurrency`。
+
 - **Target Language（目标语言）**
   - 设置项：`marklingo.translation.targetLanguage`
   - 默认值：`简体中文`
@@ -98,6 +104,27 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
   - 附加在 MarkLingo 内置的 Markdown 保护提示之后的额外术语、语气或风格指令。
 
 设置页面会立即保存下拉框的更改。自由文本字段使用各自的内联 `Save` 按钮。API 密钥操作和清除数据操作在确认后立即生效。
+
+### 使用 llama.cpp 本地运行 Hy-MT
+
+MarkLingo 可以使用本地 OpenAI-compatible 的 `llama-server` 端点运行 Hy-MT 模型：
+
+```sh
+llama-server \
+  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --alias hy-mt2 \
+  --ctx-size 4096 \
+  --api-key local-hy-secret
+```
+
+使用这些设置：
+
+- Base URL：`http://127.0.0.1:8080/v1`
+- API Key：`local-hy-secret`
+- Model ID：`hy-mt2`
+- Translation Mode：`Auto` 或 `Translation Model`
 
 ## 输出文件
 
@@ -121,7 +148,7 @@ MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送�
 - Markdown 内容会被发送到配置的端点进行翻译。
 - 默认使用官方的 OpenRouter 端点。
 - 你需要自己的 OpenRouter API 密钥。
-- 翻译请求为非流式，并通过 `reasoning.exclude: true` 和 `reasoning.effort: none` 请求排除推理过程。
+- 翻译请求为非流式。Chat JSON 模式会通过 `reasoning.exclude: true` 和 `reasoning.effort: none` 请求排除推理过程；Translation Model 模式会省略 reasoning 字段。
 - API 密钥存储在 VS Code 的 `SecretStorage` 中。
 - API 密钥不会存入工作区文件、VS Code 设置、翻译元数据或日志。
 - 翻译元数据存储在 VS Code 的 `globalStorageUri` 下，而非工作区中。

@@ -59,7 +59,7 @@ Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Ri
 | `MarkLingo: Translate This Markdown File` | Translate the Markdown file selected from the Explorer context menu. |
 | `MarkLingo: Translate Selected Markdown Files` | Translate Markdown files gathered from selected Explorer files and folders as one batch, opening the first translated output and writing the rest next to their sources. |
 | `MarkLingo: Translate All Markdown in This Folder` | Translate source Markdown files in the selected folder and subfolders, opening the first translated output and writing the rest next to their sources. |
-| `MarkLingo: Open Settings` | Open MarkLingo settings for OpenRouter, API key, target language, custom instructions, shortcut status, and cleanup. |
+| `MarkLingo: Open Settings` | Open MarkLingo settings for provider, API key, translation mode, target language, custom instructions, shortcut status, and cleanup. |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
 | `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |
 
@@ -82,6 +82,12 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Default: `google/gemini-3.1-flash-lite`
   - Use an OpenRouter model ID.
 
+- **Translation Mode**
+  - Setting: `marklingo.translation.requestMode`
+  - Default: `auto`
+  - `auto` uses Chat JSON mode for general chat models and Translation Model mode for known Hy-MT model IDs.
+  - Translation Model mode uses small same-shape JSON batches, adaptive split retries, and optional concurrency. Advanced knobs: `marklingo.translation.translationModelMaxBlocksPerRequest` and `marklingo.translation.translationModelConcurrency`.
+
 - **Target Language**
   - Setting: `marklingo.translation.targetLanguage`
   - Default: `简体中文`
@@ -98,6 +104,27 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt.
 
 The settings page saves dropdown changes immediately. Free-text fields use their own inline `Save` buttons. API key actions and cleanup actions take effect immediately after confirmation.
+
+### Local Hy-MT with llama.cpp
+
+MarkLingo can use a local OpenAI-compatible `llama-server` endpoint for Hy-MT models:
+
+```sh
+llama-server \
+  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --alias hy-mt2 \
+  --ctx-size 4096 \
+  --api-key local-hy-secret
+```
+
+Use these settings:
+
+- Base URL: `http://127.0.0.1:8080/v1`
+- API Key: `local-hy-secret`
+- Model ID: `hy-mt2`
+- Translation Mode: `Auto` or `Translation Model`
 
 ## Output Files
 
@@ -121,7 +148,7 @@ MarkLingo is a local VS Code extension, but translation requires sending documen
 - Markdown content is sent to the configured endpoint for translation.
 - The official OpenRouter endpoint is used by default.
 - You need your own OpenRouter API key.
-- Translation requests are non-streaming and request reasoning exclusion with `reasoning.exclude: true` and `reasoning.effort: none`.
+- Translation requests are non-streaming. Chat JSON mode requests reasoning exclusion with `reasoning.exclude: true` and `reasoning.effort: none`; Translation Model mode omits reasoning fields.
 - API keys are stored in VS Code `SecretStorage`.
 - API keys are not stored in workspace files, VS Code settings, translation metadata, or logs.
 - Translation metadata is stored under VS Code `globalStorageUri`, not in the workspace.

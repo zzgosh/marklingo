@@ -14,11 +14,14 @@ export type ChatMessage = {
 
 export type ChatCompletionOptions = {
   temperature?: number;
+  topP?: number;
+  topK?: number;
+  repeatPenalty?: number;
   maxTokens?: number;
   timeoutMs?: number;
   signal?: AbortSignal;
   responseFormat?: ResponseFormat;
-  reasoning?: ReasoningOptions;
+  reasoning?: ReasoningOptions | null;
 };
 
 export type ResponseFormat =
@@ -187,7 +190,15 @@ function readPositiveInteger(value: unknown): number | undefined {
 function readModelContextLength(model: unknown): number | undefined {
   if (!model || typeof model !== 'object') return undefined;
   const value = model as Record<string, unknown>;
-  return readPositiveInteger(value.context_length);
+  const openRouterContextLength = readPositiveInteger(value.context_length);
+  if (openRouterContextLength) return openRouterContextLength;
+
+  const meta = value.meta;
+  if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+    return readPositiveInteger((meta as Record<string, unknown>).n_ctx);
+  }
+
+  return undefined;
 }
 
 function normalizeModelIdForLookup(modelId: string): string {
@@ -284,9 +295,12 @@ export async function openRouterChatCompletion(
     messages,
     stream: false,
     temperature: options.temperature,
+    top_p: options.topP,
+    top_k: options.topK,
+    repeat_penalty: options.repeatPenalty,
     max_tokens: options.maxTokens,
     response_format: options.responseFormat,
-    reasoning: options.reasoning ?? { effort: 'none', exclude: true },
+    reasoning: options.reasoning === null ? undefined : options.reasoning ?? { effort: 'none', exclude: true },
   };
 
   const res = await fetchJsonWithTimeout(

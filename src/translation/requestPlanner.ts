@@ -58,16 +58,18 @@ function chunkByContextBudget(
   blocks: TranslationRequestBlock[],
   budgetTokens: number,
   buildPrompt: PromptBuilder,
+  maxBlocksPerRequest?: number,
 ): TranslationRequestChunk[] {
   const chunks: TranslationRequestChunk[] = [];
   const basePromptTokens = estimatePromptTokens(buildPrompt([]));
+  const blockLimit = maxBlocksPerRequest && maxBlocksPerRequest > 0 ? Math.floor(maxBlocksPerRequest) : undefined;
   let current: TranslationRequestBlock[] = [];
   let currentTokens = basePromptTokens;
 
   for (const block of blocks) {
     const blockTokens = estimateBlockTokens(block);
     const trialTokens = currentTokens + blockTokens;
-    if (current.length > 0 && trialTokens > budgetTokens) {
+    if (current.length > 0 && (trialTokens > budgetTokens || (blockLimit && current.length >= blockLimit))) {
       chunks.push({ blocks: current, estimatedPromptTokens: currentTokens });
       current = [block];
       currentTokens = basePromptTokens + blockTokens;
@@ -90,6 +92,7 @@ export function planTranslationRequests(
     modelContextLength?: number;
     maxContextUsageRatio: number;
     fallbackMaxBlocksPerRequest: number;
+    maxBlocksPerRequest?: number;
     buildPrompt: PromptBuilder;
   },
 ): TranslationRequestPlan {
@@ -100,7 +103,7 @@ export function planTranslationRequests(
   if (options.modelContextLength && options.modelContextLength > 0) {
     const contextBudgetTokens = Math.max(1, Math.floor(options.modelContextLength * clampContextUsageRatio(options.maxContextUsageRatio)));
     return {
-      chunks: chunkByContextBudget(blocks, contextBudgetTokens, options.buildPrompt),
+      chunks: chunkByContextBudget(blocks, contextBudgetTokens, options.buildPrompt, options.maxBlocksPerRequest),
       strategy: 'contextWindow',
       contextBudgetTokens,
     };

@@ -116,6 +116,7 @@ function buildState(url) {
     baseUrl: 'https://openrouter.ai/api/v1',
     hasApiKey: url.searchParams.get('apiKey') !== 'missing',
     modelId: defaultModelId,
+    requestMode: url.searchParams.get('mode') ?? 'auto',
     targetLanguage: usesCustomLanguage ? 'Custom...' : '简体中文',
     targetLanguageCustom: usesCustomLanguage ? 'Brazilian Portuguese' : '',
     systemPrompt: resolveSystemPrompt('', usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文'),

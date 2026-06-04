@@ -25,7 +25,8 @@ function readRequestBody(req) {
 function extractBlocks(body) {
   const userMessage = [...body.messages].reverse().find((message) => message.role === 'user');
   assert.ok(userMessage, 'expected a user message');
-  const marker = '---';
+  const jsonInputMarker = 'JSON input:';
+  const marker = userMessage.content.includes(jsonInputMarker) ? jsonInputMarker : '---';
   const markerIndex = userMessage.content.indexOf(marker);
   assert.notEqual(markerIndex, -1, 'expected prompt JSON marker');
   const payload = JSON.parse(userMessage.content.slice(markerIndex + marker.length).trim());
@@ -37,6 +38,8 @@ async function createMockOpenRouterServer() {
   const state = {
     chatRequests: [],
     corruptPlaceholderOutput: false,
+    responseShape: 'mapping',
+    invalidBlocksArrayThreshold: undefined,
     translationOverrides: new Map(),
   };
 
@@ -57,14 +60,31 @@ async function createMockOpenRouterServer() {
         state.chatRequests.push({ body, blocks });
 
         const translated = {};
+        const translatedBlocks = [];
         for (const block of blocks) {
+          let value;
           if (state.translationOverrides.has(block.markdown)) {
-            translated[block.id] = state.translationOverrides.get(block.markdown);
+            value = state.translationOverrides.get(block.markdown);
           } else if (state.corruptPlaceholderOutput && block.markdown.includes('__MDT_')) {
-            translated[block.id] = `MOCK:${block.markdown.replace(/__MDT_[A-Za-z0-9_]+__/g, 'BROKEN_PLACEHOLDER')}`;
+            value = `MOCK:${block.markdown.replace(/__MDT_[A-Za-z0-9_]+__/g, 'BROKEN_PLACEHOLDER')}`;
           } else {
-            translated[block.id] = `MOCK:${block.markdown}`;
+            value = `MOCK:${block.markdown}`;
           }
+          translated[block.id] = value;
+          translatedBlocks.push({ id: block.id, markdown: value });
+        }
+
+        if (state.responseShape === 'blocksArray') {
+          if (state.invalidBlocksArrayThreshold && blocks.length > state.invalidBlocksArrayThreshold) {
+            sendJson(res, 200, {
+              choices: [{ message: { content: '{"blocks":[{"id":"broken","markdown":"unterminated}]}' } }],
+            });
+            return;
+          }
+          sendJson(res, 200, {
+            choices: [{ message: { content: `---\n${JSON.stringify({ blocks: translatedBlocks })}` } }],
+          });
+          return;
         }
 
         sendJson(res, 200, {
@@ -115,6 +135,7 @@ async function configureExtension(mockServer) {
   await cfg.update('openrouter.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
   await cfg.update('translation.targetLanguage', 'English', vscode.ConfigurationTarget.Global);
+  await cfg.update('translation.requestMode', 'auto', vscode.ConfigurationTarget.Global);
 
   const seeded = await vscode.commands.executeCommand('marklingo.test.seedState', { apiKey: 'test-key' });
   assert.equal(seeded.origin, new URL(mockServer.baseUrl).origin);
@@ -238,6 +259,65 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.equal(meta.debug.settings.request.reasoning.effort, 'none');
   assert.equal(meta.debug.result.warningCount, 0);
   assert.ok(!JSON.stringify(meta.debug).includes('test-key'), 'debug metadata must not include the API key');
+}
+
+async function testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown(
+    'translation-model.md',
+    [
+      '# One',
+      '',
+      'Second paragraph.',
+      '',
+      'Third paragraph.',
+      '',
+      'Fourth paragraph.',
+      '',
+      'Fifth paragraph.',
+      '',
+    ].join('\n'),
+  );
+
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  await cfg.update('translation.requestMode', 'translationModel', vscode.ConfigurationTarget.Global);
+  await cfg.update('translation.translationModelMaxBlocksPerRequest', 4, vscode.ConfigurationTarget.Global);
+  await cfg.update('translation.translationModelConcurrency', 1, vscode.ConfigurationTarget.Global);
+
+  context.server.state.responseShape = 'blocksArray';
+  context.server.state.invalidBlocksArrayThreshold = 3;
+  context.server.state.chatRequests = [];
+  try {
+    await translate(source);
+  } finally {
+    await cfg.update('translation.requestMode', 'auto', vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelMaxBlocksPerRequest', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelConcurrency', undefined, vscode.ConfigurationTarget.Global);
+    context.server.state.responseShape = 'mapping';
+    context.server.state.invalidBlocksArrayThreshold = undefined;
+  }
+
+  assert.equal(context.server.state.chatRequests.length, 4, 'expected invalid 4-block chunk to be split into two 2-block retries');
+  assert.equal(context.server.state.chatRequests[0].blocks.length, 4);
+  assert.equal(context.server.state.chatRequests[1].blocks.length, 2);
+  assert.equal(context.server.state.chatRequests[2].blocks.length, 2);
+  assert.equal(context.server.state.chatRequests[3].blocks.length, 1);
+  assert.ok(!Object.hasOwn(context.server.state.chatRequests[0].body, 'reasoning'), 'expected translation-model mode to omit reasoning');
+  assert.equal(context.server.state.chatRequests[0].body.temperature, 0.7);
+  assert.equal(context.server.state.chatRequests[0].body.top_p, 0.6);
+  assert.equal(context.server.state.chatRequests[0].body.response_format.type, 'json_object');
+  assert.match(context.server.state.chatRequests[0].body.messages.at(-1).content, /JSON input:/);
+
+  const output = readText(translatedPath(source));
+  assert.match(output, /MOCK:# One/);
+  assert.match(output, /MOCK:Second paragraph\./);
+  assert.match(output, /MOCK:Fifth paragraph\./);
+
+  const { meta } = findMetaForSource(context.seeded.globalStorageUri, source);
+  assert.equal(meta.debug.settings.adapterMode, 'translationModel');
+  assert.equal(meta.debug.plan.chunkCount, 2);
+  assert.equal(meta.debug.plan.actualRequestCount, 4);
+  assert.equal(meta.debug.result.warningCount, 0);
 }
 
 async function testTranslatesFolderMarkdownFiles(context) {
@@ -650,8 +730,14 @@ async function testDeletesCurrentProjectTranslations(context) {
 
 async function runTest(name, fn, context) {
   try {
+    const cfg = vscode.workspace.getConfiguration('marklingo');
+    await cfg.update('translation.requestMode', 'auto', vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelMaxBlocksPerRequest', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelConcurrency', undefined, vscode.ConfigurationTarget.Global);
     context.server.state.chatRequests = [];
     context.server.state.corruptPlaceholderOutput = false;
+    context.server.state.responseShape = 'mapping';
+    context.server.state.invalidBlocksArrayThreshold = undefined;
     await fn(context);
     console.log(`ok - ${name}`);
   } catch (error) {
@@ -666,6 +752,7 @@ async function run() {
     const seeded = await configureExtension(server);
     const context = { server, seeded };
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
+    await runTest('translation-model mode parses blocks arrays and splits invalid chunks', testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks, context);
     await runTest('translates folder markdown files through explorer command', testTranslatesFolderMarkdownFiles, context);
     await runTest('translates explorer-selected markdown file', testTranslatesExplorerSelectedMarkdownFile, context);
     await runTest('translates explorer multi-selected markdown resources', testTranslatesExplorerMultiSelectedMarkdownResources, context);

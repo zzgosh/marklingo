@@ -19,6 +19,7 @@ export type SettingsState = {
   baseUrl: string;
   hasApiKey: boolean;
   modelId: string;
+  requestMode: string;
   targetLanguage: string;
   targetLanguageCustom: string;
   systemPrompt: string;
@@ -64,6 +65,19 @@ function renderOptions(selected: string): string {
   return TARGET_LANGUAGE_OPTIONS.map((option) => {
     const selectedAttr = option === selected ? ' selected' : '';
     return `<option value="${escapeHtml(option)}"${selectedAttr}>${escapeHtml(option)}</option>`;
+  }).join('');
+}
+
+const TRANSLATION_MODE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'chatJson', label: 'Chat JSON' },
+  { value: 'translationModel', label: 'Translation Model' },
+];
+
+function renderTranslationModeOptions(selected: string): string {
+  return TRANSLATION_MODE_OPTIONS.map((option) => {
+    const selectedAttr = option.value === selected ? ' selected' : '';
+    return `<option value="${escapeHtml(option.value)}"${selectedAttr}>${escapeHtml(option.label)}</option>`;
   }).join('');
 }
 
@@ -608,6 +622,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <button class="save-btn" type="button" data-field="modelId" data-key="openrouter.modelId" disabled>Save</button>
             </div>
           </div>
+          <div class="row">
+            <div>
+              <div class="label">Translation Mode</div>
+            </div>
+            <div class="control-full">
+              <span class="select-wrap"><select id="requestMode">${renderTranslationModeOptions(state.requestMode)}</select></span>
+            </div>
+          </div>
         </section>
 
         <h2>Translation</h2>
@@ -776,6 +798,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     registerInstant('targetLanguage', 'translation.targetLanguage');
+    registerInstant('requestMode', 'translation.requestMode');
     syncCustomLanguageVisibility(false);
 
     function handleSaved(key, saveId, value) {

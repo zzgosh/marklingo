@@ -160,6 +160,35 @@
           "maximum": 0.9,
           "description": "Max share of the model context window used for each translation request prompt when context length is available."
         },
+        "marklingo.translation.requestMode": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "chatJson",
+            "translationModel"
+          ],
+          "enumDescriptions": [
+            "Automatically choose the request mode from the configured model ID.",
+            "Ask chat models to return a JSON object keyed by block ID.",
+            "Ask translation models to translate Markdown fields in small same-shape JSON batches."
+          ],
+          "description": "Translation request mode."
+        },
+        "marklingo.translation.translationModelMaxBlocksPerRequest": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "maximum": 24,
+          "description": "Maximum number of Markdown blocks per request for translation-model mode."
+        },
+        "marklingo.translation.translationModelConcurrency": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 4,
+          "description": "Maximum concurrent requests for translation-model mode."
+        },
         "marklingo.translation.targetLanguage": {
           "type": "string",
           "default": "简体中文",

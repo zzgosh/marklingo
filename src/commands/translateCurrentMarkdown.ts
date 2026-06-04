@@ -9,10 +9,23 @@ import {
 import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
 import { getMetaFileUri, getOutputLocation, getTranslatedFileUri } from '../storage/paths.js';
 import { restoreTranslatedBlock } from '../translation/blockResults.js';
-import { protectMarkdown } from '../translation/placeholders.js';
-import { DEFAULT_SYSTEM_PROMPT, resolveSystemPrompt } from '../translation/prompts.js';
+import { compactPlaceholderTokens, protectMarkdown } from '../translation/placeholders.js';
+import { resolveSystemPrompt } from '../translation/prompts.js';
 import { clampContextUsageRatio, planTranslationRequests, type TranslationRequestBlock } from '../translation/requestPlanner.js';
 import { SEGMENTER_VERSION, segmentMarkdownDocument } from '../translation/segmenter.js';
+import {
+  buildChatJsonPrompt,
+  buildTranslationModelPrompt,
+  coerceTranslationRequestMode,
+  DEFAULT_TRANSLATION_MODEL_CONCURRENCY,
+  DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST,
+  DEFAULT_TRANSLATION_REQUEST_MODE,
+  getTranslationAdapterLabel,
+  parseTranslatedBlockMap,
+  resolveTranslationAdapterMode,
+  type TranslationAdapterMode,
+  type TranslationRequestMode,
+} from '../translation/translationAdapters.js';
 import { formatYamlScalarReplacement } from '../translation/frontmatterValues.js';
 import { hasTargetLanguageSelected, markTargetLanguageSelected } from '../onboardingState.js';
 import {
@@ -24,18 +37,6 @@ import {
   type TranslationMetaDebug,
 } from '../translation/cache.js';
 import { TRANSLATION_PROGRESS_MESSAGES, getBatchTranslationProgressMessage } from './progressMessages.js';
-
-function buildBlocksTranslatePrompt(
-  input: { blocks: Array<{ id: string; markdown: string }> },
-  options: { systemPrompt?: string; customPrompt?: string; targetLanguage: string },
-): { system: string; user: string } {
-  const baseSystem = resolveSystemPrompt(options.systemPrompt, options.targetLanguage);
-  const customPrompt = (options.customPrompt ?? '').trim();
-  const system = customPrompt ? [baseSystem, '', 'Additional custom prompt:', customPrompt].join('\n') : baseSystem;
-
-  const user = ['Translate these Markdown blocks:', '---', JSON.stringify(input)].join('\n');
-  return { system, user };
-}
 
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
@@ -228,27 +229,17 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   return picked;
 }
 
-function tryParseJsonObject(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      const sub = text.slice(start, end + 1);
-      return JSON.parse(sub);
-    }
-    throw new Error('Model output is not valid JSON.');
-  }
-}
-
 export type TranslateMode = 'auto' | 'full';
 
 type TranslationRuntime = {
   targetLanguage: string;
   settings: OpenRouterSettings;
+  requestMode: TranslationRequestMode;
+  adapterMode: TranslationAdapterMode;
   maxBlocksPerRequest: number;
   maxContextUsageRatio: number;
+  translationModelMaxBlocksPerRequest: number;
+  translationModelConcurrency: number;
   systemPrompt: string;
   customPrompt: string;
 };
@@ -353,6 +344,62 @@ function createAbortSignalFromCancellationToken(token: vscode.CancellationToken 
   };
 }
 
+function isLocalHttpBaseUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl);
+    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function getEffectiveSystemPrompt(adapterMode: TranslationAdapterMode, systemPrompt: string, targetLanguage: string): string {
+  if (adapterMode === 'chatJson') return resolveSystemPrompt(systemPrompt, targetLanguage);
+  return systemPrompt ? resolveSystemPrompt(systemPrompt, targetLanguage) : '';
+}
+
+function buildAdapterPrompt(
+  adapterMode: TranslationAdapterMode,
+  blocks: TranslationRequestBlock[],
+  options: { targetLanguage: string; systemPrompt: string; customPrompt: string },
+) {
+  if (adapterMode === 'translationModel') {
+    return buildTranslationModelPrompt(blocks, options);
+  }
+  return buildChatJsonPrompt({ blocks }, options);
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const concurrency = Math.max(1, Math.min(items.length || 1, Math.floor(limit)));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await worker(items[index], index);
+    }
+  }));
+
+  return results;
+}
+
+function isModelOutputError(error: unknown): boolean {
+  if (error instanceof SyntaxError) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /JSON|Model output|unexpected response shape|empty content/i.test(message);
+}
+
+function shouldSplitTranslationModelChunk(error: unknown): boolean {
+  if (isModelOutputError(error)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /HTTP (400|413|422)/.test(message);
+}
+
 function isCancellationError(error: unknown): boolean {
   return error instanceof vscode.CancellationError;
 }
@@ -401,16 +448,30 @@ async function resolveTranslationRuntime(context: vscode.ExtensionContext): Prom
 
   const settings = await getOpenRouterSettings(context);
   const cfg = vscode.workspace.getConfiguration('marklingo');
+  const requestMode = coerceTranslationRequestMode(cfg.get<string>('translation.requestMode') ?? DEFAULT_TRANSLATION_REQUEST_MODE);
+  const adapterMode = resolveTranslationAdapterMode(requestMode, settings.modelId);
   const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
   const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);
+  const translationModelMaxBlocksPerRequest = Math.max(
+    1,
+    cfg.get<number>('translation.translationModelMaxBlocksPerRequest') ?? DEFAULT_TRANSLATION_MODEL_MAX_BLOCKS_PER_REQUEST,
+  );
+  const translationModelConcurrency = Math.max(
+    1,
+    Math.min(4, cfg.get<number>('translation.translationModelConcurrency') ?? DEFAULT_TRANSLATION_MODEL_CONCURRENCY),
+  );
   const systemPrompt = (cfg.get<string>('translation.systemPrompt') ?? '').trim();
   const customPrompt = (cfg.get<string>('translation.customPrompt') ?? '').trim();
 
   return {
     targetLanguage,
     settings,
+    requestMode,
+    adapterMode,
     maxBlocksPerRequest,
     maxContextUsageRatio,
+    translationModelMaxBlocksPerRequest,
+    translationModelConcurrency,
     systemPrompt,
     customPrompt,
   };
@@ -442,11 +503,16 @@ async function translateMarkdownDocument(
     const {
       targetLanguage,
       settings,
+      requestMode,
+      adapterMode,
       maxBlocksPerRequest,
       maxContextUsageRatio,
+      translationModelMaxBlocksPerRequest,
+      translationModelConcurrency,
       systemPrompt,
       customPrompt,
     } = runtime;
+    const effectiveSystemPrompt = getEffectiveSystemPrompt(adapterMode, systemPrompt, targetLanguage);
     const currentTranslatedUri = getTranslatedFileUri(context, doc.uri, targetLanguage);
     const currentMetaUri = getMetaFileUri(context, doc.uri, targetLanguage);
     translatedUri = currentTranslatedUri;
@@ -457,21 +523,35 @@ async function translateMarkdownDocument(
       modelId: settings.modelId,
       targetLanguage,
       outputLocation: getOutputLocation(),
+      requestMode,
+      adapterMode: getTranslationAdapterLabel(adapterMode),
       maxBlocksPerRequest,
       maxContextUsageRatio,
+      translationModelMaxBlocksPerRequest,
+      translationModelConcurrency,
       systemPromptSource: systemPrompt ? 'custom' : 'default',
-      systemPromptHash: sha256(systemPrompt || DEFAULT_SYSTEM_PROMPT),
+      systemPromptHash: sha256(effectiveSystemPrompt),
       customPromptSet: Boolean(customPrompt),
       customPromptHash: customPrompt ? sha256(customPrompt) : undefined,
-      request: {
-        stream: false,
-        temperature: 0,
-        responseFormat: 'json_object',
-        reasoning: {
-          effort: 'none',
-          exclude: true,
-        },
-      },
+      request: adapterMode === 'translationModel'
+        ? {
+            stream: false,
+            temperature: 0.7,
+            topP: 0.6,
+            topK: isLocalHttpBaseUrl(settings.baseUrl) ? 20 : undefined,
+            repeatPenalty: isLocalHttpBaseUrl(settings.baseUrl) ? 1.05 : undefined,
+            maxTokens: 4096,
+            responseFormat: 'json_object',
+          }
+        : {
+            stream: false,
+            temperature: 0,
+            responseFormat: 'json_object',
+            reasoning: {
+              effort: 'none',
+              exclude: true,
+            },
+          },
     };
 
     const segments = segmentMarkdownDocument(doc);
@@ -521,22 +601,30 @@ async function translateMarkdownDocument(
         const placeholdersById = new Map<string, ReturnType<typeof protectMarkdown>>();
         for (const seg of toTranslate) {
           const protectedResult = protectMarkdown(seg.text, seg.id);
-          protectedBlocks.push({ id: seg.id, markdown: protectedResult.text });
-          placeholdersById.set(seg.id, protectedResult);
+          const modelProtectedResult = adapterMode === 'translationModel'
+            ? compactPlaceholderTokens(protectedResult)
+            : protectedResult;
+          protectedBlocks.push({ id: seg.id, markdown: modelProtectedResult.text });
+          placeholdersById.set(seg.id, modelProtectedResult);
         }
 
         progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.preparing });
         const modelContextLength = await getOpenRouterModelContextLength(settings);
-        const buildPrompt = (blocks: TranslationRequestBlock[]) => buildBlocksTranslatePrompt({ blocks }, { systemPrompt, customPrompt, targetLanguage });
+        const translationModelBlockLimit = Math.min(maxBlocksPerRequest, translationModelMaxBlocksPerRequest);
+        const buildPrompt = (blocks: TranslationRequestBlock[]) =>
+          buildAdapterPrompt(adapterMode, blocks, { targetLanguage, systemPrompt: effectiveSystemPrompt, customPrompt }).estimatePrompt;
         const plan = planTranslationRequests(protectedBlocks, {
           modelContextLength,
           maxContextUsageRatio,
-          fallbackMaxBlocksPerRequest: maxBlocksPerRequest,
+          fallbackMaxBlocksPerRequest: adapterMode === 'translationModel' ? translationModelBlockLimit : maxBlocksPerRequest,
+          maxBlocksPerRequest: adapterMode === 'translationModel' ? translationModelBlockLimit : undefined,
           buildPrompt,
         });
         const segById = new Map(toTranslate.map((seg) => [seg.id, seg]));
         const warnings: TranslationWarning[] = [];
         const startedAt = Date.now();
+        const translatedValuesById = new Map<string, unknown>();
+        let actualRequestCount = 0;
         debug.plan = {
           mode,
           requestedMode,
@@ -555,7 +643,7 @@ async function translateMarkdownDocument(
           'info',
           `Translating ${doc.uri.fsPath} with ${settings.modelId}: ` +
             `${translatable.length} translatable blocks, ${toTranslate.length} to translate, ` +
-            `${plan.chunks.length} request(s), mode=${mode}, strategy=${plan.strategy}, ` +
+            `${plan.chunks.length} planned request(s), mode=${mode}, adapter=${getTranslationAdapterLabel(adapterMode)}, strategy=${plan.strategy}, ` +
             `contextLength=${modelContextLength ?? 'unknown'}, estimatedPromptBudget=${plan.contextBudgetTokens ?? 'n/a'}.`,
         );
 
@@ -563,29 +651,76 @@ async function translateMarkdownDocument(
           progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.cached });
         }
 
-        for (const [chunkIndex, plannedChunk] of plan.chunks.entries()) {
+        const requestTranslatedBlocks = async (blocks: TranslationRequestBlock[], signal?: AbortSignal): Promise<Record<string, unknown>> => {
+          const prompt = buildAdapterPrompt(adapterMode, blocks, {
+            targetLanguage,
+            systemPrompt: effectiveSystemPrompt,
+            customPrompt,
+          });
+          const raw = await openRouterChatCompletion(
+            settings,
+            prompt.messages,
+            adapterMode === 'translationModel'
+              ? {
+                  timeoutMs: 120_000,
+                  temperature: 0.7,
+                  topP: 0.6,
+                  topK: isLocalHttpBaseUrl(settings.baseUrl) ? 20 : undefined,
+                  repeatPenalty: isLocalHttpBaseUrl(settings.baseUrl) ? 1.05 : undefined,
+                  maxTokens: 4096,
+                  signal,
+                  responseFormat: { type: 'json_object' },
+                  reasoning: null,
+                }
+              : {
+                  timeoutMs: 120_000,
+                  temperature: 0,
+                  signal,
+                  responseFormat: { type: 'json_object' },
+                  reasoning: { effort: 'none', exclude: true },
+                },
+          );
+          return parseTranslatedBlockMap(raw, blocks);
+        };
+
+        const validateTranslationModelValues = (values: Record<string, unknown>, blocks: TranslationRequestBlock[]): void => {
+          const missing: string[] = [];
+          const invalid: string[] = [];
+          for (const block of blocks) {
+            if (!Object.hasOwn(values, block.id)) {
+              missing.push(block.id);
+              continue;
+            }
+            const seg = segById.get(block.id);
+            const protectedResult = seg ? placeholdersById.get(seg.id) : undefined;
+            if (!seg || !protectedResult) {
+              throw new Error(`Internal error: missing translation block mapping (${block.id}).`);
+            }
+            const restored = restoreTranslatedBlock(values[block.id], seg.id, seg.text, protectedResult);
+            if (!restored.ok) {
+              invalid.push(`${block.id}: ${restored.reason}`);
+            }
+          }
+          if (missing.length > 0 || invalid.length > 0) {
+            const parts: string[] = [];
+            if (missing.length > 0) parts.push(`omitted ${missing.length} block(s): ${missing.join(', ')}`);
+            if (invalid.length > 0) parts.push(`damaged ${invalid.length} block(s): ${invalid.slice(0, 3).join('; ')}`);
+            throw new Error(`Model output is incomplete for translation-model mode: ${parts.join('; ')}.`);
+          }
+        };
+
+        const requestChatJsonChunk = async (plannedChunk: typeof plan.chunks[number], chunkIndex: number) => {
           throwIfCancellationRequested(options.cancellationToken);
           progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.translating });
-          const prompt = buildPrompt(plannedChunk.blocks);
           const requestStartedAt = Date.now();
           const requestDebug = debug.plan?.chunks[chunkIndex];
           const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
-          let raw: string;
           try {
-            raw = await openRouterChatCompletion(
-              settings,
-              [
-                { role: 'system', content: prompt.system },
-                { role: 'user', content: prompt.user },
-              ],
-              {
-                timeoutMs: 120_000,
-                temperature: 0,
-                signal: abortSignal.signal,
-                responseFormat: { type: 'json_object' },
-                reasoning: { effort: 'none', exclude: true },
-              },
-            );
+            actualRequestCount += 1;
+            const values = await requestTranslatedBlocks(plannedChunk.blocks, abortSignal.signal);
+            for (const [blockId, value] of Object.entries(values)) {
+              translatedValuesById.set(blockId, value);
+            }
           } catch (error) {
             if (requestDebug) {
               requestDebug.durationMs = Date.now() - requestStartedAt;
@@ -607,8 +742,83 @@ async function translateMarkdownDocument(
             `Request ${chunkIndex + 1}/${plan.chunks.length} finished in ${requestDurationMs}ms ` +
               `(${plannedChunk.blocks.length} blocks, ~${plannedChunk.estimatedPromptTokens} estimated prompt tokens).`,
           );
+        };
 
-          const obj = tryParseJsonObject(raw);
+        const requestTranslationModelBlocks = async (
+          blocks: TranslationRequestBlock[],
+          label: string,
+        ): Promise<Record<string, unknown>> => {
+          throwIfCancellationRequested(options.cancellationToken);
+          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.translating });
+          const requestIndex = ++actualRequestCount;
+          const requestStartedAt = Date.now();
+          const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
+          try {
+            const values = await requestTranslatedBlocks(blocks, abortSignal.signal);
+            validateTranslationModelValues(values, blocks);
+            const requestDurationMs = Date.now() - requestStartedAt;
+            addDebugEvent(
+              debug,
+              'info',
+              `Request ${requestIndex} finished in ${requestDurationMs}ms (${label}, ${blocks.length} blocks).`,
+            );
+            return values;
+          } catch (error) {
+            const requestDurationMs = Date.now() - requestStartedAt;
+            if (blocks.length > 1 && shouldSplitTranslationModelChunk(error)) {
+              addDebugEvent(
+                debug,
+                'warning',
+                `Request ${requestIndex} could not be parsed after ${requestDurationMs}ms; splitting ${blocks.length} blocks.`,
+              );
+              const midpoint = Math.ceil(blocks.length / 2);
+              const left = await requestTranslationModelBlocks(blocks.slice(0, midpoint), `${label}.1`);
+              const right = await requestTranslationModelBlocks(blocks.slice(midpoint), `${label}.2`);
+              return { ...left, ...right };
+            }
+            if (blocks.length === 1 && isModelOutputError(error)) {
+              addDebugEvent(
+                debug,
+                'warning',
+                `Request ${requestIndex} returned invalid model output for ${blocks[0].id}; keeping the source block.`,
+              );
+              return {};
+            }
+            throw error;
+          } finally {
+            abortSignal.dispose();
+          }
+        };
+
+        if (adapterMode === 'translationModel') {
+          await mapWithConcurrency(plan.chunks, translationModelConcurrency, async (plannedChunk, chunkIndex) => {
+            const requestDebug = debug.plan?.chunks[chunkIndex];
+            const chunkStartedAt = Date.now();
+            try {
+              const values = await requestTranslationModelBlocks(plannedChunk.blocks, `chunk ${chunkIndex + 1}/${plan.chunks.length}`);
+              for (const [blockId, value] of Object.entries(values)) {
+                translatedValuesById.set(blockId, value);
+              }
+              if (requestDebug) {
+                requestDebug.durationMs = Date.now() - chunkStartedAt;
+                requestDebug.status = 'success';
+              }
+            } catch (error) {
+              if (requestDebug) {
+                requestDebug.durationMs = Date.now() - chunkStartedAt;
+                requestDebug.status = 'error';
+              }
+              throw error;
+            }
+          });
+        } else {
+          for (const [chunkIndex, plannedChunk] of plan.chunks.entries()) {
+            await requestChatJsonChunk(plannedChunk, chunkIndex);
+          }
+        }
+        if (debug.plan) debug.plan.actualRequestCount = actualRequestCount;
+
+        for (const plannedChunk of plan.chunks) {
           for (const block of plannedChunk.blocks) {
             const seg = segById.get(block.id);
             if (!seg) {
@@ -618,7 +828,7 @@ async function translateMarkdownDocument(
             if (!protectedResult) {
               throw new Error(`Internal error: missing placeholder mapping (${seg.id}).`);
             }
-            const result = restoreTranslatedBlock(obj?.[seg.id], seg.id, seg.text, protectedResult);
+            const result = restoreTranslatedBlock(translatedValuesById.get(seg.id), seg.id, seg.text, protectedResult);
             if (!result.ok) {
               warnings.push({ blockId: seg.id, reason: result.reason });
               addDebugEvent(debug, 'warning', `Block ${seg.id} kept as source: ${result.reason}`);

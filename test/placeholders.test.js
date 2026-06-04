@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { protectMarkdown, restoreMarkdown } from '../out/translation/placeholders.js';
+import { compactPlaceholderTokens, protectMarkdown, restoreMarkdown } from '../out/translation/placeholders.js';
 
 test('protects inline link destination when label contains the same URL', () => {
   const result = protectMarkdown('[https://example.com](https://example.com)', 'b0');
@@ -29,6 +29,17 @@ test('restores protected markdown tokens exactly', () => {
   const translated = protectedMarkdown.text.replace('and', '和');
 
   assert.equal(restoreMarkdown(translated, protectedMarkdown.placeholders), '`code` 和 [docs](https://example.com)');
+});
+
+test('compacts placeholder tokens while preserving restoration values', () => {
+  const source = '`code` and [docs](https://example.com)';
+  const protectedMarkdown = protectMarkdown(source, 'b0');
+  const compacted = compactPlaceholderTokens(protectedMarkdown);
+
+  assert.equal(compacted.text, '__M0__ and [docs](__M1__)');
+  assert.equal(compacted.placeholders.__M0__, '`code`');
+  assert.equal(compacted.placeholders.__M1__, 'https://example.com');
+  assert.equal(restoreMarkdown('__M0__ 和 [docs](__M1__)', compacted.placeholders), '`code` 和 [docs](https://example.com)');
 });
 
 test('skips placeholder parsing for plain text blocks', () => {

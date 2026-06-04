@@ -63,8 +63,12 @@ export type TranslationMetaDebug = {
     modelId: string;
     targetLanguage?: string;
     outputLocation: string;
+    requestMode?: string;
+    adapterMode?: string;
     maxBlocksPerRequest?: number;
     maxContextUsageRatio?: number;
+    translationModelMaxBlocksPerRequest?: number;
+    translationModelConcurrency?: number;
     systemPromptSource?: "default" | "custom";
     systemPromptHash?: string;
     customPromptSet?: boolean;
@@ -72,8 +76,12 @@ export type TranslationMetaDebug = {
     request: {
       stream: false;
       temperature: number;
-      responseFormat: string;
-      reasoning: {
+      topP?: number;
+      topK?: number;
+      repeatPenalty?: number;
+      maxTokens?: number;
+      responseFormat?: string;
+      reasoning?: {
         effort: "none";
         exclude: true;
       };
@@ -86,6 +94,7 @@ export type TranslationMetaDebug = {
     modelContextLength?: number;
     contextBudgetTokens?: number;
     chunkCount: number;
+    actualRequestCount?: number;
     chunks: TranslationRequestDebug[];
   };
   result?: {

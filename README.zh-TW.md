@@ -59,9 +59,9 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 | `MarkLingo: Translate This Markdown File` | 翻譯從資源管理器右鍵選單中選取的 Markdown 檔案。 |
 | `MarkLingo: Translate Selected Markdown Files` | 將資源管理器中選取的檔案和資料夾收集到的 Markdown 檔案作為一批翻譯，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 翻譯所選資料夾及其子資料夾中的來源 Markdown 檔案，開啟第一個翻譯輸出，其餘輸出寫在各自來源檔案旁邊。 |
-| `MarkLingo: Open Settings` | 開啟 MarkLingo 設定，管理 OpenRouter、API 金鑰、目標語言、自訂指令、快捷鍵狀態與清理操作。 |
+| `MarkLingo: Open Settings` | 開啟 MarkLingo 設定，管理提供方、API 金鑰、翻譯模式、目標語言、自訂指令、快捷鍵狀態與清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 將 `*_mdt.md` 加入目前儲存庫的本機 Git 排除檔案中。 |
-| `MarkLingo: Delete Current Project Translated Files` | 刪除本專案中由擴充功能追蹤的翻譯輸出，以及私有的翻譯中繼資料/快取。 |
+| `MarkLingo: Delete Current Project Translated Files` | 刪除本專案中由擴充功能追蹤的翻譯輸出，同時保留私有翻譯中繼資料/快取。 |
 
 ## 設定
 
@@ -82,6 +82,12 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
   - 預設值：`google/gemini-3.1-flash-lite`
   - 使用一個 OpenRouter 模型 ID。
 
+- **Translation Mode（翻譯模式）**
+  - 設定項：`marklingo.translation.requestMode`
+  - 預設值：`auto`
+  - `auto` 對通用 chat model 使用 Chat JSON 模式，對已知 Hy-MT 模型 ID 使用 Translation Model 模式。
+  - Translation Model 模式使用小批量同結構 JSON、自適應拆分重試與可選並行。進階設定：`marklingo.translation.translationModelMaxBlocksPerRequest` 與 `marklingo.translation.translationModelConcurrency`。
+
 - **Target Language（目標語言）**
   - 設定項：`marklingo.translation.targetLanguage`
   - 預設值：`简体中文`
@@ -98,6 +104,27 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
   - 附加在 MarkLingo 內建的 Markdown 保護提示之後的額外術語、語氣或風格指令。
 
 設定頁面會立即儲存下拉選單的變更。自由文字欄位使用各自的行內 `Save` 按鈕。API 金鑰操作與清除資料操作在確認後立即生效。
+
+### 使用 llama.cpp 本機執行 Hy-MT
+
+MarkLingo 可以使用本機 OpenAI-compatible 的 `llama-server` 端點執行 Hy-MT 模型：
+
+```sh
+llama-server \
+  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --alias hy-mt2 \
+  --ctx-size 4096 \
+  --api-key local-hy-secret
+```
+
+使用這些設定：
+
+- Base URL：`http://127.0.0.1:8080/v1`
+- API Key：`local-hy-secret`
+- Model ID：`hy-mt2`
+- Translation Mode：`Auto` 或 `Translation Model`
 
 ## 輸出檔案
 
@@ -121,7 +148,7 @@ MarkLingo 是一個本機 VS Code 擴充功能，但翻譯需要將文件內容�
 - Markdown 內容會被傳送到設定的端點進行翻譯。
 - 預設使用官方的 OpenRouter 端點。
 - 你需要自己的 OpenRouter API 金鑰。
-- 翻譯請求為非串流，並透過 `reasoning.exclude: true` 與 `reasoning.effort: none` 請求排除推理過程。
+- 翻譯請求為非串流。Chat JSON 模式會透過 `reasoning.exclude: true` 與 `reasoning.effort: none` 請求排除推理過程；Translation Model 模式會省略 reasoning 欄位。
 - API 金鑰儲存在 VS Code 的 `SecretStorage` 中。
 - API 金鑰不會存入工作區檔案、VS Code 設定、翻譯中繼資料或記錄檔。
 - 翻譯中繼資料儲存在 VS Code 的 `globalStorageUri` 下，而非工作區中。
