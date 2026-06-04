@@ -103,7 +103,8 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /providerDrafts/);
   assert.match(html, /selectedProviderType/);
   assert.match(html, /showProviderSuccessFeedback/);
-  assert.match(html, /Provider verified\./);
+  assert.ok(!html.includes('Provider verified.'));
+  assert.match(html, /smaller Markdown block batches/);
   assert.match(html, /apiKeyInput\.addEventListener\('input', handleProviderInput\);/);
   assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification Failed', true\);/);
   assert.match(html, /verifyProvider/);

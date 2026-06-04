@@ -1058,6 +1058,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       if (customPromptNote) customPromptNote.hidden = !disabled;
     }
 
+    function getProviderSuccessStatus(baseline) {
+      if (!providerSuccessVisible || !baseline || baseline.verifiedAdapterMode !== 'translationModel') return '';
+      return 'This model could not reliably follow structured JSON instructions. MarkLingo will use smaller Markdown block batches, so translations may be slower.';
+    }
+
     function updateProviderVerificationState() {
       if (providerPending) return;
       const values = getProviderValues();
@@ -1071,7 +1076,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         setProviderStatus('', false);
         syncCustomPromptAvailability('');
       } else if (providerIsVerified) {
-        setProviderStatus(providerSuccessVisible ? 'Provider verified.' : '', false);
+        setProviderStatus(getProviderSuccessStatus(baseline), false);
         syncCustomPromptAvailability(baseline.verifiedAdapterMode);
       } else {
         setProviderStatus('', false);
