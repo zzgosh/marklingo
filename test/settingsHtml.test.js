@@ -61,6 +61,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /<option value="openaiCompatible">OpenAI Compatible<\/option>/);
   assert.match(html, /id="baseUrlRow" hidden/);
   assert.match(html, /\[hidden\] \{ display: none !important; \}/);
+  assert.match(html, /select \{\s+appearance: none;\s+color: var\(--fg\);/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
   assert.match(html, /Verified: Chat JSON/);
   assert.ok(!html.includes('<div class="label">Translation Mode</div>'));

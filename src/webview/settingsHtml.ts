@@ -258,7 +258,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     select {
       appearance: none;
-      color: var(--muted);
+      color: var(--fg);
       padding-right: 42px;
     }
     textarea {
