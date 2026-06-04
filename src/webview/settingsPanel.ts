@@ -632,7 +632,14 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         const scopes = await pickClearAllDataScopes();
         if (!scopes) return;
         const didClear = await clearExtensionDataScopes(context, scopes);
-        if (didClear) await refreshPanel(context, panel);
+        if (didClear) {
+          if (currentPanel === panel) {
+            currentPanel = undefined;
+            currentPanelProjectUri = undefined;
+          }
+          panel.dispose();
+          await openSettingsPanel(context);
+        }
         return;
       }
       if (message?.type === 'clearCurrentProjectData') {

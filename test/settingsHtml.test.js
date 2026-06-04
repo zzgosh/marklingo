@@ -67,7 +67,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /select \{\s+appearance: none;\s+color: var\(--fg\);/);
   assert.match(html, /select option \{\s+background: var\(--input\);\s+color: var\(--fg\);/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
-  assert.match(html, /Verified: Chat JSON/);
+  assert.ok(!html.includes('Verified: Chat JSON'));
   assert.ok(!html.includes('<div class="label">Translation Mode</div>'));
   assert.ok(!html.includes('Model Blocks'));
   assert.ok(!html.includes('Model Concurrency'));
@@ -102,6 +102,8 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /showApiKeyMask\(\)/);
   assert.match(html, /providerDrafts/);
   assert.match(html, /selectedProviderType/);
+  assert.match(html, /showProviderSuccessFeedback/);
+  assert.match(html, /Provider verified\./);
   assert.match(html, /apiKeyInput\.addEventListener\('input', handleProviderInput\);/);
   assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification Failed', true\);/);
   assert.match(html, /verifyProvider/);
@@ -179,7 +181,7 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
   assert.match(html, /<option value="openaiCompatible" selected>OpenAI Compatible<\/option>/);
   assert.match(html, /id="baseUrlRow">/);
   assert.match(html, /value="http:\/\/127\.0\.0\.1:8080\/v1"/);
-  assert.match(html, /Verified: Translation Model/);
+  assert.ok(!html.includes('Verified: Translation Model'));
   assert.match(html, /<textarea id="customPrompt" disabled>/);
   assert.match(html, /Custom Instructions are disabled for verified Translation Model providers/);
 });

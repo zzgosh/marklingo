@@ -137,7 +137,8 @@ function buildState(url) {
   const openRouterHasApiKey = isOpenAiCompatible
     ? url.searchParams.get('openrouterKey') === 'present'
     : currentProviderHasApiKey;
-  const verifiedAdapterMode = currentProviderHasApiKey && url.searchParams.get('verified') !== '0'
+  const shouldUseVerifiedCapability = url.searchParams.get('verified') !== '0';
+  const verifiedAdapterMode = currentProviderHasApiKey && shouldUseVerifiedCapability
     ? (url.searchParams.get('capability') ?? 'chatJson')
     : undefined;
   return {
@@ -151,7 +152,9 @@ function buildState(url) {
     openRouterBaseUrl: defaultBaseUrl,
     openRouterModelId: isOpenAiCompatible ? defaultModelId : modelId,
     openRouterHasApiKey,
-    openRouterVerifiedAdapterMode: openRouterHasApiKey ? (url.searchParams.get('openrouterCapability') ?? 'chatJson') : undefined,
+    openRouterVerifiedAdapterMode: openRouterHasApiKey && shouldUseVerifiedCapability
+      ? (url.searchParams.get('openrouterCapability') ?? 'chatJson')
+      : undefined,
     openAiCompatibleBaseUrl: isOpenAiCompatible ? baseUrl : '',
     openAiCompatibleModelId: isOpenAiCompatible ? modelId : '',
     openAiCompatibleHasApiKey: isOpenAiCompatible && currentProviderHasApiKey,

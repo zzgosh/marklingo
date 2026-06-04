@@ -882,6 +882,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const customPromptNote = document.getElementById('customPromptNote');
     let nextProviderSaveId = 1;
     let providerPending; // { saveId, providerType, baseUrl, modelId }
+    let providerSuccessTimer;
+    let providerSuccessVisible = false;
     const activeProvider = {
       providerType: ${scriptJson(state.providerType)},
       baseUrl: ${scriptJson(state.baseUrl)},
@@ -1032,6 +1034,24 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       providerStatus.classList.toggle('failed', Boolean(failed));
     }
 
+    function clearProviderSuccessFeedback() {
+      providerSuccessVisible = false;
+      if (providerSuccessTimer) {
+        clearTimeout(providerSuccessTimer);
+        providerSuccessTimer = undefined;
+      }
+    }
+
+    function showProviderSuccessFeedback() {
+      clearProviderSuccessFeedback();
+      providerSuccessVisible = true;
+      providerSuccessTimer = setTimeout(() => {
+        providerSuccessVisible = false;
+        providerSuccessTimer = undefined;
+        updateProviderVerificationState();
+      }, 2500);
+    }
+
     function syncCustomPromptAvailability(adapterMode) {
       const disabled = adapterMode === 'translationModel';
       if (customPromptInput) customPromptInput.disabled = disabled;
@@ -1045,20 +1065,22 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       const providerIsVerified = hasVerifiedProvider(baseline);
       const dirty = isProviderDirty();
       verifyProviderBtn.disabled = !dirty || !canVerifyProvider();
-      verifyProviderBtn.textContent = dirty ? 'Save and Verify' : 'Saved and Verified';
-      verifyProviderBtn.classList.toggle('saved', !dirty && providerIsVerified);
+      verifyProviderBtn.textContent = !dirty && providerSuccessVisible ? 'Saved and Verified' : 'Save and Verify';
+      verifyProviderBtn.classList.toggle('saved', !dirty && providerIsVerified && providerSuccessVisible);
       if (dirty) {
         setProviderStatus('', false);
         syncCustomPromptAvailability('');
       } else if (providerIsVerified) {
-        setProviderStatus(baseline.verifiedAdapterMode === 'translationModel' ? 'Verified: Translation Model' : 'Verified: Chat JSON', false);
+        setProviderStatus(providerSuccessVisible ? 'Provider verified.' : '', false);
         syncCustomPromptAvailability(baseline.verifiedAdapterMode);
       } else {
+        setProviderStatus('', false);
         syncCustomPromptAvailability('');
       }
     }
 
     function handleProviderInput() {
+      clearProviderSuccessFeedback();
       saveCurrentProviderDraft();
       syncProviderBaseUrlVisibility();
       updateProviderVerificationState();
@@ -1066,6 +1088,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     providerTypeSelect.addEventListener('change', () => {
       const nextProviderType = providerTypeSelect.value;
+      clearProviderSuccessFeedback();
       saveCurrentProviderDraft();
       providerSelectionTouched = true;
       loadProviderDraft(nextProviderType);
@@ -1085,6 +1108,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     apiKeyInput.addEventListener('input', handleProviderInput);
     verifyProviderBtn.addEventListener('click', () => {
       if (providerPending) return;
+      clearProviderSuccessFeedback();
       saveCurrentProviderDraft();
       const values = getProviderValues();
       const saveId = nextProviderSaveId++;
@@ -1220,9 +1244,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             if (msg.hasKey) showApiKeyMask();
           }
           syncProviderBaseUrlVisibility();
+          showProviderSuccessFeedback();
           updateProviderVerificationState();
           return;
         }
+        clearProviderSuccessFeedback();
         verifyProviderBtn.textContent = 'Save and Verify';
         verifyProviderBtn.disabled = false;
         verifyProviderBtn.classList.remove('saved');
