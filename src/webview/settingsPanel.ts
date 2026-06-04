@@ -402,6 +402,18 @@ async function refreshPanel(context: vscode.ExtensionContext, panel: vscode.Webv
   panel.webview.html = getHtml(panel.webview, await readSettingsState(context, currentPanelProjectUri));
 }
 
+async function disposePanel(panel: vscode.WebviewPanel): Promise<void> {
+  let disposable: vscode.Disposable | undefined;
+  const disposed = new Promise<void>((resolve) => {
+    disposable = panel.onDidDispose(() => {
+      disposable?.dispose();
+      resolve();
+    });
+  });
+  panel.dispose();
+  await disposed;
+}
+
 async function optimizePrivateStorage(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
   const summary = await vscode.window.withProgress(
     {
@@ -637,7 +649,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
             currentPanel = undefined;
             currentPanelProjectUri = undefined;
           }
-          panel.dispose();
+          await disposePanel(panel);
           await openSettingsPanel(context);
         }
         return;

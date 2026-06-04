@@ -83,6 +83,16 @@ function buildWarningMessage(summary: ClearExtensionDataSummary): string {
   return `${buildSummaryMessage(summary)} ${failureSummary} See Developer Tools for details.`;
 }
 
+function showCleanupNotification(kind: 'info' | 'warning', message: string): void {
+  const notification = kind === 'warning'
+    ? vscode.window.showWarningMessage(message)
+    : vscode.window.showInformationMessage(message);
+  void notification.then(undefined, (error) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn('[marklingo] cleanup notification failed:', detail);
+  });
+}
+
 async function runCleanup(context: vscode.ExtensionContext, ids: Set<CleanupOptionId>): Promise<ClearExtensionDataSummary> {
   return vscode.window.withProgress<ClearExtensionDataSummary>(
     {
@@ -161,10 +171,10 @@ export async function clearExtensionDataScopes(context: vscode.ExtensionContext,
 
   if (summary.errors.length > 0) {
     console.warn('[marklingo] clear extension data errors:', summary.errors.slice(0, 20));
-    await vscode.window.showWarningMessage(buildWarningMessage(summary));
+    showCleanupNotification('warning', buildWarningMessage(summary));
     return true;
   }
 
-  await vscode.window.showInformationMessage(buildSummaryMessage(summary));
+  showCleanupNotification('info', buildSummaryMessage(summary));
   return true;
 }

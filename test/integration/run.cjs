@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const vscode = require('vscode');
 
 const EXTENSION_ID = 'zzgosh.marklingo';
@@ -184,6 +185,10 @@ async function withWindowMessageStubs(stubs, fn) {
       vscode.window[key] = original;
     }
   }
+}
+
+function timeout(ms) {
+  return new Promise((resolve) => setTimeout(() => resolve(Symbol.for('timeout')), ms));
 }
 
 function translatedPath(sourceUri, suffix = 'en') {
@@ -780,6 +785,43 @@ async function testDeletesCurrentProjectTranslations(context) {
   }
 }
 
+async function testClearAllDataDoesNotWaitForNotification() {
+  const { clearExtensionDataScopes } = await import(pathToFileURL(
+    path.join(__dirname, '..', '..', 'out', 'commands', 'clearExtensionData.js'),
+  ).href);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'marklingo-cleanup-test-'));
+  const fakeContext = {
+    secrets: {
+      delete: async () => undefined,
+    },
+    globalState: {
+      get: () => [],
+      update: async () => undefined,
+    },
+    globalStorageUri: vscode.Uri.file(tempDir),
+  };
+
+  try {
+    let notificationShown = false;
+    await withWindowMessageStubs({
+      showInformationMessage: async () => {
+        notificationShown = true;
+        return new Promise(() => undefined);
+      },
+    }, async () => {
+      const result = await Promise.race([
+        clearExtensionDataScopes(fakeContext, { apiKeys: true }),
+        timeout(1000),
+      ]);
+      assert.equal(result, true);
+    });
+
+    assert.equal(notificationShown, true);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 async function runTest(name, fn, context) {
   try {
     const cfg = vscode.workspace.getConfiguration('marklingo');
@@ -819,6 +861,7 @@ async function run() {
     await runTest('deletes current project translated files while keeping metadata cache', testDeletesTranslatedFilesButKeepsCurrentProjectCache, context);
     await runTest('command deletes current project translated files while keeping metadata cache', testCommandDeletesTranslatedFilesButKeepsCurrentProjectCache, context);
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
+    await runTest('clear all data does not wait for notification dismissal', testClearAllDataDoesNotWaitForNotification, context);
   } finally {
     await server.close();
   }
