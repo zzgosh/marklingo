@@ -414,15 +414,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       overflow-wrap: anywhere;
     }
     .provider-actions {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) max-content;
       align-items: center;
       justify-content: flex-end;
       gap: 16px;
       min-width: 0;
-      flex-wrap: wrap;
     }
     .provider-status {
-      flex: 1 1 260px;
       min-width: 0;
       color: var(--muted);
       text-align: right;
@@ -432,7 +431,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--danger);
     }
     .provider-actions .save-btn {
-      flex: 0 0 auto;
       min-width: 150px;
       white-space: nowrap;
     }
@@ -667,8 +665,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       .danger-row { grid-template-columns: 1fr; }
       .danger-action { justify-content: flex-start; }
       .shortcut-controls { justify-content: flex-start; }
-      .provider-actions { justify-content: flex-start; }
+      .provider-actions {
+        grid-template-columns: 1fr;
+        justify-content: flex-start;
+      }
       .provider-status { text-align: left; }
+      .provider-actions .save-btn { justify-self: start; }
     }
   </style>
 </head>

@@ -377,6 +377,56 @@ async function testTranslationModelModeRetriesOnlyFailedBlocks(context) {
   assert.equal(meta.debug.result.warningCount, 1);
 }
 
+async function testTranslationModelModeSplitRetriesRepeatedValidationFailures(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown(
+    'translation-model-repeated-validation-failures.md',
+    [
+      '# Good',
+      '',
+      '[First](https://first.example.com)',
+      '',
+      '[Second](https://second.example.com)',
+      '',
+    ].join('\n'),
+  );
+
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  await cfg.update('translation.requestMode', 'translationModel', vscode.ConfigurationTarget.Global);
+  await cfg.update('translation.translationModelMaxBlocksPerRequest', 4, vscode.ConfigurationTarget.Global);
+  await cfg.update('translation.translationModelConcurrency', 1, vscode.ConfigurationTarget.Global);
+
+  context.server.state.responseShape = 'blocksArray';
+  context.server.state.corruptPlaceholderOutput = true;
+  context.server.state.chatRequests = [];
+  try {
+    await translate(source);
+  } finally {
+    await cfg.update('translation.requestMode', 'auto', vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelMaxBlocksPerRequest', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelConcurrency', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('translation.translationModelMaxOutputTokens', undefined, vscode.ConfigurationTarget.Global);
+    context.server.state.responseShape = 'mapping';
+    context.server.state.corruptPlaceholderOutput = false;
+  }
+
+  assert.equal(context.server.state.chatRequests.length, 3, 'expected two failed blocks to be split into bounded single-block retries');
+  assert.equal(context.server.state.chatRequests[0].blocks.length, 3);
+  assert.equal(context.server.state.chatRequests[1].blocks.length, 1);
+  assert.equal(context.server.state.chatRequests[2].blocks.length, 1);
+
+  const output = readText(translatedPath(source));
+  assert.match(output, /MOCK:# Good/);
+  assert.match(output, /\[First\]\(https:\/\/first\.example\.com\)/);
+  assert.match(output, /\[Second\]\(https:\/\/second\.example\.com\)/);
+  assert.doesNotMatch(output, /MOCK:\[First\]/);
+  assert.doesNotMatch(output, /MOCK:\[Second\]/);
+
+  const { meta } = findMetaForSource(context.seeded.globalStorageUri, source);
+  assert.equal(meta.debug.plan.actualRequestCount, 3);
+  assert.equal(meta.debug.result.warningCount, 2);
+}
+
 async function testTranslatesFolderMarkdownFiles(context) {
   await cleanWorkspace();
   const folder = vscode.Uri.file(path.join(workspaceRoot(), 'docs'));
@@ -848,6 +898,7 @@ async function run() {
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
     await runTest('translation-model mode parses blocks arrays and splits invalid chunks', testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks, context);
     await runTest('translation-model mode retries only failed blocks', testTranslationModelModeRetriesOnlyFailedBlocks, context);
+    await runTest('translation-model mode split-retries repeated validation failures', testTranslationModelModeSplitRetriesRepeatedValidationFailures, context);
     await runTest('translates folder markdown files through explorer command', testTranslatesFolderMarkdownFiles, context);
     await runTest('translates explorer-selected markdown file', testTranslatesExplorerSelectedMarkdownFile, context);
     await runTest('translates explorer multi-selected markdown resources', testTranslatesExplorerMultiSelectedMarkdownResources, context);

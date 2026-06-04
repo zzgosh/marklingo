@@ -73,6 +73,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /id="baseUrlRow" hidden/);
   assert.match(html, /\[hidden\] \{ display: none !important; \}/);
   assert.match(html, /\.provider-card \.row \{\s+border-bottom: 0;/);
+  assert.match(html, /\.provider-actions \{\s+display: grid;\s+grid-template-columns: minmax\(0, 1fr\) max-content;/);
   assert.match(html, /select \{\s+appearance: none;\s+color: var\(--fg\);/);
   assert.match(html, /select option \{\s+background: var\(--input\);\s+color: var\(--fg\);/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
@@ -130,6 +131,26 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('Type CLEAR to confirm'));
   assert.ok(!html.includes('Can delete saved API key'));
   assert.ok(!html.includes('id="clear-data"'));
+});
+
+test('keeps the saved OpenAI-compatible provider draft when OpenRouter is active', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({
+      providerType: 'openrouter',
+      openAiCompatibleBaseUrl: 'http://127.0.0.1:8080/v1',
+      openAiCompatibleModelId: 'hy-mt2',
+      openAiCompatibleHasApiKey: true,
+      openAiCompatibleVerifiedAdapterMode: 'translationModel',
+      openAiCompatiblePromptInstructions: '### Task\nTranslate the user-facing text in each `markdown` field.',
+      openAiCompatiblePromptInstructionsEnhanced: true,
+      openAiCompatiblePromptInstructionsEnhancementNote: 'MarkLingo uses a model-specific optimized prompt for Hy-MT2 translation models.',
+    }),
+  });
+
+  assert.match(html, /openaiCompatible: \{\s+baseUrl: "http:\/\/127\.0\.0\.1:8080\/v1",\s+modelId: "hy-mt2",\s+hasApiKey: true,\s+verifiedAdapterMode: "translationModel"/);
+  assert.match(html, /openaiCompatible: \{\s+baseUrl: "http:\/\/127\.0\.0\.1:8080\/v1",\s+modelId: "hy-mt2",\s+hasApiKey: true,\s+apiKeyInput: '',\s+\}/);
 });
 
 test('renders disabled current project cleanup when no project is selected', () => {

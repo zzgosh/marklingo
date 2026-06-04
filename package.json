@@ -153,12 +153,28 @@
           "type": "string",
           "scope": "application",
           "default": "https://openrouter.ai/api/v1",
-          "description": "Custom OpenAI-compatible API base URL. Ignored when provider is OpenRouter."
+          "description": "Active provider base URL kept for compatibility. MarkLingo Settings remembers OpenAI Compatible Base URL separately."
         },
         "marklingo.openrouter.modelId": {
           "type": "string",
           "default": "google/gemini-3.1-flash-lite",
-          "description": "OpenRouter model ID, e.g. google/gemini-3.1-flash-lite."
+          "description": "Active provider model ID kept for compatibility. Prefer MarkLingo Settings for provider-specific model values."
+        },
+        "marklingo.providers.openrouter.modelId": {
+          "type": "string",
+          "default": "google/gemini-3.1-flash-lite",
+          "description": "Model ID remembered for the OpenRouter provider."
+        },
+        "marklingo.providers.openaiCompatible.baseUrl": {
+          "type": "string",
+          "scope": "application",
+          "default": "",
+          "description": "Base URL remembered for the OpenAI Compatible provider."
+        },
+        "marklingo.providers.openaiCompatible.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID remembered for the OpenAI Compatible provider."
         },
         "marklingo.translation.maxBlocksPerRequest": {
           "type": "number",

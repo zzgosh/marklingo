@@ -3,6 +3,9 @@ import * as path from 'node:path';
 import {
   coerceProviderType,
   DEFAULT_OPENROUTER_BASE_URL,
+  OPENAI_COMPATIBLE_BASE_URL_SETTING,
+  OPENAI_COMPATIBLE_MODEL_ID_SETTING,
+  OPENROUTER_PROVIDER_MODEL_ID_SETTING,
   hasExplicitOpenRouterProviderConfiguration,
   hasOpenRouterApiKey,
   getStoredOpenRouterApiKey,
@@ -14,6 +17,7 @@ import {
 } from '../services/openRouterClient.js';
 import {
   readVerifiedTranslationAdapterMode,
+  verifyProviderConnectionOnly,
   verifyProviderConnectionAndCapability,
 } from '../services/modelCapabilities.js';
 import { clearExtensionDataScopes, type CleanupScopes } from '../commands/clearExtensionData.js';
@@ -205,24 +209,33 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
       : targetLanguage;
   const systemPrompt = cfg.get<string>('translation.systemPrompt', '');
   const provider = resolveConfiguredProvider();
-  const hasExplicitModelId = hasExplicitStringSetting(cfg, 'openrouter.modelId');
-  const hasExplicitBaseUrl = hasExplicitStringSetting(cfg, 'openrouter.baseUrl');
-  const configuredModelId = (cfg.get<string>('openrouter.modelId') ?? '').trim();
+  const hasExplicitLegacyModelId = hasExplicitStringSetting(cfg, 'openrouter.modelId');
+  const hasExplicitLegacyBaseUrl = hasExplicitStringSetting(cfg, 'openrouter.baseUrl');
+  const hasExplicitOpenRouterModelId = hasExplicitStringSetting(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING);
+  const configuredLegacyModelId = (cfg.get<string>('openrouter.modelId') ?? '').trim();
   const configuredBaseUrl = (cfg.get<string>('openrouter.baseUrl') ?? '').trim();
-  const modelId = configuredModelId || (provider.providerType === 'openrouter' ? DEFAULT_OPENROUTER_MODEL_ID : '');
+  const configuredOpenRouterModelId = hasExplicitOpenRouterModelId
+    ? (cfg.get<string>(OPENROUTER_PROVIDER_MODEL_ID_SETTING) ?? '').trim()
+    : '';
+  const configuredOpenAiCompatibleBaseUrl = (cfg.get<string>(OPENAI_COMPATIBLE_BASE_URL_SETTING) ?? '').trim();
+  const configuredOpenAiCompatibleModelId = (cfg.get<string>(OPENAI_COMPATIBLE_MODEL_ID_SETTING) ?? '').trim();
   const chatPromptInstructions = resolveSystemPrompt(systemPrompt, resolvedTargetLanguage);
-  const openAiCompatibleBaseUrl = provider.providerType === 'openaiCompatible' && hasExplicitBaseUrl && configuredBaseUrl !== DEFAULT_OPENROUTER_BASE_URL
-    ? provider.baseUrl
-    : '';
-  const openAiCompatibleModelId = provider.providerType === 'openaiCompatible'
-    ? (hasExplicitModelId ? modelId : '')
-    : '';
-  const openRouterModelId = provider.providerType === 'openrouter'
-    ? modelId
-    : DEFAULT_OPENROUTER_MODEL_ID;
+  const openRouterModelId =
+    configuredOpenRouterModelId ||
+    (provider.providerType === 'openrouter' && hasExplicitLegacyModelId ? configuredLegacyModelId : '') ||
+    DEFAULT_OPENROUTER_MODEL_ID;
+  const openAiCompatibleBaseUrl =
+    configuredOpenAiCompatibleBaseUrl ||
+    (provider.providerType === 'openaiCompatible' && hasExplicitLegacyBaseUrl && configuredBaseUrl !== DEFAULT_OPENROUTER_BASE_URL
+      ? provider.baseUrl
+      : '');
+  const openAiCompatibleModelId =
+    configuredOpenAiCompatibleModelId ||
+    (provider.providerType === 'openaiCompatible' && hasExplicitLegacyModelId ? configuredLegacyModelId : '');
+  const modelId = provider.providerType === 'openrouter' ? openRouterModelId : openAiCompatibleModelId;
   const currentProviderBaseUrl = provider.providerType === 'openaiCompatible'
     ? openAiCompatibleBaseUrl
-    : provider.baseUrl;
+    : DEFAULT_OPENROUTER_BASE_URL;
   const includeLegacyKey = !hasExplicitOpenRouterProviderConfiguration();
   const openRouterHasApiKey = await hasOpenRouterApiKey(context, DEFAULT_OPENROUTER_BASE_URL, {
     includeLegacy: includeLegacyKey,
@@ -441,6 +454,12 @@ async function saveVerifiedProviderSettings(
   await cfg.update('openrouter.provider', settings.providerType, vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.baseUrl', settings.baseUrl, vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.modelId', settings.modelId, vscode.ConfigurationTarget.Global);
+  if (settings.providerType === 'openrouter') {
+    await cfg.update(OPENROUTER_PROVIDER_MODEL_ID_SETTING, settings.modelId, vscode.ConfigurationTarget.Global);
+  } else {
+    await cfg.update(OPENAI_COMPATIBLE_BASE_URL_SETTING, settings.baseUrl, vscode.ConfigurationTarget.Global);
+    await cfg.update(OPENAI_COMPATIBLE_MODEL_ID_SETTING, settings.modelId, vscode.ConfigurationTarget.Global);
+  }
   await cfg.update('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE, vscode.ConfigurationTarget.Global);
   await storeOpenRouterApiKey(context, settings.apiKey, settings.baseUrl);
   await markOpenRouterModelAccepted(context);
@@ -672,7 +691,10 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
 
         const verificationSettings = { ...normalizedSettings, apiKey: existingApiKey };
         try {
-          const result = await verifyProviderConnectionAndCapability(context, verificationSettings);
+          const cachedAdapterMode = await readVerifiedTranslationAdapterMode(context, normalizedSettings);
+          const result = cachedAdapterMode && !apiKeyInput
+            ? await verifyProviderConnectionOnly(verificationSettings, cachedAdapterMode)
+            : await verifyProviderConnectionAndCapability(context, verificationSettings);
           await saveVerifiedProviderSettings(context, verificationSettings);
           const cfg = vscode.workspace.getConfiguration('marklingo');
           const targetLanguage = cfg.get<string>('translation.targetLanguage', '简体中文');

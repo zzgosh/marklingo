@@ -80,3 +80,27 @@ export async function verifyProviderConnectionAndCapability(
     message: adapterMode === 'chatJson' ? 'Verified as Chat JSON.' : 'Verified as Translation Model.',
   };
 }
+
+export async function verifyProviderConnectionOnly(
+  settings: OpenRouterSettings,
+  adapterMode: TranslationAdapterMode,
+): Promise<ProviderVerificationResult> {
+  try {
+    await openRouterChatCompletion(settings, [
+      { role: 'user', content: 'Connection check. Return a short response.' },
+    ], {
+      temperature: 0,
+      maxTokens: 8,
+      timeoutMs: 10_000,
+      reasoning: { effort: 'none', exclude: true },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Verification failed. ${message}`);
+  }
+
+  return {
+    adapterMode,
+    message: adapterMode === 'chatJson' ? 'Connection verified.' : 'Connection verified as Translation Model.',
+  };
+}

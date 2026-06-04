@@ -71,10 +71,11 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Setting: `marklingo.openrouter.provider`
   - Default: `openrouter`
   - `OpenRouter` uses the official OpenRouter endpoint and hides Base URL. `OpenAI Compatible` exposes Base URL for custom endpoints such as llama.cpp server.
+  - The settings page remembers OpenRouter and OpenAI Compatible fields separately. Switching the dropdown loads that provider's saved draft; `Save and Verify` activates the selected provider.
 
 - **Base URL**
-  - Setting: `marklingo.openrouter.baseUrl`
-  - Default: `https://openrouter.ai/api/v1`
+  - Setting: `marklingo.providers.openaiCompatible.baseUrl`
+  - Default: empty
   - Used only when Provider is `OpenAI Compatible`. Custom endpoints must use HTTPS, except localhost debugging.
 
 - **API Key**
@@ -83,13 +84,14 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Enter the API key for the selected provider. Keys are stored separately by endpoint origin and are never stored in VS Code settings or workspace files.
 
 - **Model ID**
-  - Setting: `marklingo.openrouter.modelId`
-  - Default: `google/gemini-3.1-flash-lite`
+  - Settings: `marklingo.providers.openrouter.modelId`, `marklingo.providers.openaiCompatible.modelId`
+  - Default: `google/gemini-3.1-flash-lite` for OpenRouter; empty for OpenAI Compatible
   - Use an OpenRouter model ID, or the model alias exposed by an OpenAI-compatible endpoint.
 
 - **Save and Verify**
   - Saves the Provider, API key, and Model ID only after a lightweight verification request succeeds.
   - The verification checks connectivity and whether the model can follow a small chat-style JSON task.
+  - If the selected provider, Base URL, Model ID, and saved API key are unchanged and a capability result is already cached, MarkLingo only reruns a short connectivity check instead of probing model capability again.
   - Models that pass use `Chat JSON`. Reachable models that return content but do not follow the JSON task are cached as `Translation Model`.
 
 - **Advanced Request Mode**

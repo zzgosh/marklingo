@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { DEFAULT_OPENROUTER_MODEL_ID } from '../services/openRouterClient.js';
+import { DEFAULT_OPENROUTER_MODEL_ID, OPENROUTER_PROVIDER_MODEL_ID_SETTING } from '../services/openRouterClient.js';
 import { markOpenRouterModelAccepted } from '../onboardingState.js';
 
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
@@ -38,6 +38,7 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
       ? vscode.ConfigurationTarget.Workspace
       : vscode.ConfigurationTarget.Global;
 
+  await cfg.update(OPENROUTER_PROVIDER_MODEL_ID_SETTING, modelId, target);
   await cfg.update('openrouter.modelId', modelId, target);
   await vscode.window.showInformationMessage(`MarkLingo: Saved OpenRouter model ID: ${modelId}`);
 }

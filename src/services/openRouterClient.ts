@@ -50,6 +50,9 @@ export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
 export const DEFAULT_PROVIDER_TYPE: ProviderType = 'openrouter';
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = 'http://127.0.0.1:8080/v1';
+export const OPENROUTER_PROVIDER_MODEL_ID_SETTING = 'providers.openrouter.modelId';
+export const OPENAI_COMPATIBLE_BASE_URL_SETTING = 'providers.openaiCompatible.baseUrl';
+export const OPENAI_COMPATIBLE_MODEL_ID_SETTING = 'providers.openaiCompatible.modelId';
 
 const LEGACY_OPENROUTER_API_KEY_SECRET = 'marklingo.openrouter.apiKey';
 const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey.v2.';
@@ -109,6 +112,16 @@ function getConfiguredProviderType(cfg: vscode.WorkspaceConfiguration): Provider
   return coerceProviderType(cfg.get<string>('openrouter.provider') ?? DEFAULT_PROVIDER_TYPE);
 }
 
+function readStringSetting(cfg: vscode.WorkspaceConfiguration, key: string): string {
+  return (cfg.get<string>(key) ?? '').trim();
+}
+
+function hasExplicitStringConfiguration(cfg: vscode.WorkspaceConfiguration, key: string): boolean {
+  const inspected = cfg.inspect<string>(key);
+  return [inspected?.globalValue, inspected?.workspaceValue, inspected?.workspaceFolderValue]
+    .some((value) => typeof value === 'string' && value.trim().length > 0);
+}
+
 export function getProviderDefaultBaseUrl(providerType: ProviderType): string {
   return providerType === 'openrouter' ? DEFAULT_OPENROUTER_BASE_URL : DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
 }
@@ -125,7 +138,9 @@ export function resolveProviderBaseUrl(providerType: ProviderType, rawBaseUrl?: 
 export function resolveConfiguredProvider(): { providerType: ProviderType; baseUrl: string; origin: string } {
   const cfg = getConfiguration();
   const providerType = getConfiguredProviderType(cfg);
-  const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? getProviderDefaultBaseUrl(providerType);
+  const rawBaseUrl = providerType === 'openaiCompatible'
+    ? readStringSetting(cfg, OPENAI_COMPATIBLE_BASE_URL_SETTING) || cfg.get<string>('openrouter.baseUrl') || getProviderDefaultBaseUrl(providerType)
+    : DEFAULT_OPENROUTER_BASE_URL;
   const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
   return { providerType, baseUrl, origin };
 }
@@ -197,14 +212,39 @@ async function resolveApiKey(
 }
 
 function hasExplicitModelConfiguration(cfg: vscode.WorkspaceConfiguration): boolean {
-  const inspected = cfg.inspect<string>('openrouter.modelId');
-  return [inspected?.globalValue, inspected?.workspaceValue, inspected?.workspaceFolderValue]
+  const legacy = cfg.inspect<string>('openrouter.modelId');
+  const openRouterProvider = cfg.inspect<string>(OPENROUTER_PROVIDER_MODEL_ID_SETTING);
+  return [
+    legacy?.globalValue,
+    legacy?.workspaceValue,
+    legacy?.workspaceFolderValue,
+    openRouterProvider?.globalValue,
+    openRouterProvider?.workspaceValue,
+    openRouterProvider?.workspaceFolderValue,
+  ]
     .some((value) => typeof value === 'string' && value.trim().length > 0);
 }
 
-async function resolveModelId(context: vscode.ExtensionContext): Promise<string> {
+async function resolveModelId(context: vscode.ExtensionContext, providerType: ProviderType): Promise<string> {
   const cfg = getConfiguration();
-  const modelId = (cfg.get<string>('openrouter.modelId') ?? '').trim() || DEFAULT_OPENROUTER_MODEL_ID;
+  if (providerType === 'openaiCompatible') {
+    const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
+      ? readStringSetting(cfg, 'openrouter.modelId')
+      : '';
+    const modelId = readStringSetting(cfg, OPENAI_COMPATIBLE_MODEL_ID_SETTING) || legacyModelId;
+    if (!modelId) {
+      throw new Error('Missing Provider modelId. Open MarkLingo settings, select OpenAI Compatible, then save and verify the provider.');
+    }
+    return modelId;
+  }
+
+  const providerModelId = hasExplicitStringConfiguration(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
+    ? readStringSetting(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
+    : '';
+  const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
+    ? readStringSetting(cfg, 'openrouter.modelId')
+    : '';
+  const modelId = providerModelId || legacyModelId || DEFAULT_OPENROUTER_MODEL_ID;
   if (hasExplicitModelConfiguration(cfg) || hasOpenRouterModelAccepted(context)) {
     await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, modelId);
     await markOpenRouterModelAccepted(context);
@@ -239,13 +279,15 @@ async function resolveModelId(context: vscode.ExtensionContext): Promise<string>
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
   const cfg = getConfiguration();
   const providerType = getConfiguredProviderType(cfg);
-  const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? getProviderDefaultBaseUrl(providerType);
+  const rawBaseUrl = providerType === 'openaiCompatible'
+    ? readStringSetting(cfg, OPENAI_COMPATIBLE_BASE_URL_SETTING) || cfg.get<string>('openrouter.baseUrl') || getProviderDefaultBaseUrl(providerType)
+    : DEFAULT_OPENROUTER_BASE_URL;
   const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
   const apiKey = await resolveApiKey(context, {
     origin,
     allowLegacyMigration: !hasExplicitProviderConfiguration(cfg),
   });
-  const modelId = await resolveModelId(context);
+  const modelId = await resolveModelId(context, providerType);
 
   return { providerType, baseUrl, modelId, apiKey };
 }
@@ -256,6 +298,16 @@ export async function storeOpenRouterApiKey(
   baseUrl?: string,
 ): Promise<void> {
   const origin = resolveApiKeyOrigin(baseUrl);
+  const legacySecret = await context.secrets.get(LEGACY_OPENROUTER_API_KEY_SECRET);
+  const defaultOpenRouterOrigin = parseOpenRouterBaseUrl(DEFAULT_OPENROUTER_BASE_URL).origin;
+  if (legacySecret?.trim() && origin !== defaultOpenRouterOrigin) {
+    const defaultSecretName = getApiKeySecretName(defaultOpenRouterOrigin);
+    const existingDefaultSecret = await context.secrets.get(defaultSecretName);
+    if (!existingDefaultSecret?.trim()) {
+      await context.secrets.store(defaultSecretName, legacySecret.trim());
+      await rememberApiKeyOrigin(context, defaultOpenRouterOrigin);
+    }
+  }
   await context.secrets.store(getApiKeySecretName(origin), apiKey.trim());
   await rememberApiKeyOrigin(context, origin);
   await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);

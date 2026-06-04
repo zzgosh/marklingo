@@ -50,6 +50,8 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 
 API keys must only use VS Code `SecretStorage`. Keys are separated by endpoint origin. Do not store API keys in workspace settings, metadata, logs, or debug output.
 
+Provider form values are intentionally remembered per provider. `providers.openrouter.modelId`, `providers.openaiCompatible.baseUrl`, and `providers.openaiCompatible.modelId` hold the Settings UI drafts for each provider. The legacy `openrouter.provider`, `openrouter.baseUrl`, and `openrouter.modelId` keys remain the active provider compatibility path used by translation commands. When changing Provider UX, update both the per-provider remembered values and the active compatibility values deliberately.
+
 Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, cached translated blocks, output hashes, cache state, and structured debug metadata. Visible translated Markdown output is always written as `*_<language>_mdt.md` next to the source Markdown file.
 
 Private storage is quota-managed. Successful translation writes active cache payloads, then enforces the 300 MB private storage quota by evicting least-recently-used cache payloads into tracking stubs. Settings `Optimize` compacts toward 150 MB. Tracking stubs must preserve `sourceUri`, `outputUri`, `outputHash`, and `targetLanguage` so cleanup can still identify generated outputs after cached translations are reclaimed.

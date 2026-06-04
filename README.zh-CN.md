@@ -71,10 +71,11 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
   - 设置项：`marklingo.openrouter.provider`
   - 默认值：`openrouter`
   - `OpenRouter` 使用官方 OpenRouter 端点并隐藏 Base URL。`OpenAI Compatible` 会显示 Base URL，用于 llama.cpp server 等自定义端点。
+  - 设置页面会分别记住 OpenRouter 与 OpenAI Compatible 的字段。切换下拉菜单会载入该 Provider 已保存的草稿；点击 `Save and Verify` 后才会激活所选 Provider。
 
 - **Base URL（基础 URL）**
-  - 设置项：`marklingo.openrouter.baseUrl`
-  - 默认值：`https://openrouter.ai/api/v1`
+  - 设置项：`marklingo.providers.openaiCompatible.baseUrl`
+  - 默认值：空
   - 仅在 Provider 为 `OpenAI Compatible` 时使用。自定义端点必须使用 HTTPS，localhost 调试除外。
 
 - **API Key（API 密钥）**
@@ -83,13 +84,14 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
   - 输入所选 Provider 的 API 密钥。密钥会按 endpoint origin 分开存储，不会写入 VS Code 设置或工作区文件。
 
 - **Model ID（模型 ID）**
-  - 设置项：`marklingo.openrouter.modelId`
-  - 默认值：`google/gemini-3.1-flash-lite`
+  - 设置项：`marklingo.providers.openrouter.modelId`、`marklingo.providers.openaiCompatible.modelId`
+  - 默认值：OpenRouter 为 `google/gemini-3.1-flash-lite`；OpenAI Compatible 为空
   - 使用 OpenRouter 模型 ID，或 OpenAI-compatible 端点暴露的模型 alias。
 
 - **Save and Verify（保存并验证）**
   - 只有轻量验证请求成功后，才会保存 Provider、API Key 和 Model ID。
   - 验证会检查连通性，以及模型是否能完成一个很小的 chat-style JSON 任务。
+  - 如果所选 Provider、Base URL、Model ID 和已保存的 API Key 都没有变化，并且已经有能力验证缓存，MarkLingo 只会重新做一次短连通性检查，不会再次探测模型能力。
   - 验证通过的模型使用 `Chat JSON`。端点可达、有内容返回但不能完成 JSON 任务的模型，会缓存为 `Translation Model`。
 
 - **Advanced Request Mode（高级请求模式）**
@@ -137,6 +139,8 @@ llama-server \
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
 - 然后点击 `Save and Verify`。Hy-MT 应会被验证为 `Translation Model`。
+
+对于 Hy-MT2 模型 ID，MarkLingo 会在 Translation Model 模式下使用内部维护的模型专属 structured-data prompt。其他 Translation Model 适配器会继续使用通用、克制的 Translation Model prompt，除非 MarkLingo 为该模型维护了专属 prompt profile。
 
 本地吞吐量主要取决于模型、量化方式和硬件。MarkLingo 不会替你下载、启动或调优 llama.cpp；那会变成单独的本地 runtime 管理器，需要处理模型下载、二进制安装、端口分配、进程生命周期和硬件探测。客户端并发只有在 `llama-server` 有匹配的 `--parallel` slot 时才有帮助；如果 server 只有一个 slot，额外的客户端请求通常只是排队，不会让翻译更快。普通设置页会隐藏模型批处理调参项，并使用保守默认值：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（按 context 自动估算输出预算）。用于诊断的 settings.json 高级覆盖仍然保留。
 

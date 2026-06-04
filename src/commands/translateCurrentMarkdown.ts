@@ -858,17 +858,33 @@ async function translateMarkdownDocument(
               .slice(0, 3)
               .map((item) => `${item.block.id}: ${item.reason}`)
               .join('; ');
-            if (blocks.length > 1) {
+            const failedRetryBlocks = validated.failedBlocks.map((item) => item.block);
+            if (failedRetryBlocks.length > 1) {
+              addDebugEvent(
+                debug,
+                'warning',
+                `Request ${requestIndex} kept ${validated.restoredTexts.size} valid block(s) and will split-retry ` +
+                  `${failedRetryBlocks.length} failed block(s): ${failedBlockSummary}`,
+              );
+              const midpoint = Math.ceil(failedRetryBlocks.length / 2);
+              const left = await requestTranslationModelBlocks(failedRetryBlocks.slice(0, midpoint), `${label}.retry.1`);
+              const right = await requestTranslationModelBlocks(failedRetryBlocks.slice(midpoint), `${label}.retry.2`);
+              return {
+                values: { ...validated.values, ...left.values, ...right.values },
+                restoredTexts: new Map([...validated.restoredTexts, ...left.restoredTexts, ...right.restoredTexts]),
+                failedBlocks: [...left.failedBlocks, ...right.failedBlocks],
+                maxTokens,
+              };
+            }
+
+            if (failedRetryBlocks.length === 1 && blocks.length > 1) {
               addDebugEvent(
                 debug,
                 'warning',
                 `Request ${requestIndex} kept ${validated.restoredTexts.size} valid block(s) and will retry ` +
-                  `${validated.failedBlocks.length} failed block(s): ${failedBlockSummary}`,
+                  `1 failed block: ${failedBlockSummary}`,
               );
-              const retry = await requestTranslationModelBlocks(
-                validated.failedBlocks.map((item) => item.block),
-                `${label}.retry`,
-              );
+              const retry = await requestTranslationModelBlocks(failedRetryBlocks, `${label}.retry`);
               return {
                 values: { ...validated.values, ...retry.values },
                 restoredTexts: new Map([...validated.restoredTexts, ...retry.restoredTexts]),

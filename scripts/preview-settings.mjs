@@ -37,8 +37,10 @@ const defaultTranslationModelConcurrency = configProperties['marklingo.translati
 const defaultTranslationModelMaxOutputTokens = configProperties['marklingo.translation.translationModelMaxOutputTokens'].default;
 const settingsHtmlUrl = pathToFileURL(path.join(root, 'out/webview/settingsHtml.js')).href;
 const promptsUrl = pathToFileURL(path.join(root, 'out/translation/prompts.js')).href;
+const translationModelPromptsUrl = pathToFileURL(path.join(root, 'out/translation/translationModelPrompts.js')).href;
 const { createSettingsHtmlNonce, renderSettingsHtml } = await import(`${settingsHtmlUrl}?t=${Date.now()}`);
 const { resolveSystemPrompt } = await import(`${promptsUrl}?t=${Date.now()}`);
+const { getTranslationModelPromptPreview } = await import(`${translationModelPromptsUrl}?t=${Date.now()}`);
 
 function getPreviewThemeCss(nonce) {
   return `<style nonce="${nonce}">
@@ -73,7 +75,29 @@ function getPreviewThemeCss(nonce) {
   </style>`;
 }
 
-function getPreviewBridgeScript(nonce) {
+function getPromptState(adapterMode, promptModelId, targetLanguage, chatPromptInstructions) {
+  if (adapterMode === 'translationModel') {
+    const preview = getTranslationModelPromptPreview({ targetLanguage, modelId: promptModelId });
+    return {
+      promptInstructions: preview.prompt,
+      promptInstructionsEnhanced: preview.enhanced,
+      promptInstructionsEnhancementNote: preview.enhancementNote,
+    };
+  }
+  return {
+    promptInstructions: chatPromptInstructions,
+    promptInstructionsEnhanced: false,
+    promptInstructionsEnhancementNote: undefined,
+  };
+}
+
+function getPreviewBridgeScript(nonce, url) {
+  const usesCustomLanguage = url.searchParams.get('custom') === '1';
+  const targetLanguage = usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文';
+  const chatPromptInstructions = resolveSystemPrompt('', targetLanguage);
+  const adapterMode = url.search.includes('capability=translationModel') ? 'translationModel' : 'chatJson';
+  const promptModelId = url.searchParams.get('openaiModel') ?? url.searchParams.get('model') ?? defaultModelId;
+  const promptState = getPromptState(adapterMode, promptModelId, targetLanguage, chatPromptInstructions);
   return `<script nonce="${nonce}">
     window.__marklingoPreviewMessages = [];
     window.acquireVsCodeApi = () => ({
@@ -100,6 +124,9 @@ function getPreviewBridgeScript(nonce) {
             baseUrl: message.providerType === 'openaiCompatible' ? message.baseUrl : ${JSON.stringify(defaultBaseUrl)},
             modelId: message.modelId,
             adapterMode,
+            promptInstructions: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructions)} : ${JSON.stringify(chatPromptInstructions)},
+            promptInstructionsEnhanced: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructionsEnhanced)} : false,
+            promptInstructionsEnhancementNote: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructionsEnhancementNote ?? '')} : '',
             message: adapterMode === 'translationModel' ? 'Verified as Translation Model.' : 'Verified as Chat JSON.',
             saveId: message.saveId,
           });
@@ -129,18 +156,32 @@ function getPreviewBridgeScript(nonce) {
 
 function buildState(url) {
   const usesCustomLanguage = url.searchParams.get('custom') === '1';
+  const targetLanguage = usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文';
+  const chatPromptInstructions = resolveSystemPrompt('', targetLanguage);
   const providerType = url.searchParams.get('provider') ?? defaultProviderType;
   const isOpenAiCompatible = providerType === 'openaiCompatible';
   const modelId = url.searchParams.get('model') ?? (isOpenAiCompatible ? '' : defaultModelId);
   const baseUrl = isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? '') : defaultBaseUrl;
   const currentProviderHasApiKey = url.searchParams.get('apiKey') === 'present';
+  const openAiCompatibleBaseUrl = url.searchParams.get('openaiBaseUrl') ?? (isOpenAiCompatible ? baseUrl : '');
+  const openAiCompatibleModelId = url.searchParams.get('openaiModel') ?? (isOpenAiCompatible ? modelId : '');
   const openRouterHasApiKey = isOpenAiCompatible
     ? url.searchParams.get('openrouterKey') === 'present'
     : currentProviderHasApiKey;
+  const openAiCompatibleHasApiKey = url.searchParams.get('openaiKey') === 'present' || (isOpenAiCompatible && currentProviderHasApiKey);
   const shouldUseVerifiedCapability = url.searchParams.get('verified') !== '0';
   const verifiedAdapterMode = currentProviderHasApiKey && shouldUseVerifiedCapability
     ? (url.searchParams.get('capability') ?? 'chatJson')
     : undefined;
+  const openRouterVerifiedAdapterMode = openRouterHasApiKey && shouldUseVerifiedCapability
+    ? (url.searchParams.get('openrouterCapability') ?? 'chatJson')
+    : undefined;
+  const openAiCompatibleVerifiedAdapterMode = openAiCompatibleHasApiKey && shouldUseVerifiedCapability
+    ? (url.searchParams.get('openaiCapability') ?? (isOpenAiCompatible ? verifiedAdapterMode : undefined))
+    : undefined;
+  const currentPromptState = getPromptState(verifiedAdapterMode, modelId, targetLanguage, chatPromptInstructions);
+  const openRouterPromptState = getPromptState(openRouterVerifiedAdapterMode, defaultModelId, targetLanguage, chatPromptInstructions);
+  const openAiCompatiblePromptState = getPromptState(openAiCompatibleVerifiedAdapterMode, openAiCompatibleModelId, targetLanguage, chatPromptInstructions);
   return {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
@@ -152,13 +193,17 @@ function buildState(url) {
     openRouterBaseUrl: defaultBaseUrl,
     openRouterModelId: isOpenAiCompatible ? defaultModelId : modelId,
     openRouterHasApiKey,
-    openRouterVerifiedAdapterMode: openRouterHasApiKey && shouldUseVerifiedCapability
-      ? (url.searchParams.get('openrouterCapability') ?? 'chatJson')
-      : undefined,
-    openAiCompatibleBaseUrl: isOpenAiCompatible ? baseUrl : '',
-    openAiCompatibleModelId: isOpenAiCompatible ? modelId : '',
-    openAiCompatibleHasApiKey: isOpenAiCompatible && currentProviderHasApiKey,
-    openAiCompatibleVerifiedAdapterMode: isOpenAiCompatible && currentProviderHasApiKey ? verifiedAdapterMode : undefined,
+    openRouterVerifiedAdapterMode,
+    openRouterPromptInstructions: openRouterPromptState.promptInstructions,
+    openRouterPromptInstructionsEnhanced: openRouterPromptState.promptInstructionsEnhanced,
+    openRouterPromptInstructionsEnhancementNote: openRouterPromptState.promptInstructionsEnhancementNote,
+    openAiCompatibleBaseUrl,
+    openAiCompatibleModelId,
+    openAiCompatibleHasApiKey,
+    openAiCompatibleVerifiedAdapterMode,
+    openAiCompatiblePromptInstructions: openAiCompatiblePromptState.promptInstructions,
+    openAiCompatiblePromptInstructionsEnhanced: openAiCompatiblePromptState.promptInstructionsEnhanced,
+    openAiCompatiblePromptInstructionsEnhancementNote: openAiCompatiblePromptState.promptInstructionsEnhancementNote,
     hasApiKey: currentProviderHasApiKey,
     modelId,
     verifiedAdapterMode,
@@ -168,7 +213,10 @@ function buildState(url) {
     translationModelMaxOutputTokens: Number.parseInt(url.searchParams.get('maxTokens') ?? String(defaultTranslationModelMaxOutputTokens), 10),
     targetLanguage: usesCustomLanguage ? 'Custom...' : '简体中文',
     targetLanguageCustom: usesCustomLanguage ? 'Brazilian Portuguese' : '',
-    systemPrompt: resolveSystemPrompt('', usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文'),
+    promptInstructions: currentPromptState.promptInstructions,
+    promptInstructionsEnhanced: currentPromptState.promptInstructionsEnhanced,
+    promptInstructionsEnhancementNote: currentPromptState.promptInstructionsEnhancementNote,
+    chatPromptInstructions,
     customPrompt: '',
     storageRoot: path.join(root, '.vscode-test', 'marklingo-preview', 'globalStorage', 'projects'),
     currentProjectPath: root,
@@ -199,7 +247,7 @@ const server = http.createServer((request, response) => {
 
   const nonce = createSettingsHtmlNonce();
   const html = renderSettingsHtml({
-    beforeMainScript: getPreviewBridgeScript(nonce),
+    beforeMainScript: getPreviewBridgeScript(nonce, requestUrl),
     cspSource: "'self'",
     extraHead: getPreviewThemeCss(nonce),
     nonce,

@@ -71,10 +71,11 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
   - 設定：`marklingo.openrouter.provider`
   - デフォルト：`openrouter`
   - `OpenRouter` は公式 OpenRouter エンドポイントを使用し、Base URL を非表示にします。`OpenAI Compatible` は llama.cpp server などのカスタムエンドポイント向けに Base URL を表示します。
+  - 設定ページは OpenRouter と OpenAI Compatible の入力内容を別々に記憶します。ドロップダウンを切り替えるとその Provider の保存済みドラフトを読み込み、`Save and Verify` をクリックすると選択した Provider が有効になります。
 
 - **Base URL（ベース URL）**
-  - 設定：`marklingo.openrouter.baseUrl`
-  - デフォルト：`https://openrouter.ai/api/v1`
+  - 設定：`marklingo.providers.openaiCompatible.baseUrl`
+  - デフォルト：空
   - Provider が `OpenAI Compatible` の場合のみ使用されます。カスタムエンドポイントは、localhost でのデバッグを除き、HTTPS を使用する必要があります。
 
 - **API Key（API キー）**
@@ -83,13 +84,14 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
   - 選択した Provider の API キーを入力します。キーは endpoint origin ごとに分けて保存され、VS Code の設定やワークスペースのファイルには保存されません。
 
 - **Model ID（モデル ID）**
-  - 設定：`marklingo.openrouter.modelId`
-  - デフォルト：`google/gemini-3.1-flash-lite`
+  - 設定：`marklingo.providers.openrouter.modelId`、`marklingo.providers.openaiCompatible.modelId`
+  - デフォルト：OpenRouter は `google/gemini-3.1-flash-lite`、OpenAI Compatible は空
   - OpenRouter のモデル ID、または OpenAI-compatible エンドポイントが公開するモデル alias を使用します。
 
 - **Save and Verify（保存して検証）**
   - 軽量な検証リクエストが成功した場合のみ、Provider、API Key、Model ID を保存します。
   - 検証では接続性と、モデルが小さな chat-style JSON タスクに従えるかを確認します。
+  - 選択した Provider、Base URL、Model ID、保存済み API Key が変わっておらず、capability 結果がすでにキャッシュされている場合、MarkLingo はモデル capability を再度プローブせず、短い接続チェックだけを行います。
   - 検証を通過したモデルは `Chat JSON` を使用します。エンドポイントに到達でき、内容は返すものの JSON タスクに従えないモデルは `Translation Model` としてキャッシュされます。
 
 - **Advanced Request Mode（詳細リクエストモード）**
@@ -137,6 +139,8 @@ llama-server \
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
 - その後 `Save and Verify` をクリックします。Hy-MT は `Translation Model` として検証されるはずです。
+
+Hy-MT2 のモデル ID では、MarkLingo は Translation Model モードで内部のモデル専用 structured-data prompt を使用します。その他の Translation Model アダプターでは、そのモデル専用の prompt profile が MarkLingo に用意されていない限り、汎用で控えめな Translation Model prompt を使い続けます。
 
 ローカルのスループットは主に、モデル、量子化方式、ハードウェアに依存します。MarkLingo は llama.cpp のダウンロード、起動、調整は行いません。それを行うには、モデルのダウンロード、バイナリのセットアップ、ポート割り当て、プロセスのライフサイクル、ハードウェア検出を扱う別のローカル runtime 管理機能が必要になります。クライアント側の並行実行は、`llama-server` に対応する `--parallel` slot がある場合にのみ有効です。server が 1 slot の場合、追加のクライアントリクエストは通常キューに入るだけで、翻訳は速くなりません。通常の設定 UI ではモデルのバッチ調整項目を隠し、保守的なデフォルト値を使います：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（context から出力予算を自動推定）。診断用の settings.json 詳細上書きは残しています。
 
