@@ -511,7 +511,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
     vscode.ViewColumn.Active,
     {
       enableScripts: true,
-      retainContextWhenHidden: false,
+      retainContextWhenHidden: true,
     },
   );
   currentPanel = panel;

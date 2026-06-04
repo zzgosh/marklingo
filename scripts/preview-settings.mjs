@@ -110,7 +110,8 @@ function getPreviewBridgeScript(nonce) {
           return;
         }
         if (message.type === 'clearAllData') {
-          console.info('[MarkLingo Settings preview] clearAllData is mocked; no files or settings are deleted.');
+          console.info('[MarkLingo Settings preview] clearAllData is mocked; resetting preview state.');
+          window.setTimeout(() => window.location.replace(window.location.origin + window.location.pathname), 140);
           return;
         }
         if (message.type === 'optimizeStorage') {

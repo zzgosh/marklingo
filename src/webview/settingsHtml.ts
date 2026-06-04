@@ -882,11 +882,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         baseUrl: ${scriptJson(state.openRouterBaseUrl)},
         modelId: ${scriptJson(state.openRouterModelId)},
         hasApiKey: ${scriptJson(state.openRouterHasApiKey)},
+        apiKeyInput: '',
       },
       openaiCompatible: {
         baseUrl: ${scriptJson(state.openAiCompatibleBaseUrl)},
         modelId: ${scriptJson(state.openAiCompatibleModelId)},
         hasApiKey: ${scriptJson(state.openAiCompatibleHasApiKey)},
+        apiKeyInput: '',
       },
     };
     let selectedProviderType = providerBaseline.providerType;
@@ -931,9 +933,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       if (!draft) return;
       draft.baseUrl = baseUrlInput.value.trim();
       draft.modelId = modelIdInput.value.trim();
-      if (!isApiKeyMasked() && apiKeyInput.value.trim()) {
-        draft.hasApiKey = false;
+      if (isApiKeyMasked()) {
+        draft.apiKeyInput = '';
+        return;
       }
+      draft.apiKeyInput = apiKeyInput.value.trim();
+      draft.hasApiKey = false;
     }
 
     function saveCurrentProviderDraft() {
@@ -950,6 +955,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         showApiKeyMask();
       } else {
         showEmptyApiKey();
+        apiKeyInput.value = draft.apiKeyInput || '';
       }
       syncProviderBaseUrlVisibility();
     }
@@ -1026,9 +1032,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         clearApiKeyMaskForEntry();
       }
     });
-    apiKeyInput.addEventListener('input', updateProviderVerificationState);
+    apiKeyInput.addEventListener('input', handleProviderInput);
     verifyProviderBtn.addEventListener('click', () => {
       if (providerPending) return;
+      saveCurrentProviderDraft();
       const values = getProviderValues();
       const saveId = nextProviderSaveId++;
       providerPending = {
@@ -1150,6 +1157,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             baseUrl: verifiedBaseUrl,
             modelId: verifiedModelId,
             hasApiKey: providerBaseline.hasApiKey,
+            apiKeyInput: '',
           };
           if (providerTypeSelect.value === verifiedProviderType) {
             baseUrlInput.value = verifiedBaseUrl;
@@ -1163,7 +1171,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         verifyProviderBtn.textContent = 'Save and Verify';
         verifyProviderBtn.disabled = false;
         verifyProviderBtn.classList.remove('saved');
-        setProviderStatus('Verification Failed', true);
+        setProviderStatus(msg.message || 'Verification Failed', true);
         return;
       }
       if (msg.type === 'shortcutState') {

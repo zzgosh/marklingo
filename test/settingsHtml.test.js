@@ -96,10 +96,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /window\.acquireVsCodeApi/);
   assert.match(html, /id="apiKey" type="password" autocomplete="off" value="•{32}" data-masked="true"/);
   assert.match(html, /modelId: "google\/gemini-3\.1-flash-lite"/);
-  assert.match(html, /openaiCompatible: \{\s+baseUrl: "",\s+modelId: "",\s+hasApiKey: false,\s+\}/);
+  assert.match(html, /openaiCompatible: \{\s+baseUrl: "",\s+modelId: "",\s+hasApiKey: false,\s+apiKeyInput: '',\s+\}/);
   assert.match(html, /showApiKeyMask\(\)/);
   assert.match(html, /providerDrafts/);
   assert.match(html, /selectedProviderType/);
+  assert.match(html, /apiKeyInput\.addEventListener\('input', handleProviderInput\);/);
+  assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification Failed', true\);/);
   assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
   assert.ok(!html.includes('Enter API key'));
