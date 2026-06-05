@@ -29,5 +29,5 @@ export async function setOpenRouterApiKey(context: vscode.ExtensionContext) {
 
   await storeOpenRouterApiKey(context, input.trim(), provider.baseUrl);
   await acceptVisibleOnboardingDefaults(context);
-  await vscode.window.showInformationMessage(`MarkLingo: Saved ${getProviderDisplayName(provider.providerType)} API key in SecretStorage.`);
+  await vscode.window.showInformationMessage(`MarkLingo: ${getProviderDisplayName(provider.providerType)} API key saved.`);
 }

@@ -15,13 +15,17 @@ export function getProviderApiKeyInputPrompt(
 ): string {
   const providerName = getProviderDisplayName(providerType);
   const endpoint = baseUrl.trim();
-  const endpointText = endpoint ? ` Endpoint: ${endpoint}.` : '';
   if (hasExisting) {
-    return `Current Provider: ${providerName}.${endpointText} An API key is already saved for this provider. Enter a new key to replace it.`;
+    return 'A key is already saved. Paste a new one to replace it.';
   }
-  return `Current Provider: ${providerName}.${endpointText} Enter the API key for ${providerName}. It will be stored in VS Code SecretStorage.`;
+  if (providerType === 'openrouter') {
+    return 'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code.';
+  }
+  return endpoint
+    ? `Paste the API key for ${endpoint}. MarkLingo stores it securely in VS Code.`
+    : `Paste the API key for ${providerName}. MarkLingo stores it securely in VS Code.`;
 }
 
 export function getMissingProviderApiKeyMessage(providerType: ProviderDisplayType): string {
-  return `Missing ${getProviderDisplayName(providerType)} API key. Save and verify it from MarkLingo settings or run translation again.`;
+  return `No ${getProviderDisplayName(providerType)} API key saved. Add one in Settings, or run translation again.`;
 }

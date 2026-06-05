@@ -123,6 +123,8 @@ function getShortcutWarningText(warning: string): string {
 }
 
 const API_KEY_MASK_VALUE = '•'.repeat(32);
+const PROVIDER_SMALL_BATCH_STATUS = 'Verified - using smaller batches for reliability.';
+const PROVIDER_SMALL_BATCH_TOOLTIP = 'Some models need smaller Markdown batches to keep output reliable, so large files may run a bit slower.';
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
@@ -419,6 +421,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       align-items: center;
       justify-content: flex-end;
       gap: 16px;
+      min-width: 0;
+    }
+    .provider-feedback {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 2px;
       min-width: 0;
     }
     .provider-status {
@@ -730,7 +739,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           <div class="row">
             <div></div>
             <div class="provider-actions">
-              <div class="provider-status" id="provider-status"></div>
+              <div class="provider-feedback">
+                <div class="provider-status" id="provider-status"></div>
+                <span class="info-tip" id="provider-mode-tip" tabindex="0" aria-label="About smaller batches" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(PROVIDER_SMALL_BATCH_TOOLTIP)}</span></span>
+              </div>
               <button class="save-btn" type="button" id="verify-provider">Save and Verify</button>
             </div>
           </div>
@@ -906,6 +918,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     syncCustomLanguageVisibility(false);
 
     const API_KEY_MASK_VALUE = ${scriptJson(API_KEY_MASK_VALUE)};
+    const PROVIDER_SMALL_BATCH_STATUS = ${scriptJson(PROVIDER_SMALL_BATCH_STATUS)};
+    const PROVIDER_SMALL_BATCH_TOOLTIP = ${scriptJson(PROVIDER_SMALL_BATCH_TOOLTIP)};
     const providerTypeSelect = document.getElementById('providerType');
     const baseUrlRow = document.getElementById('baseUrlRow');
     const baseUrlInput = document.getElementById('baseUrl');
@@ -913,6 +927,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const apiKeyInput = document.getElementById('apiKey');
     const verifyProviderBtn = document.getElementById('verify-provider');
     const providerStatus = document.getElementById('provider-status');
+    const providerModeTip = document.getElementById('provider-mode-tip');
     const promptInstructions = document.getElementById('promptInstructions');
     const promptInstructionsLabel = document.getElementById('promptInstructionsLabel');
     const customPromptRow = document.getElementById('customPromptRow');
@@ -1073,8 +1088,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     function setProviderStatus(text, failed) {
       providerStatus.textContent = text || '';
-      providerStatus.title = text || '';
+      providerStatus.title = text === PROVIDER_SMALL_BATCH_STATUS ? PROVIDER_SMALL_BATCH_TOOLTIP : text || '';
       providerStatus.classList.toggle('failed', Boolean(failed));
+    }
+
+    function syncProviderModeTip(baseline) {
+      if (!providerModeTip) return;
+      providerModeTip.hidden = !(baseline && baseline.verifiedAdapterMode === 'translationModel');
     }
 
     function clearProviderSuccessFeedback() {
@@ -1129,7 +1149,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     function getProviderSuccessStatus(baseline) {
       if (!providerSuccessVisible || !baseline || baseline.verifiedAdapterMode !== 'translationModel') return '';
-      return 'This model could not reliably follow structured JSON instructions. MarkLingo will use smaller Markdown block batches, so translations may be slower.';
+      return PROVIDER_SMALL_BATCH_STATUS;
     }
 
     function updateProviderVerificationState() {
@@ -1143,12 +1163,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       verifyProviderBtn.classList.toggle('saved', !dirty && providerIsVerified && providerSuccessVisible);
       if (dirty) {
         setProviderStatus('', false);
+        syncProviderModeTip(undefined);
         syncTranslationPromptState(undefined);
       } else if (providerIsVerified) {
         setProviderStatus(getProviderSuccessStatus(baseline), false);
+        syncProviderModeTip(baseline);
         syncTranslationPromptState(baseline);
       } else {
         setProviderStatus('', false);
+        syncProviderModeTip(undefined);
         syncTranslationPromptState(undefined);
       }
     }
@@ -1329,7 +1352,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         verifyProviderBtn.textContent = 'Save and Verify';
         verifyProviderBtn.disabled = false;
         verifyProviderBtn.classList.remove('saved');
-        setProviderStatus(msg.message || 'Verification Failed', true);
+        syncProviderModeTip(undefined);
+        setProviderStatus(msg.message || 'Verification failed.', true);
         return;
       }
       if (msg.type === 'shortcutState') {

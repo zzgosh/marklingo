@@ -6,9 +6,9 @@ AI で Markdown を翻訳します。Markdown を壊さずに。
 
 MarkLingo は、現在保存されている Markdown ファイルを翻訳済みのコピーに変換します。その際、変更すべきでない部分はそのまま保持します。見出し、リスト、表、コード、インラインコード、HTML、frontmatter 構文、リンク、画像パスなどです。VS Code 内で多言語の Markdown ドラフトをすばやく作成したいライター、メンテナー、ドキュメントチームのために作られています。
 
-翻訳はご自身の API キーを使って [OpenRouter](https://openrouter.ai) 経由で実行されます。モデルはご自身で選択でき、使った分だけお支払いいただきます。
+翻訳はデフォルトで [OpenRouter](https://openrouter.ai) 経由で実行されます。信頼できる OpenAI-compatible エンドポイントを設定して使うこともできます。ご自身の API キーを使い、モデルを選択し、使った分だけお支払いいただきます。
 
-MarkLingo 自体は無料で利用でき、完全にオープンソースで透明です。すべてのソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。お支払いは、選択したモデルに応じた OpenRouter/モデルサービスの利用料金のみです。
+MarkLingo 自体は無料で利用でき、完全にオープンソースで透明です。すべてのソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。お支払いは、選択したモデルに応じて OpenRouter または選択したモデルプロバイダーへ直接支払う利用料金のみです。
 
 ![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
@@ -19,7 +19,7 @@ MarkLingo 自体は無料で利用でき、完全にオープンソースで透�
 - 翻訳後、翻訳済みの Markdown タブとその Markdown プレビューを開きます。
 - 変更されていない Markdown ブロックが再び翻訳されるとき、以前の翻訳を再利用します。
 - フィールド名と機械可読の値は保持しつつ、人間向けに選択された YAML frontmatter の値（`title` や `description` など）を翻訳します。
-- 専用の設定ページから、OpenRouter エンドポイント、モデル、API キー、ターゲット言語、カスタム指示を設定できます。
+- 専用の設定ページから、プロバイダー、モデル、API キー、ターゲット言語、カスタム指示を設定できます。
 - 拡張機能自体は無料で、透明性のある完全なオープンソースです。ソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。
 - API キーは VS Code の `SecretStorage` に保存します。ワークスペースのファイルや拡張機能のメタデータには保存しません。
 
@@ -46,7 +46,7 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-翻訳の前に `MarkLingo: Open Settings` を実行して、API キー、ターゲット言語、モデル、カスタム指示を保存しておくこともできます。
+`MarkLingo: Translate Current Markdown` から直接始めることもできます。初回実行時、MarkLingo はターゲット言語と Provider を尋ねます。`OpenRouter` を選ぶとコマンドフロー内で続行できます。`OpenAI Compatible` / `Open MarkLingo Settings` を選ぶと、Settings でカスタム endpoint の設定を完了できます。
 
 Markdown エディターを右クリックして `MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内の Markdown ファイルを右クリックすると `MarkLingo: Translate This Markdown File` を実行できます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。エクスプローラーで複数の Markdown ファイルやフォルダーを選択し、`MarkLingo: Translate Selected Markdown Files` で 1 つのバッチとして翻訳することもできます。
 
@@ -90,15 +90,15 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 
 - **Save and Verify（保存して検証）**
   - 軽量な検証リクエストが成功した場合のみ、Provider、API Key、Model ID を保存します。
-  - 検証では接続性と、モデルが小さな chat-style JSON タスクに従えるかを確認します。
+  - 検証では接続性を確認し、選択したモデルに最も安全なリクエスト形式を選びます。
   - 選択した Provider、Base URL、Model ID、保存済み API Key が変わっておらず、capability 結果がすでにキャッシュされている場合、MarkLingo はモデル capability を再度プローブせず、短い接続チェックだけを行います。
-  - 検証を通過したモデルは `Chat JSON` を使用します。エンドポイントに到達でき、内容は返すものの JSON タスクに従えないモデルは `Translation Model` としてキャッシュされます。
+  - 利用可能なモデルの中には、信頼性のために小さな Markdown バッチが必要なものがあります。その場合、Settings に小さな情報チップが表示され、大きなファイルでは少し遅くなることがあります。
 
 - **Advanced Request Mode（詳細リクエストモード）**
   - 設定：`marklingo.translation.requestMode`
   - デフォルト：`auto`
-  - 通常は `Save and Verify` によって管理されます。`auto` は検証済みの capability キャッシュを優先し、キャッシュがない場合は `Chat JSON` に戻ります。
-  - 診断向けの詳細 settings.json 設定は引き続き利用できます：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency`、`marklingo.translation.translationModelMaxOutputTokens`。
+  - 通常は `Save and Verify` によって管理されます。`auto` は検証済みのリクエストパスを優先し、検証結果がない場合は標準の structured-output リクエストパスを使います。
+  - 小さなバッチのリクエストパス向けの診断用 settings.json 詳細設定は引き続き利用できます：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency`、`marklingo.translation.translationModelMaxOutputTokens`。
 
 - **Target Language（ターゲット言語）**
   - 設定：`marklingo.translation.targetLanguage`
@@ -113,7 +113,7 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 - **Custom Instructions（カスタム指示）**
   - 設定：`marklingo.translation.customPrompt`
   - デフォルト：空
-  - Chat JSON モデルでは、MarkLingo に内蔵された Markdown 保護プロンプトの後に追加されます。Translation Model として検証されたアダプターには送信されません。
+  - 選択したモデルが対応している場合、用語、トーン、スタイルの追加指示として MarkLingo に内蔵された Markdown 保護プロンプトの後に追加されます。小さなバッチの fallback が必要なモデルには送信されず、このフィールドも非表示になります。
 
 設定ページでは、Provider の認証情報は `Save and Verify` で保存されます。その他のドロップダウンは即座に保存され、Provider 以外の自由入力フィールドにはそれぞれインライン `Save` ボタンがあります。
 
@@ -138,9 +138,9 @@ llama-server \
 - Base URL：`http://127.0.0.1:8080/v1`
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
-- その後 `Save and Verify` をクリックします。Hy-MT は `Translation Model` として検証されるはずです。
+- その後 `Save and Verify` をクリックします。Hy-MT は信頼性のために小さな Markdown バッチを使うことが想定されます。
 
-Hy-MT2 のモデル ID では、MarkLingo は Translation Model モードで内部のモデル専用 structured-data prompt を使用します。その他の Translation Model アダプターでは、そのモデル専用の prompt profile が MarkLingo に用意されていない限り、汎用で控えめな Translation Model prompt を使い続けます。
+Hy-MT2 のモデル ID では、MarkLingo は小さなバッチのリクエストパスで内部のモデル専用 structured-data prompt を使用します。同じパスを使う他のモデルでは、そのモデル専用の prompt profile が MarkLingo に用意されていない限り、汎用で控えめな prompt を使い続けます。
 
 ローカルのスループットは主に、モデル、量子化方式、ハードウェアに依存します。MarkLingo は llama.cpp のダウンロード、起動、調整は行いません。それを行うには、モデルのダウンロード、バイナリのセットアップ、ポート割り当て、プロセスのライフサイクル、ハードウェア検出を扱う別のローカル runtime 管理機能が必要になります。クライアント側の並行実行は、`llama-server` に対応する `--parallel` slot がある場合にのみ有効です。server が 1 slot の場合、追加のクライアントリクエストは通常キューに入るだけで、翻訳は速くなりません。通常の設定 UI ではモデルのバッチ調整項目を隠し、保守的なデフォルト値を使います：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（context から出力予算を自動推定）。診断用の settings.json 詳細上書きは残しています。
 
@@ -166,7 +166,7 @@ MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキ�
 - Markdown の内容は、翻訳のために設定されたエンドポイントに送信されます。
 - デフォルトでは公式の OpenRouter エンドポイントが使用されます。
 - 選択した Provider が受け付ける API キーまたは token が必要です。
-- 翻訳リクエストは非ストリーミングです。Chat JSON モードでは `reasoning.exclude: true` と `reasoning.effort: none` により推論の除外を要求し、Translation Model モードでは reasoning フィールドを省略し、Custom Instructions を無視します。
+- 翻訳リクエストは非ストリーミングです。MarkLingo は `Save and Verify` が選んだ検証済みのリクエストパスを使用します。小さなバッチの fallback が必要なモデルには Custom Instructions は送信されません。
 - API キーは endpoint origin ごとに分けて VS Code の `SecretStorage` に保存されます。
 - API キーは、ワークスペースのファイル、VS Code の設定、翻訳メタデータ、ログには保存されません。
 - 翻訳メタデータは、ワークスペースではなく VS Code の `globalStorageUri` の下に保存されます。

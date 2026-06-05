@@ -18,7 +18,7 @@ const TARGET_LANGUAGE_OPTIONS = [
 async function promptCustomTargetLanguage(current: string): Promise<string | null> {
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: Custom Target Language',
-    prompt: 'Enter the target language name, for example Italiano or Portuguese.',
+    prompt: 'Language name, e.g. Italiano or Portuguese.',
     value: current,
     ignoreFocusOut: true,
   });

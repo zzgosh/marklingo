@@ -74,6 +74,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /\[hidden\] \{ display: none !important; \}/);
   assert.match(html, /\.provider-card \.row \{\s+border-bottom: 0;/);
   assert.match(html, /\.provider-actions \{\s+display: grid;\s+grid-template-columns: minmax\(0, 1fr\) max-content;/);
+  assert.match(html, /\.provider-feedback \{\s+display: flex;/);
   assert.match(html, /select \{\s+appearance: none;\s+color: var\(--fg\);/);
   assert.match(html, /select option \{\s+background: var\(--input\);\s+color: var\(--fg\);/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
@@ -115,9 +116,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /selectedProviderType/);
   assert.match(html, /showProviderSuccessFeedback/);
   assert.ok(!html.includes('Provider verified.'));
-  assert.match(html, /smaller Markdown block batches/);
+  assert.match(html, /Verified - using smaller batches for reliability\./);
+  assert.match(html, /Some models need smaller Markdown batches to keep output reliable/);
+  assert.match(html, /id="provider-mode-tip"/);
+  assert.ok(!html.includes('This model could not reliably follow structured JSON instructions.'));
   assert.match(html, /apiKeyInput\.addEventListener\('input', handleProviderInput\);/);
-  assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification Failed', true\);/);
+  assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification failed\.', true\);/);
   assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
   assert.ok(!html.includes('Enter API key'));

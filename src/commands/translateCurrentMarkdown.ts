@@ -163,7 +163,7 @@ function finishDebug(
 async function promptCustomTargetLanguage(current: string): Promise<string | null> {
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: Custom Target Language',
-    prompt: 'Enter the target language name, for example Italiano or Portuguese.',
+    prompt: 'Language name, e.g. Italiano or Portuguese.',
     value: current,
     ignoreFocusOut: true,
   });
@@ -183,7 +183,7 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
       if (currentCustom) return currentCustom;
       const input = await promptCustomTargetLanguage('');
       if (!input) {
-        await vscode.window.showInformationMessage('MarkLingo: Translation canceled because a custom target language is required.');
+        await vscode.window.showInformationMessage('MarkLingo: Translation canceled.');
         return null;
       }
       await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
@@ -195,7 +195,7 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   const picked = await new Promise<string | undefined>((resolve) => {
     const picker = vscode.window.createQuickPick<vscode.QuickPickItem>();
     picker.title = 'MarkLingo: Select Target Language';
-    picker.placeholder = 'Select the target language. Default: Simplified Chinese.';
+    picker.placeholder = 'Target language. Default: Simplified Chinese.';
     picker.ignoreFocusOut = true;
     picker.items = TARGET_LANGUAGE_OPTIONS.map((label) => ({ label }));
     const active = picker.items.find((item) => item.label === current) ?? picker.items[0];
@@ -216,14 +216,14 @@ async function ensureTargetLanguage(context: vscode.ExtensionContext): Promise<s
   });
 
   if (!picked) {
-    await vscode.window.showInformationMessage('MarkLingo: Translation canceled because a target language is required.');
+    await vscode.window.showInformationMessage('MarkLingo: Translation canceled.');
     return null;
   }
 
   if (picked === CUSTOM_TARGET_LANGUAGE_LABEL) {
     const input = await promptCustomTargetLanguage(currentCustom);
     if (!input) {
-      await vscode.window.showInformationMessage('MarkLingo: Translation canceled because a custom target language is required.');
+      await vscode.window.showInformationMessage('MarkLingo: Translation canceled.');
       return null;
     }
     await cfg.update('translation.targetLanguageCustom', input, vscode.ConfigurationTarget.Global);
@@ -463,11 +463,8 @@ function isCancellationError(error: unknown): boolean {
 const OPEN_SETTINGS_ACTION = 'Open Settings';
 
 function buildTranslationFailureMessage(message: string, runtime?: TranslationRuntime | null): string {
-  const provider = runtime?.settings.providerType ? ` Current Provider: ${getProviderDisplayName(runtime.settings.providerType)}.` : '';
-  return (
-    `MarkLingo: Translation failed. ${message}` +
-    `${provider} Open Settings and run Save and Verify to check connectivity and model capability.`
-  );
+  const provider = runtime?.settings.providerType ? ` (Provider: ${getProviderDisplayName(runtime.settings.providerType)})` : '';
+  return `MarkLingo: Translation failed. ${message}${provider}`;
 }
 
 async function showTranslationFailureMessage(message: string, runtime?: TranslationRuntime | null): Promise<void> {
@@ -487,7 +484,7 @@ function getDocumentValidationError(doc: vscode.TextDocument, sourceLabel: 'acti
     return 'MarkLingo: Save the file before translating.';
   }
   if (isTranslatedMarkdownOutput(doc.uri)) {
-    return 'MarkLingo: This file already looks like translated output (*_mdt.md). Run translation on the source Markdown file.';
+    return 'MarkLingo: This is already a translated file (*_mdt.md). Open the source to translate.';
   }
   return undefined;
 }
@@ -1251,9 +1248,16 @@ async function collectMarkdownSourceFiles(resources: vscode.Uri[]): Promise<Mark
 
 function buildBatchConfirmationMessage(files: vscode.Uri[], sourceLabel?: string): string {
   if (sourceLabel) {
-    return `MarkLingo: Translate ${pluralize(files.length, 'Markdown file')} in ${sourceLabel} and subfolders?`;
+    return `MarkLingo: Translate ${pluralize(files.length, 'file')} in ${sourceLabel} and subfolders?`;
   }
-  return `MarkLingo: Translate ${pluralize(files.length, 'Markdown file')} from the selected Explorer items?`;
+  return `MarkLingo: Translate ${pluralize(files.length, 'file')} from the selected Explorer items?`;
+}
+
+function shouldOfferSettingsActionForFailures(messages: string[]): boolean {
+  return messages.some((message) => (
+    isModelOutputError(message) ||
+    /api key|base url|endpoint|provider|model id|openrouter|connection|connectivity|timeout|http \d{3}|fetch|verification/i.test(message)
+  ));
 }
 
 async function translateMarkdownFilesBatch(
@@ -1267,7 +1271,7 @@ async function translateMarkdownFilesBatch(
     TRANSLATE_FOLDER_CONFIRM_ACTION,
   );
   if (confirmed !== TRANSLATE_FOLDER_CONFIRM_ACTION) {
-    await vscode.window.showInformationMessage('MarkLingo: Batch translation canceled.');
+    await vscode.window.showInformationMessage('MarkLingo: Batch canceled.');
     return;
   }
 
@@ -1360,14 +1364,19 @@ async function translateMarkdownFilesBatch(
   ].filter(Boolean).join(', ');
 
   if (summary.failed.length > 0) {
-    await vscode.window.showErrorMessage(
-      `MarkLingo: Batch translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}. ` +
-        'See the MarkLingo output for details. If failures mention JSON or incomplete model output, open Settings and run Save and Verify.',
-    );
+    const message = `MarkLingo: Batch ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}. See MarkLingo output for details.`;
+    if (shouldOfferSettingsActionForFailures(summary.failed.map((failure) => failure.message))) {
+      const picked = await vscode.window.showErrorMessage(message, OPEN_SETTINGS_ACTION);
+      if (picked === OPEN_SETTINGS_ACTION) {
+        await vscode.commands.executeCommand('marklingo.openSettings');
+      }
+    } else {
+      await vscode.window.showErrorMessage(message);
+    }
     return;
   }
 
-  await vscode.window.showInformationMessage(`MarkLingo: Batch translation ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}.`);
+  await vscode.window.showInformationMessage(`MarkLingo: Batch ${summary.canceled ? 'canceled' : 'completed'}: ${summaryText}.`);
 }
 
 async function translateMarkdownResources(

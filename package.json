@@ -198,9 +198,9 @@
             "translationModel"
           ],
           "enumDescriptions": [
-            "Use the verified provider/model capability when available; otherwise use Chat JSON.",
-            "Ask chat models to return a JSON object keyed by block ID.",
-            "Ask translation models to translate Markdown fields in small same-shape JSON batches."
+            "Use the verified provider/model behavior when available; otherwise use the standard request path.",
+            "Use the standard structured-output request path.",
+            "Use smaller Markdown batches for models that need a simpler translation request."
           ],
           "description": "Advanced translation request mode. Normally managed by MarkLingo Settings Save and Verify."
         },
@@ -209,21 +209,21 @@
           "default": 12,
           "minimum": 1,
           "maximum": 24,
-          "description": "Maximum number of Markdown blocks per request for translation-model mode."
+          "description": "Maximum number of Markdown blocks per request for the smaller-batch request path."
         },
         "marklingo.translation.translationModelConcurrency": {
           "type": "number",
           "default": 1,
           "minimum": 1,
           "maximum": 4,
-          "description": "Maximum concurrent requests for translation-model mode."
+          "description": "Maximum concurrent requests for the smaller-batch request path."
         },
         "marklingo.translation.translationModelMaxOutputTokens": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "maximum": 32768,
-          "description": "Maximum output tokens per request for translation-model mode. Use 0 to estimate from the model context window."
+          "description": "Maximum output tokens per request for the smaller-batch request path. Use 0 to estimate from the model context window."
         },
         "marklingo.translation.targetLanguage": {
           "type": "string",

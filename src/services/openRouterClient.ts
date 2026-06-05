@@ -146,26 +146,26 @@ async function resolveProviderTypeForTranslation(
   const picked = await vscode.window.showQuickPick<ProviderChoiceItem>([
     {
       label: 'OpenRouter',
-      description: 'Default provider',
-      detail: `Uses ${DEFAULT_OPENROUTER_BASE_URL}. Requires an OpenRouter API key.`,
+      description: 'Recommended',
+      detail: 'Hosted models via openrouter.ai. Needs an API key.',
       providerType: 'openrouter',
     },
     {
       label: 'OpenAI Compatible',
       description: 'Custom endpoint',
-      detail: 'Configure Base URL, Model ID, API key, and Save and Verify in MarkLingo Settings.',
+      detail: 'Custom or self-hosted endpoint. Set up in Settings.',
       providerType: 'openaiCompatible',
       openSettings: true,
     },
     {
       label: OPEN_MARKLINGO_SETTINGS_LABEL,
-      description: 'Provider setup',
-      detail: 'Use the full settings page for provider selection, credentials, model, and verification.',
+      description: 'Full setup',
+      detail: 'Open Settings to configure any provider.',
       openSettings: true,
     },
   ], {
     title: 'MarkLingo: Choose Provider',
-    placeHolder: 'Choose the provider for Markdown translation. You can change it later in MarkLingo Settings.',
+    placeHolder: 'Choose a provider. You can change this later in Settings.',
     ignoreFocusOut: true,
   });
 
@@ -332,7 +332,7 @@ async function resolveModelId(context: vscode.ExtensionContext, providerType: Pr
 
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: OpenRouter Model ID',
-    prompt: `Enter the OpenRouter model ID. Press Enter to use ${defaultModelId}.`,
+    prompt: `Model ID. Press Enter for ${defaultModelId}.`,
     password: false,
     value: defaultModelId,
     placeHolder: `Default: ${defaultModelId}`,

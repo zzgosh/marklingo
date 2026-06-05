@@ -12,7 +12,7 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: OpenRouter Model ID',
-    prompt: `Enter the OpenRouter model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}.`,
+    prompt: `Model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}.`,
     password: false,
     value: existing || DEFAULT_OPENROUTER_MODEL_ID,
     placeHolder: `Default: ${DEFAULT_OPENROUTER_MODEL_ID}`,
@@ -40,5 +40,5 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   await cfg.update(OPENROUTER_PROVIDER_MODEL_ID_SETTING, modelId, target);
   await cfg.update('openrouter.modelId', modelId, target);
-  await vscode.window.showInformationMessage(`MarkLingo: Saved OpenRouter model ID: ${modelId}`);
+  await vscode.window.showInformationMessage(`MarkLingo: Model ID saved: ${modelId}`);
 }

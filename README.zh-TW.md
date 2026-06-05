@@ -6,9 +6,9 @@
 
 MarkLingo 會將目前已儲存的 Markdown 檔案翻譯成一份副本，同時保留那些不應被更動的部分：標題、清單、表格、程式碼、行內程式碼、HTML、frontmatter 語法、連結與圖片路徑。它專為希望在 VS Code 中快速產生多語系 Markdown 草稿的寫作者、維護者與文件團隊打造。
 
-翻譯透過 [OpenRouter](https://openrouter.ai) 並使用你自己的 API 金鑰完成，因此模型由你選擇，用多少付多少。
+翻譯預設透過 [OpenRouter](https://openrouter.ai) 完成，也可以使用你設定的、受信任的 OpenAI-compatible 端點。你提供自己的 API 金鑰，自己選擇模型，用多少付多少。
 
-MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始碼都公開在 [GitHub](https://github.com/zzgosh/marklingo) 上。你只需依所選模型直接支付 OpenRouter/模型服務的用量費用。
+MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始碼都公開在 [GitHub](https://github.com/zzgosh/marklingo) 上。你只需依所選模型直接向 OpenRouter 或你選擇的模型服務支付用量費用。
 
 ![從命令選擇區執行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
@@ -19,7 +19,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 - 翻譯完成後開啟翻譯後的 Markdown 分頁及其 Markdown 預覽。
 - 當未更動的 Markdown 區塊再次被翻譯時，重複使用先前的翻譯。
 - 翻譯選定的、面向人類閱讀的 YAML frontmatter 值（例如 `title` 與 `description`），同時保留欄位名稱與機器可讀的值。
-- 在專屬的設定頁面中設定 OpenRouter 端點、模型、API 金鑰、目標語言與自訂指令。
+- 在專屬的設定頁面中設定提供方、模型、API 金鑰、目標語言與自訂指令。
 - 使用完全開源透明、擴充功能本身免費的工具；所有原始碼都公開在 [GitHub](https://github.com/zzgosh/marklingo) 上。
 - 將 API 金鑰儲存在 VS Code 的 `SecretStorage` 中；不會存入工作區檔案或擴充功能中繼資料。
 
@@ -46,7 +46,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-你也可以先執行 `MarkLingo: Open Settings`，在翻譯前儲存 API 金鑰、目標語言、模型與自訂指令。
+你也可以直接從 `MarkLingo: Translate Current Markdown` 開始。首次執行時，MarkLingo 會詢問目標語言和 Provider。選擇 `OpenRouter` 可繼續在命令流程中輸入；選擇 `OpenAI Compatible` / `Open MarkLingo Settings` 可進入設定頁完成自訂 endpoint 設定。
 
 也可以在 Markdown 編輯器上按右鍵執行 `MarkLingo: Translate Current Markdown`。在資源管理器中的 Markdown 檔案上按右鍵執行 `MarkLingo: Translate This Markdown File`。在資源管理器中的資料夾上按右鍵執行 `MarkLingo: Translate All Markdown in This Folder`，可翻譯該資料夾及其子資料夾中的 `.md` 與 `.markdown` 檔案，並略過已產生的 `*_mdt.md` 輸出。也可以在資源管理器中多選 Markdown 檔案或資料夾，再執行 `MarkLingo: Translate Selected Markdown Files` 作為一批翻譯。
 
@@ -90,15 +90,15 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 
 - **Save and Verify（儲存並驗證）**
   - 只有輕量驗證請求成功後，才會儲存 Provider、API Key 與 Model ID。
-  - 驗證會檢查連線能力，以及模型是否能完成一個很小的 chat-style JSON 任務。
+  - 驗證會檢查連線能力，並為所選模型選擇最穩妥的請求方式。
   - 如果所選 Provider、Base URL、Model ID 與已儲存的 API Key 都沒有變更，且已經有能力驗證快取，MarkLingo 只會重新做一次短連線檢查，不會再次探測模型能力。
-  - 驗證通過的模型使用 `Chat JSON`。端點可達、有內容返回但不能完成 JSON 任務的模型，會快取為 `Translation Model`。
+  - 有些可用模型需要更小的 Markdown 批次才能保持輸出可靠。遇到這種情況時，Settings 會顯示一個小提示，大型檔案可能會慢一點。
 
 - **Advanced Request Mode（進階請求模式）**
   - 設定項：`marklingo.translation.requestMode`
   - 預設值：`auto`
-  - 通常由 `Save and Verify` 管理。`auto` 會優先使用已驗證的能力快取；沒有快取時回退到 `Chat JSON`。
-  - 用於診斷的進階 settings.json 設定仍然可用：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency` 與 `marklingo.translation.translationModelMaxOutputTokens`。
+  - 通常由 `Save and Verify` 管理。`auto` 會優先使用已驗證的請求路徑；沒有驗證結果時使用標準 structured-output 請求路徑。
+  - 面向小批次請求路徑的診斷用進階 settings.json 設定仍然可用：`marklingo.translation.translationModelMaxBlocksPerRequest`、`marklingo.translation.translationModelConcurrency` 與 `marklingo.translation.translationModelMaxOutputTokens`。
 
 - **Target Language（目標語言）**
   - 設定項：`marklingo.translation.targetLanguage`
@@ -113,7 +113,7 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
 - **Custom Instructions（自訂指令）**
   - 設定項：`marklingo.translation.customPrompt`
   - 預設值：空
-  - 對 Chat JSON 模型，附加在 MarkLingo 內建的 Markdown 保護提示之後。已驗證為 Translation Model 的配接器不會收到這些自訂指令。
+  - 當所選模型支援時，附加在 MarkLingo 內建的 Markdown 保護提示之後，用於補充術語、語氣或風格要求。需要小批次 fallback 的模型不會收到這些自訂指令，欄位也會隱藏。
 
 設定頁面透過 `Save and Verify` 儲存 Provider 憑證。其他下拉選單會立即儲存；Provider 之外的自由文字欄位使用各自的行內 `Save` 按鈕。
 
@@ -138,9 +138,9 @@ llama-server \
 - Base URL：`http://127.0.0.1:8080/v1`
 - API Key：`local-hy-secret`
 - Model ID：`hy-mt2`
-- 然後點擊 `Save and Verify`。Hy-MT 應會被驗證為 `Translation Model`。
+- 然後點擊 `Save and Verify`。Hy-MT 預計會使用更小的 Markdown 批次來保持可靠性。
 
-對於 Hy-MT2 模型 ID，MarkLingo 會在 Translation Model 模式下使用內部維護的模型專屬 structured-data prompt。其他 Translation Model 配接器會繼續使用通用、克制的 Translation Model prompt，除非 MarkLingo 為該模型維護了專屬 prompt profile。
+對於 Hy-MT2 模型 ID，MarkLingo 會在小批次請求路徑中使用內部維護的模型專屬 structured-data prompt。其他走這一路徑的模型會繼續使用通用、克制的 prompt，除非 MarkLingo 為該模型維護了專屬 prompt profile。
 
 本機吞吐量主要取決於模型、量化方式與硬體。MarkLingo 不會替你下載、啟動或調校 llama.cpp；那會變成單獨的本機 runtime 管理器，需要處理模型下載、二進位安裝、連接埠分配、行程生命週期與硬體探測。用戶端並行只有在 `llama-server` 有匹配的 `--parallel` slot 時才有幫助；如果 server 只有一個 slot，額外的用戶端請求通常只是排隊，不會讓翻譯更快。普通設定頁會隱藏模型批次調參項，並使用保守預設值：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（依 context 自動估算輸出預算）。用於診斷的 settings.json 進階覆寫仍然保留。
 
@@ -166,7 +166,7 @@ MarkLingo 是一個本機 VS Code 擴充功能，但翻譯需要將文件內容�
 - Markdown 內容會被傳送到設定的端點進行翻譯。
 - 預設使用官方的 OpenRouter 端點。
 - 你需要所選 Provider 接受的 API 金鑰或 token。
-- 翻譯請求為非串流。Chat JSON 模式會透過 `reasoning.exclude: true` 與 `reasoning.effort: none` 請求排除推理過程；Translation Model 模式會省略 reasoning 欄位，並忽略 Custom Instructions。
+- 翻譯請求為非串流。MarkLingo 會使用 `Save and Verify` 選出的已驗證請求路徑；需要小批次 fallback 的模型不會收到 Custom Instructions。
 - API 金鑰依 endpoint origin 分開儲存在 VS Code 的 `SecretStorage` 中。
 - API 金鑰不會存入工作區檔案、VS Code 設定、翻譯中繼資料或記錄檔。
 - 翻譯中繼資料儲存在 VS Code 的 `globalStorageUri` 下，而非工作區中。

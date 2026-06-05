@@ -641,7 +641,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({
             type: 'providerVerification',
             ok: false,
-            message: 'Verification failed. Base URL is required.',
+            message: 'Base URL is required.',
             saveId,
           });
           return;
@@ -650,7 +650,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({
             type: 'providerVerification',
             ok: false,
-            message: 'Verification failed. Model ID is required.',
+            message: 'Model ID is required.',
             saveId,
           });
           return;
@@ -683,7 +683,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({
             type: 'providerVerification',
             ok: false,
-            message: 'Verification failed. API key is required.',
+            message: 'API key is required.',
             saveId,
           });
           return;

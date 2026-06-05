@@ -77,7 +77,7 @@ export async function verifyProviderConnectionAndCapability(
   await storeVerifiedTranslationAdapterMode(context, settings, adapterMode);
   return {
     adapterMode,
-    message: adapterMode === 'chatJson' ? 'Verified as Chat JSON.' : 'Verified as Translation Model.',
+    message: 'Verified.',
   };
 }
 
@@ -101,6 +101,6 @@ export async function verifyProviderConnectionOnly(
 
   return {
     adapterMode,
-    message: adapterMode === 'chatJson' ? 'Connection verified.' : 'Connection verified as Translation Model.',
+    message: 'Connection verified.',
   };
 }

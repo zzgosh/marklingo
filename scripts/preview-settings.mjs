@@ -127,7 +127,7 @@ function getPreviewBridgeScript(nonce, url) {
             promptInstructions: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructions)} : ${JSON.stringify(chatPromptInstructions)},
             promptInstructionsEnhanced: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructionsEnhanced)} : false,
             promptInstructionsEnhancementNote: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructionsEnhancementNote ?? '')} : '',
-            message: adapterMode === 'translationModel' ? 'Verified as Translation Model.' : 'Verified as Chat JSON.',
+            message: 'Verified.',
             saveId: message.saveId,
           });
           return;

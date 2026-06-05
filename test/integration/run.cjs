@@ -440,7 +440,7 @@ async function testTranslatesFolderMarkdownFiles(context) {
   await withWindowMessageStubs(
     {
       showWarningMessage: async (message, _options, action) => {
-        assert.match(message, /Translate 2 Markdown files/);
+        assert.match(message, /Translate 2 files/);
         assert.match(message, /docs and subfolders/);
         return action;
       },
@@ -497,7 +497,7 @@ async function testTranslatesExplorerMultiSelectedMarkdownResources(context) {
   await withWindowMessageStubs(
     {
       showWarningMessage: async (message, _options, action) => {
-        assert.match(message, /Translate 2 Markdown files from the selected Explorer items/);
+        assert.match(message, /Translate 2 files from the selected Explorer items/);
         return action;
       },
       showInformationMessage: async () => undefined,
@@ -940,8 +940,7 @@ async function testCommandProviderOnboardingShowsProviderChoice(context) {
       'Open MarkLingo Settings',
     ]);
     assert.equal(inputCalls[0].title, 'MarkLingo: OpenRouter API Key');
-    assert.match(inputCalls[0].prompt, /Current Provider: OpenRouter\./);
-    assert.match(inputCalls[0].prompt, /Endpoint: https:\/\/openrouter\.ai\/api\/v1\./);
+    assert.equal(inputCalls[0].prompt, 'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code.');
   } finally {
     await cfg.update('openrouter.provider', undefined, vscode.ConfigurationTarget.Global);
     await cfg.update('openrouter.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
