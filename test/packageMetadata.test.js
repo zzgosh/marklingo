@@ -119,13 +119,8 @@ test('cleanup configuration keys match package configuration contributions', () 
   const packageKeys = Object.keys(pkg.contributes.configuration.properties)
     .map((key) => key.replace(/^marklingo\./, ''))
     .sort();
-  const cleanupKeys = [...MARKLINGO_CONFIGURATION_KEYS].sort();
 
-  for (const key of packageKeys) {
-    assert.ok(cleanupKeys.includes(key), `expected cleanup keys to include contributed setting ${key}`);
-  }
-  assert.ok(cleanupKeys.includes('providers.moonshot.baseUrl'));
-  assert.ok(cleanupKeys.includes('providers.glm.baseUrl'));
+  assert.deepEqual([...MARKLINGO_CONFIGURATION_KEYS].sort(), packageKeys);
 });
 
 test('provider enum exposes only the supported provider presets', () => {

@@ -175,6 +175,31 @@
           "default": "google/gemini-3.1-flash-lite",
           "description": "Model ID remembered for the OpenRouter provider."
         },
+        "marklingo.providers.openai.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID remembered for the OpenAI provider."
+        },
+        "marklingo.providers.deepseek.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID remembered for the DeepSeek provider."
+        },
+        "marklingo.providers.moonshot.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID remembered for the Moonshot provider."
+        },
+        "marklingo.providers.glm.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID remembered for the GLM provider."
+        },
+        "marklingo.providers.xiaomiMimo.modelId": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID remembered for the Xiaomi MiMo provider."
+        },
         "marklingo.providers.openaiCompatible.baseUrl": {
           "type": "string",
           "scope": "application",

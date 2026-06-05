@@ -33,6 +33,10 @@ test('defines OpenAI-compatible provider presets with regional endpoints', () =>
   assert.equal(providerSupportsEditableModelId('openrouter'), true);
   assert.equal(providerSupportsEditableModelId('openaiCompatible'), true);
   assert.equal(providerSupportsEditableModelId('moonshot'), false);
+  assert.deepEqual(
+    getProviderPreset('openai').modelOptions.map((option) => option.modelId),
+    ['gpt-5.2'],
+  );
   assert.equal(getProviderPreset('moonshot').modelOptions.some((option) => option.modelId === ''), false);
   assert.equal(providerSupportsReasoningDisable('openrouter'), true);
   assert.equal(providerSupportsReasoningDisable('openai'), true);

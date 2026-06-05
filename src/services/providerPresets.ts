@@ -71,12 +71,9 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'reasoningEffortNone',
-    baseUrlSetting: 'providers.openai.baseUrl',
     modelIdSetting: 'providers.openai.modelId',
     modelOptions: [
       { label: 'GPT-5.2', modelId: 'gpt-5.2' },
-      { label: 'GPT-5 mini', modelId: 'gpt-5-mini' },
-      { label: 'GPT-5 nano', modelId: 'gpt-5-nano' },
     ],
   },
   {
@@ -89,7 +86,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'thinkingDisabled',
-    baseUrlSetting: 'providers.deepseek.baseUrl',
     modelIdSetting: 'providers.deepseek.modelId',
     modelOptions: [
       { label: 'DeepSeek V4 Flash', modelId: 'deepseek-v4-flash' },
@@ -106,7 +102,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'thinkingDisabled',
-    baseUrlSetting: 'providers.moonshot.baseUrl',
     modelIdSetting: 'providers.moonshot.modelId',
     baseUrlOptions: [
       { label: 'Global', baseUrl: 'https://api.moonshot.ai/v1' },
@@ -127,7 +122,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'thinkingDisabled',
-    baseUrlSetting: 'providers.glm.baseUrl',
     modelIdSetting: 'providers.glm.modelId',
     baseUrlOptions: [
       { label: 'Global', baseUrl: 'https://api.z.ai/api/paas/v4' },
@@ -149,7 +143,6 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'thinkingDisabled',
-    baseUrlSetting: 'providers.xiaomiMimo.baseUrl',
     modelIdSetting: 'providers.xiaomiMimo.modelId',
     modelOptions: [
       { label: 'MiMo V2.5 Pro', modelId: 'mimo-v2.5-pro' },

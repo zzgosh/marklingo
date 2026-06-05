@@ -8,6 +8,13 @@ const vscode = require('vscode');
 
 const EXTENSION_ID = 'zzgosh.marklingo';
 const MODEL_ID = 'test/mock-model';
+const PROVIDER_DRAFT_SETTING_VALUES = {
+  'providers.openai.modelId': 'gpt-5.2',
+  'providers.deepseek.modelId': 'deepseek-v4-flash',
+  'providers.moonshot.modelId': 'kimi-k2.6',
+  'providers.glm.modelId': 'glm-5.1',
+  'providers.xiaomiMimo.modelId': 'mimo-v2.5-pro',
+};
 
 function sendJson(res, status, value) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -1001,6 +1008,20 @@ async function testCommandProviderOnboardingOpensSettingsForOpenAiCompatible(con
   }
 }
 
+async function testProviderDraftSettingsAreRegistered() {
+  try {
+    for (const [key, value] of Object.entries(PROVIDER_DRAFT_SETTING_VALUES)) {
+      const cfg = vscode.workspace.getConfiguration('marklingo');
+      await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+      assert.equal(vscode.workspace.getConfiguration('marklingo').get(key), value);
+    }
+  } finally {
+    for (const key of Object.keys(PROVIDER_DRAFT_SETTING_VALUES)) {
+      await vscode.workspace.getConfiguration('marklingo').update(key, undefined, vscode.ConfigurationTarget.Global);
+    }
+  }
+}
+
 async function runTest(name, fn, context) {
   try {
     const cfg = vscode.workspace.getConfiguration('marklingo');
@@ -1042,6 +1063,7 @@ async function run() {
     await runTest('command deletes current project translated files while keeping metadata cache', testCommandDeletesTranslatedFilesButKeepsCurrentProjectCache, context);
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
     await runTest('clear all data does not wait for notification dismissal', testClearAllDataDoesNotWaitForNotification, context);
+    await runTest('provider draft settings are registered and writable', testProviderDraftSettingsAreRegistered, context);
     await runTest('command provider onboarding shows provider choice', testCommandProviderOnboardingShowsProviderChoice, context);
     await runTest('command provider onboarding opens settings for Custom OpenAI Compatible', testCommandProviderOnboardingOpensSettingsForOpenAiCompatible, context);
   } finally {
