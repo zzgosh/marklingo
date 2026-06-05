@@ -46,7 +46,7 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-你也可以先运行 `MarkLingo: Open Settings`，在翻译前保存 API 密钥、目标语言、模型和自定义指令。
+也可以直接从 `MarkLingo: Translate Current Markdown` 开始。首次运行时，MarkLingo 会询问目标语言和 Provider。选择 `OpenRouter` 可继续在命令流程中输入；选择 `OpenAI Compatible` / `Open MarkLingo Settings` 可进入设置页完成自定义 endpoint 配置。
 
 也可以在 Markdown 编辑器上右键运行 `MarkLingo: Translate Current Markdown`。在资源管理器中的 Markdown 文件上右键运行 `MarkLingo: Translate This Markdown File`。在资源管理器中的文件夹上右键运行 `MarkLingo: Translate All Markdown in This Folder`，可翻译该文件夹及其子文件夹中的 `.md` 和 `.markdown` 文件，并跳过已生成的 `*_mdt.md` 输出。也可以在资源管理器中多选 Markdown 文件或文件夹，再运行 `MarkLingo: Translate Selected Markdown Files` 作为一批翻译。
 

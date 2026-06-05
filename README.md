@@ -46,7 +46,7 @@ Default shortcut:
 - macOS: `Option + Command + T`
 - Windows/Linux: `Control + Alt + T`
 
-You can also run `MarkLingo: Open Settings` first to save your API key, target language, model, and custom instructions before translating.
+You can also start with `MarkLingo: Translate Current Markdown`. On first run, MarkLingo asks for the target language and Provider. Choose `OpenRouter` to continue inline, or choose `OpenAI Compatible` / `Open MarkLingo Settings` to finish custom endpoint setup in Settings.
 
 Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Right-click a Markdown file in the Explorer to run `MarkLingo: Translate This Markdown File`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs. You can also select multiple Markdown files or folders in the Explorer and run `MarkLingo: Translate Selected Markdown Files` to translate them as one batch.
 

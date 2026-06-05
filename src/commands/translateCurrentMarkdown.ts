@@ -7,6 +7,7 @@ import {
   type ChatCompletionOptions,
   type OpenRouterSettings,
 } from '../services/openRouterClient.js';
+import { getProviderDisplayName } from '../services/providerDisplay.js';
 import { readVerifiedTranslationAdapterMode } from '../services/modelCapabilities.js';
 import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
 import { getMetaFileUri, getOutputLocation, getTranslatedFileUri } from '../storage/paths.js';
@@ -462,7 +463,7 @@ function isCancellationError(error: unknown): boolean {
 const OPEN_SETTINGS_ACTION = 'Open Settings';
 
 function buildTranslationFailureMessage(message: string, runtime?: TranslationRuntime | null): string {
-  const provider = runtime?.settings.providerType ? ` Current Provider: ${runtime.settings.providerType}.` : '';
+  const provider = runtime?.settings.providerType ? ` Current Provider: ${getProviderDisplayName(runtime.settings.providerType)}.` : '';
   return (
     `MarkLingo: Translation failed. ${message}` +
     `${provider} Open Settings and run Save and Verify to check connectivity and model capability.`
@@ -1131,6 +1132,7 @@ export async function translateCurrentMarkdown(
     }
     return result;
   } catch (err) {
+    if (isCancellationError(err)) return undefined;
     const msg = err instanceof Error ? err.message : String(err);
     await showTranslationFailureMessage(msg, runtime);
     return undefined;
@@ -1273,6 +1275,7 @@ async function translateMarkdownFilesBatch(
   try {
     runtime = await resolveTranslationRuntime(context);
   } catch (error) {
+    if (isCancellationError(error)) return;
     const msg = error instanceof Error ? error.message : String(error);
     await showTranslationFailureMessage(msg);
     return;

@@ -2,20 +2,21 @@ import * as vscode from 'vscode';
 import {
   hasExplicitOpenRouterProviderConfiguration,
   hasOpenRouterApiKey,
+  resolveConfiguredProvider,
   storeOpenRouterApiKey,
 } from '../services/openRouterClient.js';
+import { getProviderApiKeyInputPrompt, getProviderApiKeyInputTitle, getProviderDisplayName } from '../services/providerDisplay.js';
 import { acceptVisibleOnboardingDefaults } from '../onboardingState.js';
 
 export async function setOpenRouterApiKey(context: vscode.ExtensionContext) {
-  const hasExisting = await hasOpenRouterApiKey(context, undefined, {
+  const provider = resolveConfiguredProvider();
+  const hasExisting = await hasOpenRouterApiKey(context, provider.baseUrl, {
     includeLegacy: !hasExplicitOpenRouterProviderConfiguration(),
   });
 
   const input = await vscode.window.showInputBox({
-    title: 'MarkLingo: Provider API Key',
-    prompt: hasExisting
-      ? 'An API key is already saved. Enter a new key to replace it.'
-      : 'Enter the API key for the configured provider. It will be stored securely in VS Code SecretStorage.',
+    title: getProviderApiKeyInputTitle(provider.providerType),
+    prompt: getProviderApiKeyInputPrompt(provider.providerType, provider.baseUrl, hasExisting),
     password: true,
     ignoreFocusOut: true,
   });
@@ -26,7 +27,7 @@ export async function setOpenRouterApiKey(context: vscode.ExtensionContext) {
     return;
   }
 
-  await storeOpenRouterApiKey(context, input.trim());
+  await storeOpenRouterApiKey(context, input.trim(), provider.baseUrl);
   await acceptVisibleOnboardingDefaults(context);
-  await vscode.window.showInformationMessage('MarkLingo: Saved API key in SecretStorage.');
+  await vscode.window.showInformationMessage(`MarkLingo: Saved ${getProviderDisplayName(provider.providerType)} API key in SecretStorage.`);
 }
