@@ -69,8 +69,18 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /<h2>Provider<\/h2>/);
   assert.match(html, /<section class="card provider-card">/);
   assert.match(html, /<option value="openrouter" selected>OpenRouter<\/option>/);
-  assert.match(html, /<option value="openaiCompatible">OpenAI Compatible<\/option>/);
+  assert.match(html, /<option value="moonshot">Moonshot<\/option>/);
+  assert.match(html, /<option value="glm">GLM<\/option>/);
+  assert.match(html, /<option value="xiaomiMimo">Xiaomi MiMo<\/option>/);
+  assert.match(html, /<option value="openaiCompatible">Custom OpenAI Compatible<\/option>/);
+  assert.ok(!html.includes('value="ollama"'));
+  assert.ok(!html.includes('value="lmStudio"'));
+  assert.ok(!html.includes('id="baseUrlPresetRow"'));
   assert.match(html, /id="baseUrlRow" hidden/);
+  assert.ok(!html.includes('id="modelPresetRow"'));
+  assert.match(html, /<div class="label">Model ID<\/div>/);
+  assert.match(html, /<input id="modelId" value="google\/gemini-3\.1-flash-lite">/);
+  assert.match(html, /id="modelIdSelectWrap" hidden/);
   assert.match(html, /\[hidden\] \{ display: none !important; \}/);
   assert.match(html, /\.provider-card \.row \{\s+border-bottom: 0;/);
   assert.match(html, /\.provider-actions \{\s+display: grid;\s+grid-template-columns: minmax\(0, 1fr\) max-content;/);
@@ -109,11 +119,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /script-src 'nonce-test-nonce'/);
   assert.match(html, /window\.acquireVsCodeApi/);
   assert.match(html, /id="apiKey" type="password" autocomplete="off" value="•{32}" data-masked="true"/);
-  assert.match(html, /modelId: "google\/gemini-3\.1-flash-lite"/);
-  assert.match(html, /openaiCompatible: \{\s+baseUrl: "",\s+modelId: "",\s+hasApiKey: false,\s+apiKeyInput: '',\s+\}/);
+  assert.match(html, /"modelId":"google\/gemini-3\.1-flash-lite"/);
+  assert.match(html, /"openaiCompatible":\{"baseUrl":"","modelId":"","hasApiKey":false,"apiKeyInput":""\}/);
   assert.match(html, /showApiKeyMask\(\)/);
   assert.match(html, /providerDrafts/);
   assert.match(html, /selectedProviderType/);
+  assert.match(html, /providerModelIdEditable/);
   assert.match(html, /showProviderSuccessFeedback/);
   assert.ok(!html.includes('Provider verified.'));
   assert.match(html, /Verified - using smaller batches for reliability\./);
@@ -121,6 +132,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /id="provider-mode-tip"/);
   assert.ok(!html.includes('This model could not reliably follow structured JSON instructions.'));
   assert.match(html, /apiKeyInput\.addEventListener\('input', handleProviderInput\);/);
+  assert.match(html, /modelIdSelect\.addEventListener\('change', handleModelIdSelectChange\);/);
   assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification failed\.', true\);/);
   assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
@@ -153,8 +165,8 @@ test('keeps the saved OpenAI-compatible provider draft when OpenRouter is active
     }),
   });
 
-  assert.match(html, /openaiCompatible: \{\s+baseUrl: "http:\/\/127\.0\.0\.1:8080\/v1",\s+modelId: "hy-mt2",\s+hasApiKey: true,\s+verifiedAdapterMode: "translationModel"/);
-  assert.match(html, /openaiCompatible: \{\s+baseUrl: "http:\/\/127\.0\.0\.1:8080\/v1",\s+modelId: "hy-mt2",\s+hasApiKey: true,\s+apiKeyInput: '',\s+\}/);
+  assert.match(html, /"openaiCompatible":\{"baseUrl":"http:\/\/127\.0\.0\.1:8080\/v1","modelId":"hy-mt2","hasApiKey":true,"verifiedAdapterMode":"translationModel"/);
+  assert.match(html, /"openaiCompatible":\{"baseUrl":"http:\/\/127\.0\.0\.1:8080\/v1","modelId":"hy-mt2","hasApiKey":true,"apiKeyInput":""\}/);
 });
 
 test('renders disabled current project cleanup when no project is selected', () => {
@@ -172,7 +184,7 @@ test('renders empty API key input when no key is on file', () => {
   const html = renderSettingsHtml({
     cspSource: "'self'",
     nonce: 'test-nonce',
-    state: getState({ hasApiKey: false }),
+    state: getState({ hasApiKey: false, openRouterHasApiKey: false }),
   });
 
   assert.match(html, /<input id="apiKey" type="password" autocomplete="off">/);
@@ -193,7 +205,7 @@ test('does not present cached model capability as verified when the API key is m
   });
 
   assert.match(html, /<input id="apiKey" type="password" autocomplete="off">/);
-  assert.match(html, /hasApiKey: false,\s+verifiedAdapterMode: "",/);
+  assert.match(html, /"hasApiKey":false,"verifiedAdapterMode":""/);
   assert.match(html, /id="verify-provider">Save and Verify<\/button>/);
   assert.ok(!html.includes('data-masked="true"'));
 });
@@ -221,7 +233,7 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
     }),
   });
 
-  assert.match(html, /<option value="openaiCompatible" selected>OpenAI Compatible<\/option>/);
+  assert.match(html, /<option value="openaiCompatible" selected>Custom OpenAI Compatible<\/option>/);
   assert.match(html, /id="baseUrlRow">/);
   assert.match(html, /value="http:\/\/127\.0\.0\.1:8080\/v1"/);
   assert.ok(!html.includes('Verified: Translation Model'));
@@ -233,12 +245,33 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
   assert.match(html, /const CHAT_PROMPT_INSTRUCTIONS = "You are a precise Markdown translation assistant\."/);
 });
 
+test('renders fixed provider models as Model ID choices without Base URL controls', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({
+      providerType: 'moonshot',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      modelId: 'kimi-k2.6',
+    }),
+  });
+
+  assert.match(html, /<option value="moonshot" selected>Moonshot<\/option>/);
+  assert.match(html, /id="baseUrlRow" hidden/);
+  assert.ok(!html.includes('id="baseUrlPresetRow"'));
+  assert.match(html, /<input id="modelId" hidden value="kimi-k2\.6">/);
+  assert.match(html, /id="modelIdSelectWrap">/);
+  assert.match(html, /<option value="kimi-k2\.6" selected>Kimi K2\.6<\/option>/);
+});
+
 test('escapes settings state before rendering into HTML', () => {
   const html = renderSettingsHtml({
     cspSource: "'self'",
     nonce: 'test-nonce',
     state: getState({
+      providerType: 'openaiCompatible',
       baseUrl: '<img src=x onerror=alert(1)>',
+      openAiCompatibleBaseUrl: '<img src=x onerror=alert(1)>',
       customPrompt: '<b>Keep names</b>',
       shortcutWarning: '<script>alert(1)</script>',
       targetLanguage: 'Custom...',

@@ -6,8 +6,29 @@ import {
   getProviderApiKeyInputPrompt,
   getProviderApiKeyInputTitle,
 } from './providerDisplay.js';
-
-export type ProviderType = 'openrouter' | 'openaiCompatible';
+import {
+  coerceProviderType,
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  DEFAULT_OPENROUTER_BASE_URL,
+  DEFAULT_OPENROUTER_MODEL_ID,
+  DEFAULT_PROVIDER_TYPE,
+  getProviderBaseUrlSetting,
+  getProviderDefaultBaseUrl,
+  getProviderDefaultModelId,
+  getProviderModelIdSetting,
+  getProviderReasoningControl,
+  OPENAI_COMPATIBLE_BASE_URL_SETTING,
+  OPENAI_COMPATIBLE_MODEL_ID_SETTING,
+  OPENROUTER_PROVIDER_MODEL_ID_SETTING,
+  coerceProviderModelId,
+  providerRequiresApiKey,
+  providerSupportsApiKey,
+  providerSupportsOpenRouterHeaders,
+  providerSupportsOpenRouterReasoningControl,
+  providerSupportsTemperatureControl,
+  PROVIDER_PRESETS,
+  type ProviderType,
+} from './providerPresets.js';
 
 export type OpenRouterSettings = {
   providerType: ProviderType;
@@ -51,27 +72,32 @@ export type ReasoningOptions = {
   exclude?: boolean;
 };
 
-export const DEFAULT_OPENROUTER_MODEL_ID = 'google/gemini-3.1-flash-lite';
-export const DEFAULT_PROVIDER_TYPE: ProviderType = 'openrouter';
-export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-export const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = 'http://127.0.0.1:8080/v1';
-export const OPENROUTER_PROVIDER_MODEL_ID_SETTING = 'providers.openrouter.modelId';
-export const OPENAI_COMPATIBLE_BASE_URL_SETTING = 'providers.openaiCompatible.baseUrl';
-export const OPENAI_COMPATIBLE_MODEL_ID_SETTING = 'providers.openaiCompatible.modelId';
+type ThinkingOptions = {
+  type: 'disabled';
+};
+
+export {
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  DEFAULT_OPENROUTER_BASE_URL,
+  DEFAULT_OPENROUTER_MODEL_ID,
+  DEFAULT_PROVIDER_TYPE,
+  OPENAI_COMPATIBLE_BASE_URL_SETTING,
+  OPENAI_COMPATIBLE_MODEL_ID_SETTING,
+  OPENROUTER_PROVIDER_MODEL_ID_SETTING,
+  coerceProviderType,
+  getProviderDefaultBaseUrl,
+  providerRequiresApiKey,
+  type ProviderType,
+};
 
 const LEGACY_OPENROUTER_API_KEY_SECRET = 'marklingo.openrouter.apiKey';
 const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey.v2.';
 const OPENROUTER_API_KEY_ORIGINS_STATE = 'marklingo.openrouter.apiKeyOrigins';
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
 const MODEL_CONTEXT_CACHE_TTL_MS = 30 * 60 * 1000;
-const PROVIDER_TYPES = new Set<ProviderType>(['openrouter', 'openaiCompatible']);
 const OPEN_MARKLINGO_SETTINGS_LABEL = 'Open MarkLingo Settings';
 
 const modelContextCache = new Map<string, { expiresAt: number; contextLength: number | undefined }>();
-
-export function coerceProviderType(value: unknown): ProviderType {
-  return PROVIDER_TYPES.has(value as ProviderType) ? value as ProviderType : DEFAULT_PROVIDER_TYPE;
-}
 
 export function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
@@ -144,17 +170,17 @@ async function resolveProviderTypeForTranslation(
   }
 
   const picked = await vscode.window.showQuickPick<ProviderChoiceItem>([
-    {
-      label: 'OpenRouter',
+    ...PROVIDER_PRESETS.slice(0, 1).map((preset) => ({
+      label: preset.label,
       description: 'Recommended',
-      detail: 'Hosted models via openrouter.ai. Needs an API key.',
-      providerType: 'openrouter',
-    },
+      detail: preset.description,
+      providerType: preset.id,
+    })),
     {
-      label: 'OpenAI Compatible',
+      label: 'Custom OpenAI Compatible',
       description: 'Custom endpoint',
       detail: 'Set Base URL, model, and key in Settings.',
-      providerType: 'openaiCompatible',
+      providerType: 'openaiCompatible' as ProviderType,
       openSettings: true,
     },
     {
@@ -176,8 +202,8 @@ async function resolveProviderTypeForTranslation(
     return 'openrouter';
   }
 
-  if (picked.providerType === 'openaiCompatible') {
-    await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
+  if (picked.providerType) {
+    await cfg.update('openrouter.provider', picked.providerType, vscode.ConfigurationTarget.Global);
   }
 
   if (picked.openSettings) {
@@ -198,15 +224,17 @@ function hasExplicitStringConfiguration(cfg: vscode.WorkspaceConfiguration, key:
     .some((value) => typeof value === 'string' && value.trim().length > 0);
 }
 
-export function getProviderDefaultBaseUrl(providerType: ProviderType): string {
-  return providerType === 'openrouter' ? DEFAULT_OPENROUTER_BASE_URL : DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
+function readLegacyProviderBaseUrl(cfg: vscode.WorkspaceConfiguration): string {
+  if (!hasExplicitStringConfiguration(cfg, 'openrouter.baseUrl')) return '';
+  const value = readStringSetting(cfg, 'openrouter.baseUrl');
+  return normalizeBaseUrl(value) === DEFAULT_OPENROUTER_BASE_URL ? '' : value;
 }
 
 export function resolveProviderBaseUrl(providerType: ProviderType, rawBaseUrl?: string): { baseUrl: string; origin: string } {
   const fallbackBaseUrl = getProviderDefaultBaseUrl(providerType);
   const candidate = providerType === 'openrouter'
     ? DEFAULT_OPENROUTER_BASE_URL
-    : (rawBaseUrl && normalizeBaseUrl(rawBaseUrl) !== DEFAULT_OPENROUTER_BASE_URL ? rawBaseUrl : fallbackBaseUrl);
+    : (rawBaseUrl?.trim() ? rawBaseUrl : fallbackBaseUrl);
   const url = parseOpenRouterBaseUrl(candidate);
   return { baseUrl: normalizeBaseUrl(url.toString()), origin: url.origin };
 }
@@ -214,9 +242,12 @@ export function resolveProviderBaseUrl(providerType: ProviderType, rawBaseUrl?: 
 export function resolveConfiguredProvider(): { providerType: ProviderType; baseUrl: string; origin: string } {
   const cfg = getConfiguration();
   const providerType = getConfiguredProviderType(cfg);
-  const rawBaseUrl = providerType === 'openaiCompatible'
-    ? readStringSetting(cfg, OPENAI_COMPATIBLE_BASE_URL_SETTING) || cfg.get<string>('openrouter.baseUrl') || getProviderDefaultBaseUrl(providerType)
-    : DEFAULT_OPENROUTER_BASE_URL;
+  const providerBaseUrlSetting = getProviderBaseUrlSetting(providerType);
+  const rawBaseUrl = providerType === 'openrouter'
+    ? DEFAULT_OPENROUTER_BASE_URL
+    : (providerBaseUrlSetting ? readStringSetting(cfg, providerBaseUrlSetting) : '') ||
+      readLegacyProviderBaseUrl(cfg) ||
+      getProviderDefaultBaseUrl(providerType);
   const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
   return { providerType, baseUrl, origin };
 }
@@ -260,6 +291,8 @@ async function resolveApiKey(
   context: vscode.ExtensionContext,
   options: { providerType: ProviderType; baseUrl: string; origin: string; allowLegacyMigration: boolean },
 ): Promise<string> {
+  if (!providerSupportsApiKey(options.providerType)) return '';
+
   const fromSecret = await context.secrets.get(getApiKeySecretName(options.origin));
   if (fromSecret?.trim()) return fromSecret.trim();
 
@@ -271,6 +304,8 @@ async function resolveApiKey(
     await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
     return apiKey;
   }
+
+  if (!providerRequiresApiKey(options.providerType)) return '';
 
   const input = await vscode.window.showInputBox({
     title: getProviderApiKeyInputTitle(options.providerType),
@@ -303,22 +338,25 @@ function hasExplicitModelConfiguration(cfg: vscode.WorkspaceConfiguration): bool
 
 async function resolveModelId(context: vscode.ExtensionContext, providerType: ProviderType): Promise<string> {
   const cfg = getConfiguration();
-  if (providerType === 'openaiCompatible') {
-    const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
-      ? readStringSetting(cfg, 'openrouter.modelId')
-      : '';
-    const modelId = readStringSetting(cfg, OPENAI_COMPATIBLE_MODEL_ID_SETTING) || legacyModelId;
+  const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
+    ? readStringSetting(cfg, 'openrouter.modelId')
+    : '';
+
+  if (providerType !== 'openrouter') {
+    const modelIdSetting = getProviderModelIdSetting(providerType);
+    const providerModelId = modelIdSetting ? readStringSetting(cfg, modelIdSetting) : '';
+    const modelId = coerceProviderModelId(
+      providerType,
+      providerModelId || legacyModelId || getProviderDefaultModelId(providerType),
+    );
     if (!modelId) {
-      throw new Error('Missing Provider modelId. Open MarkLingo settings, select OpenAI Compatible, then save and verify the provider.');
+      throw new Error('Missing Provider modelId. Open MarkLingo settings, select a model, then save and verify the provider.');
     }
     return modelId;
   }
 
   const providerModelId = hasExplicitStringConfiguration(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
     ? readStringSetting(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
-    : '';
-  const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
-    ? readStringSetting(cfg, 'openrouter.modelId')
     : '';
   const modelId = providerModelId || legacyModelId || DEFAULT_OPENROUTER_MODEL_ID;
   if (hasExplicitModelConfiguration(cfg) || hasOpenRouterModelAccepted(context)) {
@@ -356,9 +394,12 @@ export async function getOpenRouterSettings(context: vscode.ExtensionContext): P
   let cfg = getConfiguration();
   const providerType = await resolveProviderTypeForTranslation(context, cfg);
   cfg = getConfiguration();
-  const rawBaseUrl = providerType === 'openaiCompatible'
-    ? readStringSetting(cfg, OPENAI_COMPATIBLE_BASE_URL_SETTING) || cfg.get<string>('openrouter.baseUrl') || getProviderDefaultBaseUrl(providerType)
-    : DEFAULT_OPENROUTER_BASE_URL;
+  const providerBaseUrlSetting = getProviderBaseUrlSetting(providerType);
+  const rawBaseUrl = providerType === 'openrouter'
+    ? DEFAULT_OPENROUTER_BASE_URL
+    : (providerBaseUrlSetting ? readStringSetting(cfg, providerBaseUrlSetting) : '') ||
+      readLegacyProviderBaseUrl(cfg) ||
+      getProviderDefaultBaseUrl(providerType);
   const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
   const apiKey = await resolveApiKey(context, {
     providerType,
@@ -434,6 +475,57 @@ export async function resetOpenRouterSecretsAndState(context: vscode.ExtensionCo
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, undefined);
 }
 
+function buildProviderHeaders(settings: Pick<OpenRouterSettings, 'providerType' | 'apiKey'>): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (providerSupportsApiKey(settings.providerType) && settings.apiKey.trim()) {
+    headers.Authorization = `Bearer ${settings.apiKey}`;
+  }
+
+  if (providerSupportsOpenRouterHeaders(settings.providerType)) {
+    headers['HTTP-Referer'] = 'https://github.com/zzgosh/marklingo';
+    headers['X-Title'] = 'MarkLingo';
+  }
+
+  return headers;
+}
+
+function resolveReasoningOptions(
+  providerType: ProviderType,
+  reasoning: ReasoningOptions | null | undefined,
+): ReasoningOptions | undefined {
+  if (!providerSupportsOpenRouterReasoningControl(providerType)) return undefined;
+  if (reasoning === null) return undefined;
+  return reasoning ?? { effort: 'none', exclude: true };
+}
+
+function resolveReasoningEffort(
+  providerType: ProviderType,
+  reasoning: ReasoningOptions | null | undefined,
+): 'none' | undefined {
+  if (getProviderReasoningControl(providerType) !== 'reasoningEffortNone') return undefined;
+  if (reasoning === null) return undefined;
+  return 'none';
+}
+
+function resolveThinkingOptions(
+  providerType: ProviderType,
+  reasoning: ReasoningOptions | null | undefined,
+): ThinkingOptions | undefined {
+  if (getProviderReasoningControl(providerType) !== 'thinkingDisabled') return undefined;
+  if (reasoning === null) return undefined;
+  return { type: 'disabled' };
+}
+
+function resolveTemperature(providerType: ProviderType, temperature: number | undefined): number | undefined {
+  if (temperature === undefined) return undefined;
+  // Kimi K2.x rejects non-default temperature values on the Chat Completions endpoint.
+  if (!providerSupportsTemperatureControl(providerType)) return undefined;
+  return temperature;
+}
+
 function readPositiveInteger(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
 }
@@ -482,10 +574,7 @@ export async function getOpenRouterModelContextLength(settings: OpenRouterSettin
       `${settings.baseUrl}/models`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${settings.apiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: buildProviderHeaders(settings),
       },
       5_000,
     );
@@ -545,26 +634,22 @@ export async function openRouterChatCompletion(
     model: settings.modelId,
     messages,
     stream: false,
-    temperature: options.temperature,
+    temperature: resolveTemperature(settings.providerType, options.temperature),
     top_p: options.topP,
     top_k: options.topK,
     repeat_penalty: options.repeatPenalty,
     max_tokens: options.maxTokens,
     response_format: options.responseFormat,
-    reasoning: options.reasoning === null ? undefined : options.reasoning ?? { effort: 'none', exclude: true },
+    reasoning: resolveReasoningOptions(settings.providerType, options.reasoning),
+    reasoning_effort: resolveReasoningEffort(settings.providerType, options.reasoning),
+    thinking: resolveThinkingOptions(settings.providerType, options.reasoning),
   };
 
   const res = await fetchJsonWithTimeout(
     url,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${settings.apiKey}`,
-        'Content-Type': 'application/json',
-        // OpenRouter recommended headers.
-        'HTTP-Referer': 'https://github.com/zzgosh/marklingo',
-        'X-Title': 'MarkLingo',
-      },
+      headers: buildProviderHeaders(settings),
       body: JSON.stringify(body),
     },
     timeoutMs,
@@ -573,13 +658,13 @@ export async function openRouterChatCompletion(
 
   if (!res.ok) {
     const errorDetail = typeof res.text === 'string' && res.text.trim() ? res.text.trim() : res.statusText;
-    throw new Error(`OpenRouter request failed: HTTP ${res.status}. ${errorDetail}`);
+    throw new Error(`Provider request failed: HTTP ${res.status}. ${errorDetail}`);
   }
 
   const data = res.json as any;
   const content: unknown = data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('OpenRouter returned empty content or an unexpected response shape.');
+    throw new Error('Provider returned empty content or an unexpected response shape.');
   }
   return content;
 }

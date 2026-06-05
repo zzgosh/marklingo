@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import {
   hasExplicitOpenRouterProviderConfiguration,
   hasOpenRouterApiKey,
+  providerRequiresApiKey,
   resolveConfiguredProvider,
   storeOpenRouterApiKey,
 } from '../services/openRouterClient.js';
@@ -10,6 +11,11 @@ import { acceptVisibleOnboardingDefaults } from '../onboardingState.js';
 
 export async function setOpenRouterApiKey(context: vscode.ExtensionContext) {
   const provider = resolveConfiguredProvider();
+  if (!providerRequiresApiKey(provider.providerType)) {
+    await vscode.window.showInformationMessage(`MarkLingo: ${getProviderDisplayName(provider.providerType)} does not require an API key.`);
+    return;
+  }
+
   const hasExisting = await hasOpenRouterApiKey(context, provider.baseUrl, {
     includeLegacy: !hasExplicitOpenRouterProviderConfiguration(),
   });

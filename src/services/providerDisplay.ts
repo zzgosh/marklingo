@@ -1,7 +1,9 @@
-export type ProviderDisplayType = 'openrouter' | 'openaiCompatible';
+import { getProviderPreset, type ProviderType } from './providerPresets.js';
+
+export type ProviderDisplayType = ProviderType;
 
 export function getProviderDisplayName(providerType: ProviderDisplayType): string {
-  return providerType === 'openaiCompatible' ? 'OpenAI Compatible' : 'OpenRouter';
+  return getProviderPreset(providerType).label;
 }
 
 export function getProviderApiKeyInputTitle(providerType: ProviderDisplayType): string {

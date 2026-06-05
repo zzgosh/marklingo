@@ -141,11 +141,21 @@
           "default": "openrouter",
           "enum": [
             "openrouter",
+            "openai",
+            "deepseek",
+            "moonshot",
+            "glm",
+            "xiaomiMimo",
             "openaiCompatible"
           ],
           "enumDescriptions": [
             "Use OpenRouter's official API endpoint.",
-            "Use a custom OpenAI-compatible API endpoint, such as llama.cpp server."
+            "Use OpenAI's official Chat Completions endpoint.",
+            "Use DeepSeek's OpenAI-compatible API endpoint.",
+            "Use Moonshot's OpenAI-compatible API endpoint.",
+            "Use GLM's OpenAI-compatible API endpoint.",
+            "Use Xiaomi MiMo's OpenAI-compatible API endpoint.",
+            "Use a custom OpenAI-compatible API endpoint, such as llama.cpp server, Ollama, or LM Studio."
           ],
           "description": "Provider used for translation requests."
         },
@@ -153,7 +163,7 @@
           "type": "string",
           "scope": "application",
           "default": "https://openrouter.ai/api/v1",
-          "description": "Active provider base URL kept for compatibility. MarkLingo Settings remembers OpenAI Compatible Base URL separately."
+          "description": "Active provider base URL kept for compatibility. MarkLingo Settings remembers Custom OpenAI Compatible Base URL separately."
         },
         "marklingo.openrouter.modelId": {
           "type": "string",
@@ -169,12 +179,12 @@
           "type": "string",
           "scope": "application",
           "default": "",
-          "description": "Base URL remembered for the OpenAI Compatible provider."
+          "description": "Base URL remembered for the Custom OpenAI Compatible provider."
         },
         "marklingo.providers.openaiCompatible.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the OpenAI Compatible provider."
+          "description": "Model ID remembered for the Custom OpenAI Compatible provider."
         },
         "marklingo.translation.maxBlocksPerRequest": {
           "type": "number",

@@ -8,7 +8,7 @@ import {
 test('classifies model output errors for retry and settings actions', () => {
   assert.equal(isModelOutputError(new SyntaxError('Unexpected token')), true);
   assert.equal(isModelOutputError('Model output is not valid JSON.'), true);
-  assert.equal(isModelOutputError('OpenRouter returned empty content or an unexpected response shape.'), true);
+  assert.equal(isModelOutputError('Provider returned empty content or an unexpected response shape.'), true);
   assert.equal(isModelOutputError('ENOENT: no such file or directory'), false);
 });
 

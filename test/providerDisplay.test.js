@@ -9,9 +9,12 @@ import {
 
 test('builds provider-specific command onboarding copy', () => {
   assert.equal(getProviderDisplayName('openrouter'), 'OpenRouter');
-  assert.equal(getProviderDisplayName('openaiCompatible'), 'OpenAI Compatible');
+  assert.equal(getProviderDisplayName('openaiCompatible'), 'Custom OpenAI Compatible');
+  assert.equal(getProviderDisplayName('moonshot'), 'Moonshot');
+  assert.equal(getProviderDisplayName('glm'), 'GLM');
+  assert.equal(getProviderDisplayName('xiaomiMimo'), 'Xiaomi MiMo');
   assert.equal(getProviderApiKeyInputTitle('openrouter'), 'MarkLingo: OpenRouter API Key');
-  assert.equal(getProviderApiKeyInputTitle('openaiCompatible'), 'MarkLingo: OpenAI Compatible API Key');
+  assert.equal(getProviderApiKeyInputTitle('openaiCompatible'), 'MarkLingo: Custom OpenAI Compatible API Key');
 
   assert.equal(
     getProviderApiKeyInputPrompt('openrouter', 'https://openrouter.ai/api/v1'),
@@ -27,10 +30,10 @@ test('builds provider-specific command onboarding copy', () => {
   );
   assert.equal(
     getProviderApiKeyInputPrompt('openaiCompatible', ''),
-    'Paste the API key for OpenAI Compatible. MarkLingo stores it securely in VS Code.',
+    'Paste the API key for Custom OpenAI Compatible. MarkLingo stores it securely in VS Code.',
   );
   assert.equal(
     getMissingProviderApiKeyMessage('openaiCompatible'),
-    'No OpenAI Compatible API key saved. Add one in Settings, or run translation again.',
+    'No Custom OpenAI Compatible API key saved. Add one in Settings, or run translation again.',
   );
 });

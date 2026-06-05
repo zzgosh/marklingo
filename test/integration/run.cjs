@@ -133,8 +133,11 @@ async function configureExtension(mockServer) {
   await extension.activate();
 
   const cfg = vscode.workspace.getConfiguration('marklingo');
+  await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openaiCompatible.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
   await cfg.update('translation.targetLanguage', 'English', vscode.ConfigurationTarget.Global);
   await cfg.update('translation.requestMode', 'auto', vscode.ConfigurationTarget.Global);
 
@@ -252,7 +255,7 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
 
   const request = context.server.state.chatRequests[0];
   assert.equal(request.body.stream, false);
-  assert.deepEqual(request.body.reasoning, { effort: 'none', exclude: true });
+  assert.equal(Object.hasOwn(request.body, 'reasoning'), false);
   assert.equal(request.body.response_format.type, 'json_object');
   assert.equal(request.body.messages[0].role, 'system');
   assert.equal(request.body.messages[1].role, 'user');
@@ -261,7 +264,7 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.match(path.basename(metaPath), /_en_[a-f0-9]+_mdt\.meta\.json$/);
   assert.equal(meta.debug.status, 'success');
   assert.equal(meta.debug.settings.request.stream, false);
-  assert.equal(meta.debug.settings.request.reasoning.effort, 'none');
+  assert.equal(meta.debug.settings.request.reasoning, undefined);
   assert.equal(meta.debug.result.warningCount, 0);
   assert.ok(!JSON.stringify(meta.debug).includes('test-key'), 'debug metadata must not include the API key');
 }
@@ -936,18 +939,18 @@ async function testCommandProviderOnboardingShowsProviderChoice(context) {
     assert.equal(quickPickCalls[0].options.title, 'MarkLingo: Choose Provider');
     assert.deepEqual(quickPickCalls[0].items.map((item) => item.label), [
       'OpenRouter',
-      'OpenAI Compatible',
+      'Custom OpenAI Compatible',
       'Open MarkLingo Settings',
     ]);
     assert.equal(inputCalls[0].title, 'MarkLingo: OpenRouter API Key');
     assert.equal(inputCalls[0].prompt, 'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code.');
   } finally {
-    await cfg.update('openrouter.provider', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
     await cfg.update('openrouter.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
     await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
     await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.baseUrl', undefined, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.modelId', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('providers.openaiCompatible.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
+    await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
   }
 }
 
@@ -974,9 +977,9 @@ async function testCommandProviderOnboardingOpensSettingsForOpenAiCompatible(con
     };
 
     await withWindowMessageStubs({
-      showQuickPick: async (items) => items.find((item) => item.label === 'OpenAI Compatible'),
+      showQuickPick: async (items) => items.find((item) => item.label === 'Custom OpenAI Compatible'),
       showInputBox: async () => {
-        throw new Error('Expected OpenAI Compatible onboarding to open Settings before prompting for credentials.');
+        throw new Error('Expected Custom OpenAI Compatible onboarding to open Settings before prompting for credentials.');
       },
     }, async () => {
       await assert.rejects(
@@ -989,12 +992,12 @@ async function testCommandProviderOnboardingOpensSettingsForOpenAiCompatible(con
     assert.equal(vscode.workspace.getConfiguration('marklingo').get('openrouter.provider'), 'openaiCompatible');
   } finally {
     vscode.commands.executeCommand = originalExecuteCommand;
-    await cfg.update('openrouter.provider', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
     await cfg.update('openrouter.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
     await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
     await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.baseUrl', undefined, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.modelId', undefined, vscode.ConfigurationTarget.Global);
+    await cfg.update('providers.openaiCompatible.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
+    await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
   }
 }
 
@@ -1040,7 +1043,7 @@ async function run() {
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
     await runTest('clear all data does not wait for notification dismissal', testClearAllDataDoesNotWaitForNotification, context);
     await runTest('command provider onboarding shows provider choice', testCommandProviderOnboardingShowsProviderChoice, context);
-    await runTest('command provider onboarding opens settings for OpenAI Compatible', testCommandProviderOnboardingOpensSettingsForOpenAiCompatible, context);
+    await runTest('command provider onboarding opens settings for Custom OpenAI Compatible', testCommandProviderOnboardingOpensSettingsForOpenAiCompatible, context);
   } finally {
     await server.close();
   }

@@ -6,7 +6,7 @@ Translate Markdown with AI, without breaking it.
 
 MarkLingo turns the active saved Markdown file into a translated copy while preserving the parts that should not be touched: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths. It is built for writers, maintainers, and documentation teams who want fast multilingual Markdown drafts inside VS Code.
 
-Translation runs through [OpenRouter](https://openrouter.ai) by default, or through a trusted OpenAI-compatible endpoint you configure. You bring your own API key, pick the model, and pay only for what you use.
+Translation runs through [OpenRouter](https://openrouter.ai) by default, or through a trusted OpenAI-compatible provider you configure. You bring your own API key, pick the model, and pay only for what you use.
 
 MarkLingo itself is free to use and fully open source: all source code is public on [GitHub](https://github.com/zzgosh/marklingo). You only pay OpenRouter or your selected model provider directly, based on the model you choose.
 
@@ -46,7 +46,7 @@ Default shortcut:
 - macOS: `Option + Command + T`
 - Windows/Linux: `Control + Alt + T`
 
-You can also start with `MarkLingo: Translate Current Markdown`. On first run, MarkLingo asks for the target language and Provider. Choose `OpenRouter` to continue inline, or choose `OpenAI Compatible` / `Open MarkLingo Settings` to finish custom endpoint setup in Settings.
+You can also start with `MarkLingo: Translate Current Markdown`. On first run, MarkLingo asks for the target language and Provider. Choose `OpenRouter` to continue inline, or choose `Custom OpenAI Compatible` / `Open MarkLingo Settings` to finish custom endpoint setup in Settings.
 
 Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Right-click a Markdown file in the Explorer to run `MarkLingo: Translate This Markdown File`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs. You can also select multiple Markdown files or folders in the Explorer and run `MarkLingo: Translate Selected Markdown Files` to translate them as one batch.
 
@@ -70,13 +70,14 @@ Use `MarkLingo: Open Settings` for the settings most users need.
 - **Provider**
   - Setting: `marklingo.openrouter.provider`
   - Default: `openrouter`
-  - `OpenRouter` uses the official OpenRouter endpoint and hides Base URL. `OpenAI Compatible` exposes Base URL for custom endpoints such as llama.cpp server.
-  - The settings page remembers OpenRouter and OpenAI Compatible fields separately. Switching the dropdown loads that provider's saved draft; `Save and Verify` activates the selected provider.
+  - Presets include `OpenRouter`, `OpenAI`, `DeepSeek`, `Moonshot`, `GLM`, `Xiaomi MiMo`, and `Custom OpenAI Compatible`.
+  - Use `Custom OpenAI Compatible` for local or custom endpoints such as llama.cpp server, Ollama, or LM Studio.
+  - The settings page remembers each provider's Model ID and API key by endpoint origin. Switching the dropdown loads that provider's saved draft; `Save and Verify` activates the selected provider.
 
 - **Base URL**
-  - Setting: `marklingo.providers.openaiCompatible.baseUrl`
-  - Default: empty
-  - Used only when Provider is `OpenAI Compatible`. Custom endpoints must use HTTPS, except localhost debugging.
+  - Shown only for `Custom OpenAI Compatible`.
+  - Custom endpoints must use HTTPS, except localhost debugging endpoints such as llama.cpp server, Ollama, or LM Studio.
+  - Fixed presets use their official endpoint internally. `Moonshot` and `GLM` probe their supported global/China endpoints during verification and keep the working endpoint for later requests.
 
 - **API Key**
   - Storage: VS Code `SecretStorage`
@@ -84,14 +85,13 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Enter the API key for the selected provider. Keys are stored separately by endpoint origin and are never stored in VS Code settings or workspace files.
 
 - **Model ID**
-  - Settings: `marklingo.providers.openrouter.modelId`, `marklingo.providers.openaiCompatible.modelId`
-  - Default: `google/gemini-3.1-flash-lite` for OpenRouter; empty for OpenAI Compatible
-  - Use an OpenRouter model ID, or the model alias exposed by an OpenAI-compatible endpoint.
+  - OpenRouter and Custom OpenAI Compatible allow direct Model ID entry.
+  - Other provider presets offer only curated Model ID choices.
 
 - **Save and Verify**
   - Saves the Provider, API key, and Model ID only after a lightweight verification request succeeds.
   - The verification checks connectivity and chooses the safest request shape for the selected model.
-  - If the selected provider, Base URL, Model ID, and saved API key are unchanged and a capability result is already cached, MarkLingo only reruns a short connectivity check instead of probing model capability again.
+  - If the selected provider, internal endpoint, Model ID, and saved API key are unchanged and a capability result is already cached, MarkLingo only reruns a short connectivity check instead of probing model capability again.
   - Some reachable models need smaller Markdown batches for reliability. When that happens, Settings shows a small info tip, and large files may run a bit slower.
 
 - **Advanced Request Mode**
@@ -134,7 +134,7 @@ llama-server \
 
 Use these settings:
 
-- Provider: `OpenAI Compatible`
+- Provider: `Custom OpenAI Compatible`
 - Base URL: `http://127.0.0.1:8080/v1`
 - API Key: `local-hy-secret`
 - Model ID: `hy-mt2`
@@ -161,7 +161,7 @@ Running translation again rebuilds the translated file from the current source M
 
 ## Privacy and Data
 
-MarkLingo is a local VS Code extension, but translation requires sending document content to OpenRouter, or to a trusted OpenAI-compatible custom endpoint if you select that Provider.
+MarkLingo is a local VS Code extension, but translation requires sending document content to OpenRouter, or to the trusted OpenAI-compatible provider selected in Settings.
 
 - Markdown content is sent to the configured endpoint for translation.
 - The official OpenRouter endpoint is used by default.
@@ -172,7 +172,7 @@ MarkLingo is a local VS Code extension, but translation requires sending documen
 - Translation metadata is stored under VS Code `globalStorageUri`, not in the workspace.
 - No telemetry SDK is included.
 
-Changing Provider or Base URL changes where future translation requests send Markdown content. Only use endpoints you trust.
+Changing Provider or the Custom OpenAI Compatible Base URL changes where future translation requests send Markdown content. Only use endpoints you trust.
 
 ## Cleanup
 

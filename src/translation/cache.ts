@@ -79,7 +79,7 @@ export type TranslationMetaDebug = {
     customPromptHash?: string;
     request: {
       stream: false;
-      temperature: number;
+      temperature?: number;
       topP?: number;
       topK?: number;
       repeatPenalty?: number;
@@ -90,6 +90,7 @@ export type TranslationMetaDebug = {
         effort: "none";
         exclude: true;
       };
+      reasoningControl?: string;
     };
   };
   plan?: {

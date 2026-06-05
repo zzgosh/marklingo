@@ -7,6 +7,11 @@ import {
   type ChatCompletionOptions,
   type OpenRouterSettings,
 } from '../services/openRouterClient.js';
+import {
+  getProviderReasoningControl,
+  providerSupportsReasoningDisable,
+  providerSupportsTemperatureControl,
+} from '../services/providerPresets.js';
 import { getProviderDisplayName } from '../services/providerDisplay.js';
 import { readVerifiedTranslationAdapterMode } from '../services/modelCapabilities.js';
 import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
@@ -413,7 +418,7 @@ function buildChatCompletionOptions(options: {
       maxTokens,
       signal: options.signal,
       responseFormat: { type: 'json_object' },
-      reasoning: null,
+      reasoning: { effort: 'none', exclude: true },
     };
   }
 
@@ -610,22 +615,32 @@ async function translateMarkdownDocument(
       request: adapterMode === 'translationModel'
         ? {
             stream: false,
-            temperature: 0.7,
+            temperature: providerSupportsTemperatureControl(settings.providerType) ? 0.7 : undefined,
             topP: 0.6,
             topK: isLocalHttpBaseUrl(settings.baseUrl) ? 20 : undefined,
             repeatPenalty: isLocalHttpBaseUrl(settings.baseUrl) ? 1.05 : undefined,
             maxTokens: translationModelMaxOutputTokens > 0 ? translationModelMaxOutputTokens : undefined,
             maxTokensMode: translationModelMaxOutputTokens > 0 ? 'fixed' : 'auto',
             responseFormat: 'json_object',
+            reasoning: providerSupportsReasoningDisable(settings.providerType)
+              ? {
+                  effort: 'none',
+                  exclude: true,
+                }
+              : undefined,
+            reasoningControl: getProviderReasoningControl(settings.providerType),
           }
         : {
             stream: false,
-            temperature: 0,
+            temperature: providerSupportsTemperatureControl(settings.providerType) ? 0 : undefined,
             responseFormat: 'json_object',
-            reasoning: {
-              effort: 'none',
-              exclude: true,
-            },
+            reasoning: providerSupportsReasoningDisable(settings.providerType)
+              ? {
+                  effort: 'none',
+                  exclude: true,
+                }
+              : undefined,
+            reasoningControl: getProviderReasoningControl(settings.providerType),
           },
     };
 
