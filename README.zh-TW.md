@@ -10,7 +10,7 @@ MarkLingo 會將目前已儲存的 Markdown 檔案翻譯成一份副本，同時
 
 MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始碼都公開在 [GitHub](https://github.com/zzgosh/marklingo) 上。你只需依所選模型直接向 OpenRouter 或你選擇的模型服務支付用量費用。
 
-![從命令選擇區執行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+![從命令選擇區執行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## 為什麼選擇 MarkLingo
 
@@ -116,33 +116,6 @@ MarkLingo 本身不收取任何費用，並且完全開源透明：所有原始�
   - 當所選模型支援時，附加在 MarkLingo 內建的 Markdown 保護提示之後，用於補充術語、語氣或風格要求。需要小批次 fallback 的模型不會收到這些自訂指令，欄位也會隱藏。
 
 設定頁面透過 `Save and Verify` 儲存 Provider 憑證。其他下拉選單會立即儲存；Provider 之外的自由文字欄位使用各自的行內 `Save` 按鈕。
-
-### 使用 llama.cpp 本機執行 Hy-MT
-
-MarkLingo 可以使用本機 OpenAI-compatible 的 `llama-server` 端點執行 Hy-MT 模型：
-
-```sh
-llama-server \
-  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
-  --host 127.0.0.1 \
-  --port 8080 \
-  --alias hy-mt2 \
-  --parallel 2 \
-  --ctx-size 8192 \
-  --api-key local-hy-secret
-```
-
-使用這些設定：
-
-- Provider：`OpenAI Compatible`
-- Base URL：`http://127.0.0.1:8080/v1`
-- API Key：`local-hy-secret`
-- Model ID：`hy-mt2`
-- 然後點擊 `Save and Verify`。Hy-MT 預計會使用更小的 Markdown 批次來保持可靠性。
-
-對於 Hy-MT2 模型 ID，MarkLingo 會在小批次請求路徑中使用內部維護的模型專屬 structured-data prompt。其他走這一路徑的模型會繼續使用通用、克制的 prompt，除非 MarkLingo 為該模型維護了專屬 prompt profile。
-
-本機吞吐量主要取決於模型、量化方式與硬體。MarkLingo 不會替你下載、啟動或調校 llama.cpp；那會變成單獨的本機 runtime 管理器，需要處理模型下載、二進位安裝、連接埠分配、行程生命週期與硬體探測。用戶端並行只有在 `llama-server` 有匹配的 `--parallel` slot 時才有幫助；如果 server 只有一個 slot，額外的用戶端請求通常只是排隊，不會讓翻譯更快。普通設定頁會隱藏模型批次調參項，並使用保守預設值：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（依 context 自動估算輸出預算）。用於診斷的 settings.json 進階覆寫仍然保留。
 
 ## 輸出檔案
 

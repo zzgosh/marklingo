@@ -10,7 +10,7 @@ MarkLingo は、現在保存されている Markdown ファイルを翻訳済み
 
 MarkLingo 自体は無料で利用でき、完全にオープンソースで透明です。すべてのソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。お支払いは、選択したモデルに応じて OpenRouter または選択したモデルプロバイダーへ直接支払う利用料金のみです。
 
-![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## MarkLingo の特長
 
@@ -116,33 +116,6 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
   - 選択したモデルが対応している場合、用語、トーン、スタイルの追加指示として MarkLingo に内蔵された Markdown 保護プロンプトの後に追加されます。小さなバッチの fallback が必要なモデルには送信されず、このフィールドも非表示になります。
 
 設定ページでは、Provider の認証情報は `Save and Verify` で保存されます。その他のドロップダウンは即座に保存され、Provider 以外の自由入力フィールドにはそれぞれインライン `Save` ボタンがあります。
-
-### llama.cpp でローカル Hy-MT を使う
-
-MarkLingo は、ローカルの OpenAI-compatible な `llama-server` エンドポイントで Hy-MT モデルを使用できます。
-
-```sh
-llama-server \
-  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
-  --host 127.0.0.1 \
-  --port 8080 \
-  --alias hy-mt2 \
-  --parallel 2 \
-  --ctx-size 8192 \
-  --api-key local-hy-secret
-```
-
-以下の設定を使用します。
-
-- Provider：`OpenAI Compatible`
-- Base URL：`http://127.0.0.1:8080/v1`
-- API Key：`local-hy-secret`
-- Model ID：`hy-mt2`
-- その後 `Save and Verify` をクリックします。Hy-MT は信頼性のために小さな Markdown バッチを使うことが想定されます。
-
-Hy-MT2 のモデル ID では、MarkLingo は小さなバッチのリクエストパスで内部のモデル専用 structured-data prompt を使用します。同じパスを使う他のモデルでは、そのモデル専用の prompt profile が MarkLingo に用意されていない限り、汎用で控えめな prompt を使い続けます。
-
-ローカルのスループットは主に、モデル、量子化方式、ハードウェアに依存します。MarkLingo は llama.cpp のダウンロード、起動、調整は行いません。それを行うには、モデルのダウンロード、バイナリのセットアップ、ポート割り当て、プロセスのライフサイクル、ハードウェア検出を扱う別のローカル runtime 管理機能が必要になります。クライアント側の並行実行は、`llama-server` に対応する `--parallel` slot がある場合にのみ有効です。server が 1 slot の場合、追加のクライアントリクエストは通常キューに入るだけで、翻訳は速くなりません。通常の設定 UI ではモデルのバッチ調整項目を隠し、保守的なデフォルト値を使います：`translationModelMaxBlocksPerRequest: 12`、`translationModelConcurrency: 1`、`translationModelMaxOutputTokens: 0`（context から出力予算を自動推定）。診断用の settings.json 詳細上書きは残しています。
 
 ## 出力ファイル
 

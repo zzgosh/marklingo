@@ -10,7 +10,7 @@ Translation runs through [OpenRouter](https://openrouter.ai) by default, or thro
 
 MarkLingo itself is free to use and fully open source: all source code is public on [GitHub](https://github.com/zzgosh/marklingo). You only pay OpenRouter or your selected model provider directly, based on the model you choose.
 
-![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.1/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
 
 ## Why MarkLingo
 
@@ -116,33 +116,6 @@ Use `MarkLingo: Open Settings` for the settings most users need.
   - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt when the selected model supports them. This field is hidden and not sent for models that need the smaller-batch fallback.
 
 The settings page saves Provider credentials through `Save and Verify`. Other dropdown changes save immediately, and free-text fields outside Provider use their own inline `Save` buttons.
-
-### Local Hy-MT with llama.cpp
-
-MarkLingo can use a local OpenAI-compatible `llama-server` endpoint for Hy-MT models:
-
-```sh
-llama-server \
-  -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M \
-  --host 127.0.0.1 \
-  --port 8080 \
-  --alias hy-mt2 \
-  --parallel 2 \
-  --ctx-size 8192 \
-  --api-key local-hy-secret
-```
-
-Use these settings:
-
-- Provider: `Custom OpenAI Compatible`
-- Base URL: `http://127.0.0.1:8080/v1`
-- API Key: `local-hy-secret`
-- Model ID: `hy-mt2`
-- Then click `Save and Verify`. Hy-MT is expected to use smaller Markdown batches for reliability.
-
-For Hy-MT2 model IDs, MarkLingo uses an internal model-specific structured-data prompt for the smaller-batch request path. Other models on that path keep the generic, conservative prompt unless MarkLingo has a dedicated prompt profile for that model.
-
-Local throughput depends mainly on the model, quantization, and hardware. MarkLingo does not download, start, or tune llama.cpp for you; doing that would require a separate local runtime manager for model downloads, binary setup, port allocation, process lifecycle, and hardware probing. Client concurrency only helps when `llama-server` has matching `--parallel` slots; if the server has one slot, extra client requests usually just queue and do not make translation faster. The UI keeps model-batching knobs hidden for normal use and uses conservative defaults: `translationModelMaxBlocksPerRequest: 12`, `translationModelConcurrency: 1`, and `translationModelMaxOutputTokens: 0` for context-based auto output budgeting. Advanced settings.json overrides remain available for diagnostics.
 
 ## Output Files
 
