@@ -166,7 +166,7 @@ MarkLingo is a local VS Code extension, but translation requires sending documen
 - Markdown content is sent to the configured endpoint for translation.
 - The official OpenRouter endpoint is used by default.
 - You need an API key or token accepted by the selected Provider.
-- Translation requests are non-streaming. MarkLingo uses the verified request path selected by `Save and Verify`; models that need the smaller-batch fallback do not receive Custom Instructions.
+- Translation requests are non-streaming. MarkLingo uses the verified request path selected by `Save and Verify`; models that need the smaller-batch fallback do not receive Custom Instructions. For the standard request path, MarkLingo asks the provider to exclude model reasoning from responses when supported.
 - API keys are stored in VS Code `SecretStorage`, separated by endpoint origin.
 - API keys are not stored in workspace files, VS Code settings, translation metadata, or logs.
 - Translation metadata is stored under VS Code `globalStorageUri`, not in the workspace.

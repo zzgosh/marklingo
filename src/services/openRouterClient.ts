@@ -153,7 +153,7 @@ async function resolveProviderTypeForTranslation(
     {
       label: 'OpenAI Compatible',
       description: 'Custom endpoint',
-      detail: 'Custom or self-hosted endpoint. Set up in Settings.',
+      detail: 'Set Base URL, model, and key in Settings.',
       providerType: 'openaiCompatible',
       openSettings: true,
     },

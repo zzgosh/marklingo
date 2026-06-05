@@ -36,6 +36,7 @@ import {
 } from '../translation/translationAdapters.js';
 import { formatYamlScalarReplacement } from '../translation/frontmatterValues.js';
 import { hasTargetLanguageSelected, markTargetLanguageSelected } from '../onboardingState.js';
+import { isModelOutputError, shouldOfferSettingsActionForFailures } from './failureActions.js';
 import {
   createEmptyMeta,
   loadTranslationMeta,
@@ -442,12 +443,6 @@ async function mapWithConcurrency<T, R>(
   }));
 
   return results;
-}
-
-function isModelOutputError(error: unknown): boolean {
-  if (error instanceof SyntaxError) return true;
-  const message = error instanceof Error ? error.message : String(error);
-  return /JSON|Model output|unexpected response shape|empty content/i.test(message);
 }
 
 function shouldSplitTranslationModelChunk(error: unknown): boolean {
@@ -1251,13 +1246,6 @@ function buildBatchConfirmationMessage(files: vscode.Uri[], sourceLabel?: string
     return `MarkLingo: Translate ${pluralize(files.length, 'file')} in ${sourceLabel} and subfolders?`;
   }
   return `MarkLingo: Translate ${pluralize(files.length, 'file')} from the selected Explorer items?`;
-}
-
-function shouldOfferSettingsActionForFailures(messages: string[]): boolean {
-  return messages.some((message) => (
-    isModelOutputError(message) ||
-    /api key|base url|endpoint|provider|model id|openrouter|connection|connectivity|timeout|http \d{3}|fetch|verification/i.test(message)
-  ));
 }
 
 async function translateMarkdownFilesBatch(

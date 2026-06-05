@@ -166,7 +166,7 @@ MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキ�
 - Markdown の内容は、翻訳のために設定されたエンドポイントに送信されます。
 - デフォルトでは公式の OpenRouter エンドポイントが使用されます。
 - 選択した Provider が受け付ける API キーまたは token が必要です。
-- 翻訳リクエストは非ストリーミングです。MarkLingo は `Save and Verify` が選んだ検証済みのリクエストパスを使用します。小さなバッチの fallback が必要なモデルには Custom Instructions は送信されません。
+- 翻訳リクエストは非ストリーミングです。MarkLingo は `Save and Verify` が選んだ検証済みのリクエストパスを使用します。小さなバッチの fallback が必要なモデルには Custom Instructions は送信されません。標準のリクエストパスでは、プロバイダーが対応している場合、MarkLingo はレスポンスからモデルの推論内容を除外するようリクエストします。
 - API キーは endpoint origin ごとに分けて VS Code の `SecretStorage` に保存されます。
 - API キーは、ワークスペースのファイル、VS Code の設定、翻訳メタデータ、ログには保存されません。
 - 翻訳メタデータは、ワークスペースではなく VS Code の `globalStorageUri` の下に保存されます。

@@ -166,7 +166,7 @@ MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送�
 - Markdown 内容会被发送到配置的端点进行翻译。
 - 默认使用官方的 OpenRouter 端点。
 - 你需要所选 Provider 接受的 API 密钥或 token。
-- 翻译请求为非流式。MarkLingo 会使用 `Save and Verify` 选出的已验证请求路径；需要小批次 fallback 的模型不会收到 Custom Instructions。
+- 翻译请求为非流式。MarkLingo 会使用 `Save and Verify` 选出的已验证请求路径；需要小批次 fallback 的模型不会收到 Custom Instructions。对于标准请求路径，MarkLingo 会在提供方支持时请求从响应中排除模型推理内容。
 - API 密钥按 endpoint origin 分开存储在 VS Code 的 `SecretStorage` 中。
 - API 密钥不会存入工作区文件、VS Code 设置、翻译元数据或日志。
 - 翻译元数据存储在 VS Code 的 `globalStorageUri` 下，而非工作区中。

@@ -22,6 +22,14 @@ test('builds provider-specific command onboarding copy', () => {
     'A key is already saved. Paste a new one to replace it.',
   );
   assert.equal(
+    getProviderApiKeyInputPrompt('openaiCompatible', 'http://127.0.0.1:8080/v1'),
+    'Paste the API key for http://127.0.0.1:8080/v1. MarkLingo stores it securely in VS Code.',
+  );
+  assert.equal(
+    getProviderApiKeyInputPrompt('openaiCompatible', ''),
+    'Paste the API key for OpenAI Compatible. MarkLingo stores it securely in VS Code.',
+  );
+  assert.equal(
     getMissingProviderApiKeyMessage('openaiCompatible'),
     'No OpenAI Compatible API key saved. Add one in Settings, or run translation again.',
   );
