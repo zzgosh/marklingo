@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import {
   getProviderBaseUrlCandidates,
   getProviderPreset,
+  PROVIDER_PRESETS,
   providerRequiresApiKey,
   providerSupportsApiKey,
   providerSupportsEditableModelId,
   providerSupportsReasoningDisable,
   providerSupportsTemperatureControl,
 } from '../out/services/providerPresets.js';
+import { MARKLINGO_CONFIGURATION_KEYS } from '../out/configurationKeys.js';
 
 test('defines OpenAI-compatible provider presets with regional endpoints', () => {
   assert.deepEqual(
@@ -44,4 +46,16 @@ test('defines OpenAI-compatible provider presets with regional endpoints', () =>
   assert.equal(providerSupportsReasoningDisable('openaiCompatible'), false);
   assert.equal(providerSupportsTemperatureControl('moonshot'), false);
   assert.equal(providerSupportsTemperatureControl('deepseek'), true);
+});
+
+test('keeps provider preset setting references registered', () => {
+  for (const preset of PROVIDER_PRESETS) {
+    for (const key of [preset.baseUrlSetting, preset.modelIdSetting]) {
+      if (!key) continue;
+      assert.ok(
+        MARKLINGO_CONFIGURATION_KEYS.includes(key),
+        `unregistered preset setting: ${key}`,
+      );
+    }
+  }
 });
