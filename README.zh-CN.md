@@ -4,24 +4,14 @@
 
 用 AI 翻译 Markdown，同时不破坏 Markdown。
 
-MarkLingo 会将当前已保存的 Markdown 文件翻译成一份副本，同时保留那些不应被改动的部分：标题、列表、表格、代码、行内代码、HTML、frontmatter 语法、链接和图片路径。它面向希望在 VS Code 中快速生成多语言 Markdown 草稿的写作者、维护者和文档团队。
+MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原文件不变。它面向希望在 VS Code 中快速生成多语言 Markdown 草稿的写作者、维护者和文档团队。
 
-翻译默认通过 [OpenRouter](https://openrouter.ai) 完成，也可以使用你配置的、受信任的 OpenAI-compatible 端点。你提供自己的 API 密钥，自己选择模型，用多少付多少。
-
-MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代码都公开在 [GitHub](https://github.com/zzgosh/marklingo) 上。你只需按所选模型直接向 OpenRouter 或你选择的模型服务支付用量费用。
+- 保留 Markdown 结构：标题、列表、表格、代码、行内代码、HTML、frontmatter 语法、链接和图片路径。
+- 可选择内置 Provider presets：[OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，或使用受信任的 Custom OpenAI Compatible 端点。
+- 在源文件旁写出翻译后的 `*_<language>_mdt.md` 文件，打开翻译标签页和预览，并复用未改动 Markdown 块的缓存翻译。
+- 使用免费、开源的扩展；API 密钥存储在 VS Code `SecretStorage` 中，不包含遥测 SDK。
 
 ![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
-
-## 为什么选择 MarkLingo
-
-- 可从命令面板、编辑器右键菜单或资源管理器右键菜单翻译已保存的 Markdown 文档。
-- 保持原文件不变，并在其旁边写出一个翻译后的 `*_<language>_mdt.md` 文件。
-- 翻译完成后打开翻译后的 Markdown 标签页及其 Markdown 预览。
-- 当未改动的 Markdown 块再次被翻译时，复用此前的翻译。
-- 翻译选定的、面向人类阅读的 YAML frontmatter 值（例如 `title` 和 `description`），同时保留字段名和机器可读的值。
-- 在专门的设置页面中配置提供方、模型、API 密钥、目标语言和自定义指令。
-- 使用完全开源透明、插件本身免费的扩展；所有源代码都公开在 [GitHub](https://github.com/zzgosh/marklingo) 上。
-- 将 API 密钥存储在 VS Code 的 `SecretStorage` 中；不会存入工作区文件或扩展元数据。
 
 ## 安装
 
@@ -33,10 +23,10 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 
 ## 快速开始
 
-首先，获取一个 OpenRouter API 密钥：在 [openrouter.ai/keys](https://openrouter.ai/keys) 登录并创建一个密钥。费用由 OpenRouter 按请求计费，具体取决于你选择的模型。
+最快路径是使用 OpenRouter：在 [openrouter.ai/keys](https://openrouter.ai/keys) 登录并创建一个 API 密钥。费用由 OpenRouter 按请求计费，具体取决于你选择的模型。如需使用其他内置 Provider，先运行 `MarkLingo: Open Settings`，再从 Provider 中选择。
 
 1. 运行 `MarkLingo: Open Settings`。
-2. 保持 Provider 为 `OpenRouter`，粘贴 API key，选择 Model ID，然后点击 `Save and Verify`。
+2. 如果走最快路径，保持 Provider 为 `OpenRouter`；也可以在 Settings 中选择其他 Provider。粘贴 API key，选择 Model ID，然后点击 `Save and Verify`。
 3. 打开一个已保存的 Markdown 文件。
 4. 从命令面板运行 `MarkLingo: Translate Current Markdown`。
 5. 选择目标语言。
@@ -46,7 +36,7 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-也可以直接从 `MarkLingo: Translate Current Markdown` 开始。首次运行时，MarkLingo 会询问目标语言和 Provider。选择 `OpenRouter` 可继续在命令流程中输入；选择 `OpenAI Compatible` / `Open MarkLingo Settings` 可进入设置页完成自定义 endpoint 配置。
+也可以直接从 `MarkLingo: Translate Current Markdown` 开始。首次运行时，MarkLingo 会询问目标语言和 Provider。选择 `OpenRouter` 可快速配置；选择 `Custom OpenAI Compatible` 可配置自定义 endpoint；也可以打开 MarkLingo Settings 配置任意 Provider preset。
 
 也可以在 Markdown 编辑器上右键运行 `MarkLingo: Translate Current Markdown`。在资源管理器中的 Markdown 文件上右键运行 `MarkLingo: Translate This Markdown File`。在资源管理器中的文件夹上右键运行 `MarkLingo: Translate All Markdown in This Folder`，可翻译该文件夹及其子文件夹中的 `.md` 和 `.markdown` 文件，并跳过已生成的 `*_mdt.md` 输出。也可以在资源管理器中多选 Markdown 文件或文件夹，再运行 `MarkLingo: Translate Selected Markdown Files` 作为一批翻译。
 
@@ -67,16 +57,33 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
 
 大多数用户需要的设置，可通过 `MarkLingo: Open Settings` 访问。
 
+### 内置 Provider 模型
+
+固定 Provider presets 只提供精选模型选项。OpenRouter 和 Custom OpenAI Compatible 也支持直接输入 Model ID。
+
+| Provider | Model options |
+| --- | --- |
+| OpenRouter | 默认 `google/gemini-3.1-flash-lite`；支持直接输入 Model ID |
+| OpenAI | `gpt-5.2` |
+| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
+| Moonshot | `kimi-k2.6`、`kimi-k2.5` |
+| GLM | `glm-5.1`、`glm-5`、`glm-4.7` |
+| Xiaomi MiMo | `mimo-v2.5-pro`、`mimo-v2.5` |
+| Custom OpenAI Compatible | 端点暴露的模型 alias；支持直接输入 Model ID |
+
 - **Provider（提供方）**
   - 设置项：`marklingo.openrouter.provider`
   - 默认值：`openrouter`
-  - `OpenRouter` 使用官方 OpenRouter 端点并隐藏 Base URL。`OpenAI Compatible` 会显示 Base URL，用于 llama.cpp server 等自定义端点。
-  - 设置页面会分别记住 OpenRouter 与 OpenAI Compatible 的字段。切换下拉菜单会载入该 Provider 已保存的草稿；点击 `Save and Verify` 后才会激活所选 Provider。
+  - Presets 包括 `OpenRouter`、`OpenAI`、`DeepSeek`、`Moonshot`、`GLM`、`Xiaomi MiMo` 和 `Custom OpenAI Compatible`。
+  - `Custom OpenAI Compatible` 用于 llama.cpp server、Ollama、LM Studio 等本地或自定义端点。
+  - 设置页面会记住每个 Provider 的 Model ID，并按 endpoint origin 分开保存 API key。切换下拉菜单会载入该 Provider 已保存的草稿；点击 `Save and Verify` 后才会激活所选 Provider。
 
 - **Base URL（基础 URL）**
   - 设置项：`marklingo.providers.openaiCompatible.baseUrl`
   - 默认值：空
-  - 仅在 Provider 为 `OpenAI Compatible` 时使用。自定义端点必须使用 HTTPS，localhost 调试除外。
+  - 仅在 Provider 为 `Custom OpenAI Compatible` 时显示。
+  - 自定义端点必须使用 HTTPS，localhost 调试端点（例如 llama.cpp server、Ollama 或 LM Studio）除外。
+  - 固定 preset 会在内部使用官方端点。`Moonshot` 和 `GLM` 会在验证时探测支持的全球/中国端点，并保留可用端点用于后续请求。
 
 - **API Key（API 密钥）**
   - 存储：VS Code `SecretStorage`
@@ -84,9 +91,8 @@ MarkLingo 本身不收取任何费用，并且完全开源透明：所有源代�
   - 输入所选 Provider 的 API 密钥。密钥会按 endpoint origin 分开存储，不会写入 VS Code 设置或工作区文件。
 
 - **Model ID（模型 ID）**
-  - 设置项：`marklingo.providers.openrouter.modelId`、`marklingo.providers.openaiCompatible.modelId`
-  - 默认值：OpenRouter 为 `google/gemini-3.1-flash-lite`；OpenAI Compatible 为空
-  - 使用 OpenRouter 模型 ID，或 OpenAI-compatible 端点暴露的模型 alias。
+  - OpenRouter 和 Custom OpenAI Compatible 支持直接输入 Model ID。
+  - 其他 Provider presets 只提供精选 Model ID 选项。
 
 - **Save and Verify（保存并验证）**
   - 只有轻量验证请求成功后，才会保存 Provider、API Key 和 Model ID。
@@ -134,10 +140,10 @@ README_zh-CN_mdt.md
 
 ## 隐私与数据
 
-MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送到 OpenRouter，或在你选择对应 Provider 时发送到受信任的 OpenAI-compatible 自定义端点。
+MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送到 Settings 中选定的 Provider，例如 OpenRouter、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，或受信任的 Custom OpenAI Compatible 端点。
 
-- Markdown 内容会被发送到配置的端点进行翻译。
-- 默认使用官方的 OpenRouter 端点。
+- Markdown 内容会被发送到所选 Provider endpoint 进行翻译。
+- OpenRouter 是推荐的快速上手 Provider，其他 Provider presets 可在 Settings 中选择。
 - 你需要所选 Provider 接受的 API 密钥或 token。
 - 翻译请求为非流式。MarkLingo 会使用 `Save and Verify` 选出的已验证请求路径；需要小批次 fallback 的模型不会收到 Custom Instructions。对于标准请求路径，MarkLingo 会在提供方支持时请求从响应中排除模型推理内容。
 - API 密钥按 endpoint origin 分开存储在 VS Code 的 `SecretStorage` 中。

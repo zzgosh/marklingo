@@ -1,7 +1,7 @@
 {
   "name": "marklingo",
   "displayName": "MarkLingo - Translate Markdown with AI",
-  "description": "Translate Markdown through OpenRouter or OpenAI-compatible providers while preserving structure, links, code, and frontmatter.",
+  "description": "Translate Markdown with OpenRouter, OpenAI, DeepSeek, Moonshot, GLM, Xiaomi MiMo, and custom endpoints without breaking Markdown.",
   "version": "0.0.3",
   "publisher": "zzgosh",
   "type": "module",

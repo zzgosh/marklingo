@@ -4,24 +4,14 @@
 
 AI で Markdown を翻訳します。Markdown を壊さずに。
 
-MarkLingo は、現在保存されている Markdown ファイルを翻訳済みのコピーに変換します。その際、変更すべきでない部分はそのまま保持します。見出し、リスト、表、コード、インラインコード、HTML、frontmatter 構文、リンク、画像パスなどです。VS Code 内で多言語の Markdown ドラフトをすばやく作成したいライター、メンテナー、ドキュメントチームのために作られています。
+MarkLingo は、保存済みの Markdown を多言語ドラフトに翻訳し、元のファイルは変更しません。VS Code 内で多言語の Markdown ドラフトをすばやく作成したいライター、メンテナー、ドキュメントチームのために作られています。
 
-翻訳はデフォルトで [OpenRouter](https://openrouter.ai) 経由で実行されます。信頼できる OpenAI-compatible エンドポイントを設定して使うこともできます。ご自身の API キーを使い、モデルを選択し、使った分だけお支払いいただきます。
-
-MarkLingo 自体は無料で利用でき、完全にオープンソースで透明です。すべてのソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。お支払いは、選択したモデルに応じて OpenRouter または選択したモデルプロバイダーへ直接支払う利用料金のみです。
+- Markdown 構造を保持します：見出し、リスト、表、コード、インラインコード、HTML、frontmatter 構文、リンク、画像パス。
+- 組み込み Provider presets として [OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo を選択できます。信頼できる Custom OpenAI Compatible エンドポイントも利用できます。
+- ソースの隣に翻訳済みの `*_<language>_mdt.md` ファイルを書き出し、翻訳タブとプレビューを開き、変更されていない Markdown ブロックのキャッシュ翻訳を再利用します。
+- 無料でオープンソースの拡張機能です。API キーは VS Code `SecretStorage` に保存され、テレメトリ SDK は含まれていません。
 
 ![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
-
-## MarkLingo の特長
-
-- コマンドパレット、エディターのコンテキストメニュー、またはエクスプローラーのコンテキストメニューから、保存済みの Markdown ドキュメントを翻訳します。
-- 元のファイルはそのまま保持し、その隣に翻訳済みの `*_<language>_mdt.md` ファイルを書き出します。
-- 翻訳後、翻訳済みの Markdown タブとその Markdown プレビューを開きます。
-- 変更されていない Markdown ブロックが再び翻訳されるとき、以前の翻訳を再利用します。
-- フィールド名と機械可読の値は保持しつつ、人間向けに選択された YAML frontmatter の値（`title` や `description` など）を翻訳します。
-- 専用の設定ページから、プロバイダー、モデル、API キー、ターゲット言語、カスタム指示を設定できます。
-- 拡張機能自体は無料で、透明性のある完全なオープンソースです。ソースコードは [GitHub](https://github.com/zzgosh/marklingo) で公開されています。
-- API キーは VS Code の `SecretStorage` に保存します。ワークスペースのファイルや拡張機能のメタデータには保存しません。
 
 ## インストール
 
@@ -33,10 +23,10 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 
 ## クイックスタート
 
-まず、OpenRouter の API キーを取得します。[openrouter.ai/keys](https://openrouter.ai/keys) でサインインし、キーを作成してください。料金は、選択したモデルに応じて OpenRouter からリクエストごとに請求されます。
+最短のセットアップは OpenRouter を使う方法です。[openrouter.ai/keys](https://openrouter.ai/keys) でサインインし、API キーを作成してください。料金は、選択したモデルに応じて OpenRouter からリクエストごとに請求されます。別の組み込み Provider を使う場合は、まず `MarkLingo: Open Settings` を実行し、Provider から選択してください。
 
 1. `MarkLingo: Open Settings` を実行します。
-2. Provider を `OpenRouter` のままにし、API key を貼り付け、Model ID を選択して `Save and Verify` をクリックします。
+2. 最短セットアップでは Provider を `OpenRouter` のままにします。別の Provider は Settings で選択できます。API key を貼り付け、Model ID を選択して `Save and Verify` をクリックします。
 3. 保存済みの Markdown ファイルを開きます。
 4. コマンドパレットから `MarkLingo: Translate Current Markdown` を実行します。
 5. ターゲット言語を選択します。
@@ -46,7 +36,7 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-`MarkLingo: Translate Current Markdown` から直接始めることもできます。初回実行時、MarkLingo はターゲット言語と Provider を尋ねます。`OpenRouter` を選ぶとコマンドフロー内で続行できます。`OpenAI Compatible` / `Open MarkLingo Settings` を選ぶと、Settings でカスタム endpoint の設定を完了できます。
+`MarkLingo: Translate Current Markdown` から直接始めることもできます。初回実行時、MarkLingo はターゲット言語と Provider を尋ねます。`OpenRouter` を選ぶと素早く設定できます。`Custom OpenAI Compatible` を選ぶとカスタム endpoint を設定できます。MarkLingo Settings を開いて任意の Provider preset を設定することもできます。
 
 Markdown エディターを右クリックして `MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内の Markdown ファイルを右クリックすると `MarkLingo: Translate This Markdown File` を実行できます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。エクスプローラーで複数の Markdown ファイルやフォルダーを選択し、`MarkLingo: Translate Selected Markdown Files` で 1 つのバッチとして翻訳することもできます。
 
@@ -67,16 +57,33 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 
 ほとんどのユーザーに必要な設定は、`MarkLingo: Open Settings` から利用できます。
 
+### 組み込み Provider モデル
+
+固定 Provider presets は、選択済みのモデル候補だけを表示します。OpenRouter と Custom OpenAI Compatible では Model ID を直接入力することもできます。
+
+| Provider | Model options |
+| --- | --- |
+| OpenRouter | デフォルトは `google/gemini-3.1-flash-lite`。Model ID を直接入力できます |
+| OpenAI | `gpt-5.2` |
+| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
+| Moonshot | `kimi-k2.6`、`kimi-k2.5` |
+| GLM | `glm-5.1`、`glm-5`、`glm-4.7` |
+| Xiaomi MiMo | `mimo-v2.5-pro`、`mimo-v2.5` |
+| Custom OpenAI Compatible | エンドポイントが公開するモデル alias。Model ID を直接入力できます |
+
 - **Provider（プロバイダー）**
   - 設定：`marklingo.openrouter.provider`
   - デフォルト：`openrouter`
-  - `OpenRouter` は公式 OpenRouter エンドポイントを使用し、Base URL を非表示にします。`OpenAI Compatible` は llama.cpp server などのカスタムエンドポイント向けに Base URL を表示します。
-  - 設定ページは OpenRouter と OpenAI Compatible の入力内容を別々に記憶します。ドロップダウンを切り替えるとその Provider の保存済みドラフトを読み込み、`Save and Verify` をクリックすると選択した Provider が有効になります。
+  - Presets には `OpenRouter`、`OpenAI`、`DeepSeek`、`Moonshot`、`GLM`、`Xiaomi MiMo`、`Custom OpenAI Compatible` が含まれます。
+  - `Custom OpenAI Compatible` は llama.cpp server、Ollama、LM Studio などのローカルまたはカスタムエンドポイント向けです。
+  - 設定ページは各 Provider の Model ID を記憶し、API key は endpoint origin ごとに分けて保存します。ドロップダウンを切り替えるとその Provider の保存済みドラフトを読み込み、`Save and Verify` をクリックすると選択した Provider が有効になります。
 
 - **Base URL（ベース URL）**
   - 設定：`marklingo.providers.openaiCompatible.baseUrl`
   - デフォルト：空
-  - Provider が `OpenAI Compatible` の場合のみ使用されます。カスタムエンドポイントは、localhost でのデバッグを除き、HTTPS を使用する必要があります。
+  - Provider が `Custom OpenAI Compatible` の場合のみ表示されます。
+  - カスタムエンドポイントは、llama.cpp server、Ollama、LM Studio などの localhost デバッグエンドポイントを除き、HTTPS を使用する必要があります。
+  - 固定 preset は内部で公式エンドポイントを使用します。`Moonshot` と `GLM` は検証時に対応する Global/China エンドポイントをプローブし、動作したエンドポイントを後続リクエストに使用します。
 
 - **API Key（API キー）**
   - 保存先：VS Code `SecretStorage`
@@ -84,9 +91,8 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
   - 選択した Provider の API キーを入力します。キーは endpoint origin ごとに分けて保存され、VS Code の設定やワークスペースのファイルには保存されません。
 
 - **Model ID（モデル ID）**
-  - 設定：`marklingo.providers.openrouter.modelId`、`marklingo.providers.openaiCompatible.modelId`
-  - デフォルト：OpenRouter は `google/gemini-3.1-flash-lite`、OpenAI Compatible は空
-  - OpenRouter のモデル ID、または OpenAI-compatible エンドポイントが公開するモデル alias を使用します。
+  - OpenRouter と Custom OpenAI Compatible では Model ID を直接入力できます。
+  - その他の Provider presets では、選択済みの Model ID オプションのみを提供します。
 
 - **Save and Verify（保存して検証）**
   - 軽量な検証リクエストが成功した場合のみ、Provider、API Key、Model ID を保存します。
@@ -134,10 +140,10 @@ README_zh-CN_mdt.md
 
 ## プライバシーとデータ
 
-MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキュメントの内容を OpenRouter に送信する必要があります。該当する Provider を選択した場合は、信頼できる OpenAI-compatible カスタムエンドポイントに送信されます。
+MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキュメントの内容を Settings で選択した Provider に送信する必要があります。たとえば OpenRouter、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo、または信頼できる Custom OpenAI Compatible エンドポイントです。
 
-- Markdown の内容は、翻訳のために設定されたエンドポイントに送信されます。
-- デフォルトでは公式の OpenRouter エンドポイントが使用されます。
+- Markdown の内容は、翻訳のために選択した Provider endpoint に送信されます。
+- OpenRouter は推奨のクイックスタート Provider で、その他の Provider presets は Settings で選択できます。
 - 選択した Provider が受け付ける API キーまたは token が必要です。
 - 翻訳リクエストは非ストリーミングです。MarkLingo は `Save and Verify` が選んだ検証済みのリクエストパスを使用します。小さなバッチの fallback が必要なモデルには Custom Instructions は送信されません。標準のリクエストパスでは、プロバイダーが対応している場合、MarkLingo はレスポンスからモデルの推論内容を除外するようリクエストします。
 - API キーは endpoint origin ごとに分けて VS Code の `SecretStorage` に保存されます。
