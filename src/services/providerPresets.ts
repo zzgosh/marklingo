@@ -9,6 +9,7 @@ export type ProviderType =
 
 export type ProviderAuthMode = 'bearer' | 'optional' | 'none';
 export type ProviderReasoningControl = 'openrouter' | 'reasoningEffortNone' | 'thinkingDisabled' | 'none';
+export type ModelTag = 'fast' | 'quality' | 'slow' | 'local';
 
 export type ProviderBaseUrlOption = {
   label: string;
@@ -18,6 +19,13 @@ export type ProviderBaseUrlOption = {
 export type ProviderModelOption = {
   label: string;
   modelId: string;
+  tags?: readonly ModelTag[];
+};
+
+export type KnownLocalModelTagRule = {
+  pattern: string;
+  flags?: string;
+  tags: readonly ModelTag[];
 };
 
 export type ProviderPreset = {
@@ -45,6 +53,19 @@ export const OPENROUTER_PROVIDER_MODEL_ID_SETTING = 'providers.openrouter.modelI
 export const OPENAI_COMPATIBLE_BASE_URL_SETTING = 'providers.openaiCompatible.baseUrl';
 export const OPENAI_COMPATIBLE_MODEL_ID_SETTING = 'providers.openaiCompatible.modelId';
 
+export const KNOWN_LOCAL_MODEL_TAG_RULES: readonly KnownLocalModelTagRule[] = [
+  {
+    pattern: 'hy[-_ ]?mt2.*1\\.8b',
+    flags: 'i',
+    tags: ['local', 'slow'],
+  },
+  {
+    pattern: 'hy[-_ ]?mt2.*7b',
+    flags: 'i',
+    tags: ['local', 'slow'],
+  },
+] as const;
+
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     id: 'openrouter',
@@ -58,7 +79,10 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     reasoningControl: 'openrouter',
     modelIdSetting: OPENROUTER_PROVIDER_MODEL_ID_SETTING,
     modelOptions: [
-      { label: DEFAULT_OPENROUTER_MODEL_ID, modelId: DEFAULT_OPENROUTER_MODEL_ID },
+      { label: 'Gemini 3.1 Flash Lite', modelId: DEFAULT_OPENROUTER_MODEL_ID, tags: ['quality', 'fast'] },
+      { label: 'DeepSeek V4 Flash', modelId: 'deepseek/deepseek-v4-flash', tags: ['quality', 'fast'] },
+      { label: 'GPT-5.4 Mini', modelId: 'openai/gpt-5.4-mini', tags: ['quality', 'fast'] },
+      { label: 'MiMo V2 Flash', modelId: 'xiaomi/mimo-v2-flash', tags: ['quality', 'fast'] },
     ],
   },
   {
@@ -66,14 +90,17 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     label: 'OpenAI',
     description: 'OpenAI API through Chat Completions.',
     defaultBaseUrl: 'https://api.openai.com/v1',
-    defaultModelId: 'gpt-5.2',
+    defaultModelId: 'gpt-5.4-mini',
     authMode: 'bearer',
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'reasoningEffortNone',
     modelIdSetting: 'providers.openai.modelId',
     modelOptions: [
-      { label: 'GPT-5.2', modelId: 'gpt-5.2' },
+      { label: 'GPT-5.4 Mini', modelId: 'gpt-5.4-mini', tags: ['quality', 'fast'] },
+      { label: 'GPT-5.4 Nano', modelId: 'gpt-5.4-nano', tags: ['fast'] },
+      { label: 'GPT-5.4', modelId: 'gpt-5.4', tags: ['quality'] },
+      { label: 'GPT-5.5', modelId: 'gpt-5.5', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -88,8 +115,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     reasoningControl: 'thinkingDisabled',
     modelIdSetting: 'providers.deepseek.modelId',
     modelOptions: [
-      { label: 'DeepSeek V4 Flash', modelId: 'deepseek-v4-flash' },
-      { label: 'DeepSeek V4 Pro', modelId: 'deepseek-v4-pro' },
+      { label: 'DeepSeek V4 Flash', modelId: 'deepseek-v4-flash', tags: ['quality', 'fast'] },
+      { label: 'DeepSeek V4 Pro', modelId: 'deepseek-v4-pro', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -108,8 +135,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
       { label: 'China', baseUrl: 'https://api.moonshot.cn/v1' },
     ],
     modelOptions: [
-      { label: 'Kimi K2.6', modelId: 'kimi-k2.6' },
-      { label: 'Kimi K2.5', modelId: 'kimi-k2.5' },
+      { label: 'Kimi K2.6', modelId: 'kimi-k2.6', tags: ['quality'] },
+      { label: 'Kimi K2.5', modelId: 'kimi-k2.5', tags: ['quality'] },
     ],
   },
   {
@@ -117,7 +144,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     label: 'GLM',
     description: 'GLM OpenAI-compatible API.',
     defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
-    defaultModelId: 'glm-5.1',
+    defaultModelId: 'glm-4.7',
     authMode: 'bearer',
     baseUrlEditable: false,
     modelIdEditable: false,
@@ -128,9 +155,9 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
       { label: 'China', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     ],
     modelOptions: [
-      { label: 'GLM-5.1', modelId: 'glm-5.1' },
-      { label: 'GLM-5', modelId: 'glm-5' },
-      { label: 'GLM-4.7', modelId: 'glm-4.7' },
+      { label: 'GLM-4.7', modelId: 'glm-4.7', tags: ['quality'] },
+      { label: 'GLM-5', modelId: 'glm-5', tags: ['quality', 'slow'] },
+      { label: 'GLM-5.1', modelId: 'glm-5.1', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -138,15 +165,16 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     label: 'Xiaomi MiMo',
     description: 'Xiaomi MiMo OpenAI-compatible API.',
     defaultBaseUrl: 'https://api.xiaomimimo.com/v1',
-    defaultModelId: 'mimo-v2.5-pro',
+    defaultModelId: 'mimo-v2-flash',
     authMode: 'bearer',
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'thinkingDisabled',
     modelIdSetting: 'providers.xiaomiMimo.modelId',
     modelOptions: [
-      { label: 'MiMo V2.5 Pro', modelId: 'mimo-v2.5-pro' },
-      { label: 'MiMo V2.5', modelId: 'mimo-v2.5' },
+      { label: 'MiMo V2 Flash', modelId: 'mimo-v2-flash', tags: ['quality', 'fast'] },
+      { label: 'MiMo V2.5', modelId: 'mimo-v2.5', tags: ['quality', 'slow'] },
+      { label: 'MiMo V2.5 Pro', modelId: 'mimo-v2.5-pro', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -240,6 +268,83 @@ export function coerceProviderModelId(providerType: ProviderType, modelId: strin
   const trimmed = modelId.trim();
   if (providerAcceptsModelId(providerType, trimmed)) return trimmed;
   return getProviderDefaultModelId(providerType);
+}
+
+function uniqueModelTags(tags: readonly ModelTag[]): ModelTag[] {
+  const seen = new Set<ModelTag>();
+  const result: ModelTag[] = [];
+  for (const tag of tags) {
+    if (seen.has(tag)) continue;
+    seen.add(tag);
+    result.push(tag);
+  }
+  return result;
+}
+
+function parseIpv4Literal(hostname: string): number[] | undefined {
+  const parts = hostname.split('.');
+  if (parts.length !== 4) return undefined;
+  const octets = parts.map((part) => {
+    if (!/^\d{1,3}$/.test(part)) return Number.NaN;
+    return Number(part);
+  });
+  return octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255)
+    ? octets
+    : undefined;
+}
+
+function isLocalIpv4Literal(hostname: string): boolean {
+  const octets = parseIpv4Literal(hostname);
+  if (!octets) return false;
+  const [first, second] = octets;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+export function isLocalEndpoint(baseUrl: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    return false;
+  }
+
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return (
+    hostname === 'localhost' ||
+    hostname === '::1' ||
+    hostname.endsWith('.local') ||
+    isLocalIpv4Literal(hostname)
+  );
+}
+
+export function getKnownLocalModelTags(modelId: string): ModelTag[] {
+  const trimmed = modelId.trim();
+  if (!trimmed) return [];
+
+  for (const rule of KNOWN_LOCAL_MODEL_TAG_RULES) {
+    if (new RegExp(rule.pattern, rule.flags).test(trimmed)) {
+      return uniqueModelTags(rule.tags);
+    }
+  }
+
+  return [];
+}
+
+export function getProviderModelTags(providerType: ProviderType, baseUrl: string, modelId: string): ModelTag[] {
+  const trimmed = modelId.trim();
+  const option = getProviderPreset(providerType).modelOptions.find((item) => item.modelId === trimmed);
+  if (option?.tags) return uniqueModelTags(option.tags);
+
+  if (providerType === 'openaiCompatible' && isLocalEndpoint(baseUrl)) {
+    return uniqueModelTags(['local', ...getKnownLocalModelTags(trimmed)]);
+  }
+
+  return [];
 }
 
 export function providerSupportsOpenRouterHeaders(providerType: ProviderType): boolean {

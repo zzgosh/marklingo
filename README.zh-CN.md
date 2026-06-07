@@ -63,12 +63,12 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 
 | Provider | Model options |
 | --- | --- |
-| OpenRouter | 默认 `google/gemini-3.1-flash-lite`；支持直接输入 Model ID |
-| OpenAI | `gpt-5.2` |
+| OpenRouter | 默认 `google/gemini-3.1-flash-lite`；推荐模型加直接输入 Model ID |
+| OpenAI | `gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.4`、`gpt-5.5` |
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
 | Moonshot | `kimi-k2.6`、`kimi-k2.5` |
-| GLM | `glm-5.1`、`glm-5`、`glm-4.7` |
-| Xiaomi MiMo | `mimo-v2.5-pro`、`mimo-v2.5` |
+| GLM | `glm-4.7`、`glm-5`、`glm-5.1` |
+| Xiaomi MiMo | `mimo-v2-flash`、`mimo-v2.5`、`mimo-v2.5-pro` |
 | Custom OpenAI Compatible | 端点暴露的模型 alias；支持直接输入 Model ID |
 
 - **Provider（提供方）**

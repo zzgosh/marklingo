@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getProviderModelTags,
   getProviderBaseUrlCandidates,
   getProviderPreset,
+  isLocalEndpoint,
   PROVIDER_PRESETS,
   providerRequiresApiKey,
   providerSupportsApiKey,
@@ -37,7 +39,7 @@ test('defines OpenAI-compatible provider presets with regional endpoints', () =>
   assert.equal(providerSupportsEditableModelId('moonshot'), false);
   assert.deepEqual(
     getProviderPreset('openai').modelOptions.map((option) => option.modelId),
-    ['gpt-5.2'],
+    ['gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4', 'gpt-5.5'],
   );
   assert.equal(getProviderPreset('moonshot').modelOptions.some((option) => option.modelId === ''), false);
   assert.equal(providerSupportsReasoningDisable('openrouter'), true);
@@ -46,6 +48,33 @@ test('defines OpenAI-compatible provider presets with regional endpoints', () =>
   assert.equal(providerSupportsReasoningDisable('openaiCompatible'), false);
   assert.equal(providerSupportsTemperatureControl('moonshot'), false);
   assert.equal(providerSupportsTemperatureControl('deepseek'), true);
+});
+
+test('exposes curated model tags and conservative local model tags', () => {
+  assert.deepEqual(
+    getProviderModelTags('openai', 'https://api.openai.com/v1', 'gpt-5.4-mini'),
+    ['quality', 'fast'],
+  );
+  assert.deepEqual(
+    getProviderModelTags('openrouter', 'https://openrouter.ai/api/v1', 'unknown/model'),
+    [],
+  );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'http://127.0.0.1:8080/v1', 'custom-model'),
+    ['local'],
+  );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'http://127.0.0.1:8080/v1', 'hy-mt2-1.8b-q4'),
+    ['local', 'slow'],
+  );
+  assert.equal(isLocalEndpoint('https://192.168.1.20/v1'), true);
+  assert.equal(isLocalEndpoint('https://10.0.0.2/v1'), true);
+  assert.equal(isLocalEndpoint('https://172.16.0.1/v1'), true);
+  assert.equal(isLocalEndpoint('http://[::1]:8080/v1'), true);
+  assert.equal(isLocalEndpoint('https://10.example.com/v1'), false);
+  assert.equal(isLocalEndpoint('https://192.168.example.com/v1'), false);
+  assert.equal(isLocalEndpoint('https://172.32.0.1/v1'), false);
+  assert.equal(isLocalEndpoint('https://api.openai.com/v1'), false);
 });
 
 test('keeps provider preset setting references registered', () => {

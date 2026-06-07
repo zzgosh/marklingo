@@ -1,9 +1,12 @@
 import {
   coerceProviderType,
+  getProviderModelTags,
   getProviderPreset,
+  KNOWN_LOCAL_MODEL_TAG_RULES,
   PROVIDER_PRESETS,
   providerRequiresApiKey,
   providerSupportsApiKey,
+  type ModelTag,
   type ProviderType,
 } from '../services/providerPresets.js';
 
@@ -126,13 +129,34 @@ function renderProviderOptions(selected: string): string {
   }).join('');
 }
 
+const MODEL_TAG_LABELS: Record<ModelTag, string> = {
+  quality: 'Quality',
+  fast: 'Fast',
+  slow: 'Slow',
+  local: 'Local',
+};
+
 function renderModelIdSelectOptions(providerType: ProviderType, modelId: string): string {
   const preset = getProviderPreset(providerType);
   const normalizedModelId = modelId.trim();
-  return preset.modelOptions.map((option) => {
+  const concreteOptions = preset.modelOptions.filter((option) => option.modelId);
+  const hasSelectedOption = concreteOptions.some((option) => option.modelId === normalizedModelId);
+  const optionsHtml = concreteOptions.map((option) => {
     const selectedAttr = option.modelId === normalizedModelId ? ' selected' : '';
-    return `<option value="${escapeHtml(option.modelId)}"${selectedAttr}>${escapeHtml(option.label)}</option>`;
+    const tags = option.tags?.map((tag) => MODEL_TAG_LABELS[tag]).join(' · ');
+    const label = tags ? `${option.label} · ${tags}` : option.label;
+    return `<option value="${escapeHtml(option.modelId)}"${selectedAttr}>${escapeHtml(label)}</option>`;
   }).join('');
+  if (!preset.modelIdEditable) return optionsHtml;
+
+  const customSelectedAttr = hasSelectedOption ? '' : ' selected';
+  return `${optionsHtml}<option value=""${customSelectedAttr}>Custom...</option>`;
+}
+
+function renderModelTagBadges(tags: readonly ModelTag[]): string {
+  return tags.map((tag) => (
+    `<span class="model-tag model-tag-${escapeHtml(tag)}">${escapeHtml(MODEL_TAG_LABELS[tag])}</span>`
+  )).join('');
 }
 
 function getShortcutWarningText(warning: string): string {
@@ -158,7 +182,7 @@ type ProviderClientPreset = {
   requiresApiKey: boolean;
   baseUrlEditable: boolean;
   modelIdEditable: boolean;
-  modelOptions: { label: string; modelId: string }[];
+  modelOptions: { label: string; modelId: string; tags?: readonly ModelTag[] }[];
 };
 
 function getFallbackProviderState(state: SettingsState, providerType: ProviderType): SettingsProviderState {
@@ -252,7 +276,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     : '';
   const providerBaseUrlHidden = activeProviderPreset.baseUrlEditable ? '' : ' hidden';
   const providerModelInputHidden = activeProviderPreset.modelIdEditable ? '' : ' hidden';
-  const providerModelSelectHidden = activeProviderPreset.modelIdEditable ? ' hidden' : '';
+  const activeProviderHasModelSelect = activeProviderPreset.modelOptions.some((option) => option.modelId);
+  const providerModelSelectHidden = activeProviderHasModelSelect ? '' : ' hidden';
+  const activeProviderModelTags = getProviderModelTags(
+    activeProviderType,
+    activeProviderState.baseUrl,
+    activeProviderState.modelId,
+  );
+  const providerModelTagsHidden = activeProviderModelTags.length > 0 ? '' : ' hidden';
   const apiKeyRowHidden = activeProviderSupportsApiKey ? '' : ' hidden';
   const verifiedAdapterMode = activeProviderState.hasApiKey ? activeProviderState.verifiedAdapterMode : undefined;
   const customPromptRowHidden = verifiedAdapterMode === 'translationModel' ? ' hidden' : '';
@@ -511,6 +542,45 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .control-full {
       min-width: 0;
+    }
+    .model-control {
+      display: grid;
+      gap: 8px;
+    }
+    .model-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 22px;
+      align-items: center;
+    }
+    .model-tag {
+      display: inline-flex;
+      min-height: 20px;
+      align-items: center;
+      border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+      border-radius: 4px;
+      padding: 1px 7px;
+      background: color-mix(in srgb, var(--fg) 6%, transparent);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .model-tag-quality {
+      border-color: color-mix(in srgb, var(--button) 38%, var(--border));
+      color: color-mix(in srgb, var(--button) 75%, var(--fg));
+    }
+    .model-tag-fast {
+      border-color: color-mix(in srgb, #2ea043 38%, var(--border));
+      color: color-mix(in srgb, #2ea043 78%, var(--fg));
+    }
+    .model-tag-slow {
+      border-color: color-mix(in srgb, #d29922 42%, var(--border));
+      color: color-mix(in srgb, #d29922 78%, var(--fg));
+    }
+    .model-tag-local {
+      border-color: color-mix(in srgb, #8b949e 48%, var(--border));
+      color: color-mix(in srgb, #8b949e 82%, var(--fg));
     }
     .select-wrap {
       display: block;
@@ -865,11 +935,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
             <div>
               <div class="label">Model ID</div>
             </div>
-            <div class="control-full">
+            <div class="control-full model-control">
               <input id="modelId"${providerModelInputHidden} value="${escapeHtml(activeProviderState.modelId)}">
               <span class="select-wrap" id="modelIdSelectWrap"${providerModelSelectHidden}>
                 <select id="modelIdSelect">${renderModelIdSelectOptions(activeProviderType, activeProviderState.modelId)}</select>
               </span>
+              <div class="model-tags" id="model-tags"${providerModelTagsHidden}>${renderModelTagBadges(activeProviderModelTags)}</div>
             </div>
           </div>
           <div class="row">
@@ -1056,6 +1127,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const API_KEY_MASK_VALUE = ${scriptJson(API_KEY_MASK_VALUE)};
     const PROVIDER_SMALL_BATCH_STATUS = ${scriptJson(PROVIDER_SMALL_BATCH_STATUS)};
     const PROVIDER_SMALL_BATCH_TOOLTIP = ${scriptJson(PROVIDER_SMALL_BATCH_TOOLTIP)};
+    const MODEL_TAG_LABELS = ${scriptJson(MODEL_TAG_LABELS)};
+    const KNOWN_LOCAL_MODEL_TAG_RULES = ${scriptJson(KNOWN_LOCAL_MODEL_TAG_RULES)};
     const providerTypeSelect = document.getElementById('providerType');
     const baseUrlRow = document.getElementById('baseUrlRow');
     const baseUrlInput = document.getElementById('baseUrl');
@@ -1063,6 +1136,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const modelIdInput = document.getElementById('modelId');
     const modelIdSelectWrap = document.getElementById('modelIdSelectWrap');
     const modelIdSelect = document.getElementById('modelIdSelect');
+    const modelTags = document.getElementById('model-tags');
     const apiKeyInput = document.getElementById('apiKey');
     const verifyProviderBtn = document.getElementById('verify-provider');
     const providerStatus = document.getElementById('provider-status');
@@ -1104,6 +1178,92 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     function providerModelIdEditable(providerType) {
       return Boolean(getProviderPreset(providerType).modelIdEditable);
+    }
+
+    function providerHasModelOptions(providerType) {
+      return getProviderModelOptions(providerType).some((option) => option.modelId);
+    }
+
+    function uniqueModelTags(tags) {
+      const seen = new Set();
+      const result = [];
+      for (const tag of tags) {
+        if (seen.has(tag)) continue;
+        seen.add(tag);
+        result.push(tag);
+      }
+      return result;
+    }
+
+    function parseIpv4Literal(hostname) {
+      const parts = String(hostname || '').split('.');
+      if (parts.length !== 4) return undefined;
+      const octets = parts.map((part) => /^\\d{1,3}$/.test(part) ? Number(part) : Number.NaN);
+      return octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255)
+        ? octets
+        : undefined;
+    }
+
+    function isLocalIpv4Literal(hostname) {
+      const octets = parseIpv4Literal(hostname);
+      if (!octets) return false;
+      const first = octets[0];
+      const second = octets[1];
+      return (
+        first === 10 ||
+        first === 127 ||
+        (first === 172 && second >= 16 && second <= 31) ||
+        (first === 192 && second === 168)
+      );
+    }
+
+    function isLocalEndpointValue(baseUrl) {
+      let url;
+      try {
+        url = new URL(String(baseUrl || '').trim());
+      } catch {
+        return false;
+      }
+      const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, '');
+      return (
+        host === 'localhost' ||
+        host === '::1' ||
+        host.endsWith('.local') ||
+        isLocalIpv4Literal(host)
+      );
+    }
+
+    function getKnownLocalModelTags(modelId) {
+      const trimmed = String(modelId || '').trim();
+      if (!trimmed) return [];
+      for (const rule of KNOWN_LOCAL_MODEL_TAG_RULES) {
+        if (new RegExp(rule.pattern, rule.flags || '').test(trimmed)) return uniqueModelTags(rule.tags || []);
+      }
+      return [];
+    }
+
+    function getSelectedModelTags(providerType, baseUrl, modelId) {
+      const trimmed = String(modelId || '').trim();
+      const option = getProviderModelOptions(providerType).find((item) => item.modelId === trimmed);
+      if (option && option.tags) return uniqueModelTags(option.tags);
+      if (providerType === 'openaiCompatible' && isLocalEndpointValue(baseUrl)) {
+        return uniqueModelTags(['local'].concat(getKnownLocalModelTags(trimmed)));
+      }
+      return [];
+    }
+
+    function renderSelectedModelTags() {
+      if (!modelTags) return;
+      const values = getProviderValues();
+      const tags = getSelectedModelTags(values.providerType, values.baseUrl, values.modelId);
+      modelTags.textContent = '';
+      modelTags.hidden = tags.length === 0;
+      for (const tag of tags) {
+        const el = document.createElement('span');
+        el.className = 'model-tag model-tag-' + tag;
+        el.textContent = MODEL_TAG_LABELS[tag] || tag;
+        modelTags.appendChild(el);
+      }
     }
 
     function ensureProviderDraft(providerType) {
@@ -1176,11 +1336,19 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       const modelOptions = getProviderModelOptions(providerType);
       const concreteOptions = modelOptions
         .filter((option) => option.modelId)
-        .map((option) => ({ label: option.label, value: option.modelId }));
+        .map((option) => ({
+          label: option.tags && option.tags.length > 0
+            ? option.label + ' · ' + option.tags.map((tag) => MODEL_TAG_LABELS[tag] || tag).join(' · ')
+            : option.label,
+          value: option.modelId,
+        }));
       if (!providerModelIdEditable(providerType) && concreteOptions.length > 0 && !concreteOptions.some((option) => option.value === modelId)) {
         modelIdInput.value = concreteOptions[0].value;
       }
-      renderSelectOptions(modelIdSelect, concreteOptions, modelIdInput.value.trim(), false);
+      const selectedModelId = modelIdInput.value.trim();
+      const selectedSelectValue = concreteOptions.some((option) => option.value === selectedModelId) ? selectedModelId : '';
+      renderSelectOptions(modelIdSelect, concreteOptions, selectedSelectValue, providerModelIdEditable(providerType));
+      renderSelectedModelTags();
     }
 
     function syncProviderBaseUrlVisibility() {
@@ -1195,8 +1363,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         modelIdInput.hidden = !editable;
         modelIdInput.disabled = !editable;
       }
-      if (modelIdSelectWrap) modelIdSelectWrap.hidden = editable;
-      if (modelIdSelect) modelIdSelect.disabled = editable;
+      const hasOptions = providerHasModelOptions(providerTypeSelect.value);
+      if (modelIdSelectWrap) modelIdSelectWrap.hidden = !hasOptions;
+      if (modelIdSelect) modelIdSelect.disabled = !hasOptions;
       syncModelIdSelection();
     }
 
@@ -1396,7 +1565,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     function handleModelIdSelectChange() {
       if (!modelIdSelect) return;
       clearProviderSuccessFeedback();
-      modelIdInput.value = modelIdSelect.value.trim();
+      const selectedModelId = modelIdSelect.value.trim();
+      if (selectedModelId) {
+        modelIdInput.value = selectedModelId;
+      } else if (providerModelIdEditable(providerTypeSelect.value)) {
+        modelIdInput.value = '';
+        modelIdInput.focus();
+      }
       saveCurrentProviderDraft();
       syncModelIdSelection();
       updateProviderVerificationState();

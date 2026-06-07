@@ -63,12 +63,12 @@ Fixed provider presets expose a curated set of model choices. OpenRouter and Cus
 
 | Provider | Model options |
 | --- | --- |
-| OpenRouter | `google/gemini-3.1-flash-lite` by default; direct Model ID entry |
-| OpenAI | `gpt-5.2` |
+| OpenRouter | `google/gemini-3.1-flash-lite` by default; recommended models plus direct Model ID entry |
+| OpenAI | `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.4`, `gpt-5.5` |
 | DeepSeek | `deepseek-v4-flash`, `deepseek-v4-pro` |
 | Moonshot | `kimi-k2.6`, `kimi-k2.5` |
-| GLM | `glm-5.1`, `glm-5`, `glm-4.7` |
-| Xiaomi MiMo | `mimo-v2.5-pro`, `mimo-v2.5` |
+| GLM | `glm-4.7`, `glm-5`, `glm-5.1` |
+| Xiaomi MiMo | `mimo-v2-flash`, `mimo-v2.5`, `mimo-v2.5-pro` |
 | Custom OpenAI Compatible | Endpoint-provided model alias; direct Model ID entry |
 
 - **Provider**

@@ -63,12 +63,12 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 
 | Provider | Model options |
 | --- | --- |
-| OpenRouter | デフォルトは `google/gemini-3.1-flash-lite`。Model ID を直接入力できます |
-| OpenAI | `gpt-5.2` |
+| OpenRouter | デフォルトは `google/gemini-3.1-flash-lite`。推奨モデルと直接入力の Model ID を使えます |
+| OpenAI | `gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.4`、`gpt-5.5` |
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
 | Moonshot | `kimi-k2.6`、`kimi-k2.5` |
-| GLM | `glm-5.1`、`glm-5`、`glm-4.7` |
-| Xiaomi MiMo | `mimo-v2.5-pro`、`mimo-v2.5` |
+| GLM | `glm-4.7`、`glm-5`、`glm-5.1` |
+| Xiaomi MiMo | `mimo-v2-flash`、`mimo-v2.5`、`mimo-v2.5-pro` |
 | Custom OpenAI Compatible | エンドポイントが公開するモデル alias。Model ID を直接入力できます |
 
 - **Provider（プロバイダー）**

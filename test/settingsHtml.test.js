@@ -80,7 +80,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('id="modelPresetRow"'));
   assert.match(html, /<div class="label">Model ID<\/div>/);
   assert.match(html, /<input id="modelId" value="google\/gemini-3\.1-flash-lite">/);
-  assert.match(html, /id="modelIdSelectWrap" hidden/);
+  assert.match(html, /id="modelIdSelectWrap">/);
+  assert.match(html, /<option value="google\/gemini-3\.1-flash-lite" selected>Gemini 3\.1 Flash Lite · Quality · Fast<\/option>/);
+  assert.match(html, /<option value="deepseek\/deepseek-v4-flash">DeepSeek V4 Flash · Quality · Fast<\/option>/);
+  assert.match(html, /<option value="">Custom\.\.\.<\/option>/);
+  assert.match(html, /id="model-tags"><span class="model-tag model-tag-quality">Quality<\/span><span class="model-tag model-tag-fast">Fast<\/span><\/div>/);
+  assert.match(html, /\.model-tags \{\s+display: flex;/);
   assert.match(html, /\[hidden\] \{ display: none !important; \}/);
   assert.match(html, /\.provider-card \.row \{\s+border-bottom: 0;/);
   assert.match(html, /\.provider-actions \{\s+display: grid;\s+grid-template-columns: minmax\(0, 1fr\) max-content;/);
@@ -125,6 +130,9 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /providerDrafts/);
   assert.match(html, /selectedProviderType/);
   assert.match(html, /providerModelIdEditable/);
+  assert.match(html, /renderSelectedModelTags/);
+  assert.match(html, /function parseIpv4Literal\(hostname\)/);
+  assert.doesNotMatch(html, /host\.startsWith\('10\.'\)/);
   assert.match(html, /showProviderSuccessFeedback/);
   assert.ok(!html.includes('Provider verified.'));
   assert.match(html, /Verified - using smaller batches for reliability\./);
@@ -133,6 +141,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('This model could not reliably follow structured JSON instructions.'));
   assert.match(html, /apiKeyInput\.addEventListener\('input', handleProviderInput\);/);
   assert.match(html, /modelIdSelect\.addEventListener\('change', handleModelIdSelectChange\);/);
+  assert.match(html, /modelIdInput\.value = '';\s+modelIdInput\.focus\(\);/);
   assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification failed\.', true\);/);
   assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
@@ -218,8 +227,8 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
       providerType: 'openaiCompatible',
       baseUrl: 'http://127.0.0.1:8080/v1',
       openAiCompatibleBaseUrl: 'http://127.0.0.1:8080/v1',
-      modelId: 'hy-mt2',
-      openAiCompatibleModelId: 'hy-mt2',
+      modelId: 'hy-mt2-1.8b',
+      openAiCompatibleModelId: 'hy-mt2-1.8b',
       openAiCompatibleHasApiKey: true,
       openAiCompatibleVerifiedAdapterMode: 'translationModel',
       openAiCompatiblePromptInstructions: '### Task\nTranslate the user-facing text in each `blocks[i].markdown` value.',
@@ -236,6 +245,7 @@ test('renders OpenAI-compatible provider with Base URL visible', () => {
   assert.match(html, /<option value="openaiCompatible" selected>Custom OpenAI Compatible<\/option>/);
   assert.match(html, /id="baseUrlRow">/);
   assert.match(html, /value="http:\/\/127\.0\.0\.1:8080\/v1"/);
+  assert.match(html, /<div class="model-tags" id="model-tags"><span class="model-tag model-tag-local">Local<\/span><span class="model-tag model-tag-slow">Slow<\/span><\/div>/);
   assert.ok(!html.includes('Verified: Translation Model'));
   assert.match(html, /id="customPromptRow" hidden/);
   assert.doesNotMatch(html, /Custom Instructions are disabled for verified Translation Model providers/);
@@ -261,7 +271,8 @@ test('renders fixed provider models as Model ID choices without Base URL control
   assert.ok(!html.includes('id="baseUrlPresetRow"'));
   assert.match(html, /<input id="modelId" hidden value="kimi-k2\.6">/);
   assert.match(html, /id="modelIdSelectWrap">/);
-  assert.match(html, /<option value="kimi-k2\.6" selected>Kimi K2\.6<\/option>/);
+  assert.match(html, /<option value="kimi-k2\.6" selected>Kimi K2\.6 · Quality<\/option>/);
+  assert.match(html, /<div class="model-tags" id="model-tags"><span class="model-tag model-tag-quality">Quality<\/span><\/div>/);
 });
 
 test('escapes settings state before rendering into HTML', () => {

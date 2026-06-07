@@ -9,11 +9,11 @@ const vscode = require('vscode');
 const EXTENSION_ID = 'zzgosh.marklingo';
 const MODEL_ID = 'test/mock-model';
 const PROVIDER_DRAFT_SETTING_VALUES = {
-  'providers.openai.modelId': 'gpt-5.2',
+  'providers.openai.modelId': 'gpt-5.4-mini',
   'providers.deepseek.modelId': 'deepseek-v4-flash',
   'providers.moonshot.modelId': 'kimi-k2.6',
-  'providers.glm.modelId': 'glm-5.1',
-  'providers.xiaomiMimo.modelId': 'mimo-v2.5-pro',
+  'providers.glm.modelId': 'glm-4.7',
+  'providers.xiaomiMimo.modelId': 'mimo-v2-flash',
 };
 
 function sendJson(res, status, value) {

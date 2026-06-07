@@ -38,9 +38,21 @@ const defaultTranslationModelMaxOutputTokens = configProperties['marklingo.trans
 const settingsHtmlUrl = pathToFileURL(path.join(root, 'out/webview/settingsHtml.js')).href;
 const promptsUrl = pathToFileURL(path.join(root, 'out/translation/prompts.js')).href;
 const translationModelPromptsUrl = pathToFileURL(path.join(root, 'out/translation/translationModelPrompts.js')).href;
+const providerPresetsUrl = pathToFileURL(path.join(root, 'out/services/providerPresets.js')).href;
 const { createSettingsHtmlNonce, renderSettingsHtml } = await import(`${settingsHtmlUrl}?t=${Date.now()}`);
 const { resolveSystemPrompt } = await import(`${promptsUrl}?t=${Date.now()}`);
 const { getTranslationModelPromptPreview } = await import(`${translationModelPromptsUrl}?t=${Date.now()}`);
+const {
+  coerceProviderType,
+  getProviderDefaultBaseUrl,
+  getProviderDefaultModelId,
+  PROVIDER_PRESETS,
+} = await import(`${providerPresetsUrl}?t=${Date.now()}`);
+
+const providerDefaultBaseUrls = Object.fromEntries(PROVIDER_PRESETS.map((preset) => [
+  preset.id,
+  preset.defaultBaseUrl,
+]));
 
 function getPreviewThemeCss(nonce) {
   return `<style nonce="${nonce}">
@@ -121,7 +133,9 @@ function getPreviewBridgeScript(nonce, url) {
             ok: true,
             hasKey: true,
             providerType: message.providerType,
-            baseUrl: message.providerType === 'openaiCompatible' ? message.baseUrl : ${JSON.stringify(defaultBaseUrl)},
+            baseUrl: message.providerType === 'openaiCompatible'
+              ? message.baseUrl
+              : (${JSON.stringify(providerDefaultBaseUrls)}[message.providerType] || ${JSON.stringify(defaultBaseUrl)}),
             modelId: message.modelId,
             adapterMode,
             promptInstructions: adapterMode === 'translationModel' ? ${JSON.stringify(promptState.promptInstructions)} : ${JSON.stringify(chatPromptInstructions)},
@@ -158,16 +172,18 @@ function buildState(url) {
   const usesCustomLanguage = url.searchParams.get('custom') === '1';
   const targetLanguage = usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文';
   const chatPromptInstructions = resolveSystemPrompt('', targetLanguage);
-  const providerType = url.searchParams.get('provider') ?? defaultProviderType;
+  const providerType = coerceProviderType(url.searchParams.get('provider') ?? defaultProviderType);
   const isOpenAiCompatible = providerType === 'openaiCompatible';
-  const modelId = url.searchParams.get('model') ?? (isOpenAiCompatible ? '' : defaultModelId);
-  const baseUrl = isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? '') : defaultBaseUrl;
+  const isOpenRouter = providerType === 'openrouter';
+  const providerDefaultModelId = getProviderDefaultModelId(providerType);
+  const providerDefaultBaseUrl = getProviderDefaultBaseUrl(providerType);
+  const modelId = url.searchParams.get('model') ?? (isOpenAiCompatible ? '' : providerDefaultModelId);
+  const baseUrl = isOpenAiCompatible ? (url.searchParams.get('baseUrl') ?? '') : providerDefaultBaseUrl;
+  const openRouterModelId = url.searchParams.get('openrouterModel') ?? (isOpenRouter ? modelId : defaultModelId);
   const currentProviderHasApiKey = url.searchParams.get('apiKey') === 'present';
   const openAiCompatibleBaseUrl = url.searchParams.get('openaiBaseUrl') ?? (isOpenAiCompatible ? baseUrl : '');
   const openAiCompatibleModelId = url.searchParams.get('openaiModel') ?? (isOpenAiCompatible ? modelId : '');
-  const openRouterHasApiKey = isOpenAiCompatible
-    ? url.searchParams.get('openrouterKey') === 'present'
-    : currentProviderHasApiKey;
+  const openRouterHasApiKey = url.searchParams.get('openrouterKey') === 'present' || (isOpenRouter && currentProviderHasApiKey);
   const openAiCompatibleHasApiKey = url.searchParams.get('openaiKey') === 'present' || (isOpenAiCompatible && currentProviderHasApiKey);
   const shouldUseVerifiedCapability = url.searchParams.get('verified') !== '0';
   const verifiedAdapterMode = currentProviderHasApiKey && shouldUseVerifiedCapability
@@ -180,7 +196,7 @@ function buildState(url) {
     ? (url.searchParams.get('openaiCapability') ?? (isOpenAiCompatible ? verifiedAdapterMode : undefined))
     : undefined;
   const currentPromptState = getPromptState(verifiedAdapterMode, modelId, targetLanguage, chatPromptInstructions);
-  const openRouterPromptState = getPromptState(openRouterVerifiedAdapterMode, defaultModelId, targetLanguage, chatPromptInstructions);
+  const openRouterPromptState = getPromptState(openRouterVerifiedAdapterMode, openRouterModelId, targetLanguage, chatPromptInstructions);
   const openAiCompatiblePromptState = getPromptState(openAiCompatibleVerifiedAdapterMode, openAiCompatibleModelId, targetLanguage, chatPromptInstructions);
   return {
     shortcutLabel: 'Option + Command + T',
@@ -191,7 +207,7 @@ function buildState(url) {
     providerType,
     baseUrl,
     openRouterBaseUrl: defaultBaseUrl,
-    openRouterModelId: isOpenAiCompatible ? defaultModelId : modelId,
+    openRouterModelId,
     openRouterHasApiKey,
     openRouterVerifiedAdapterMode,
     openRouterPromptInstructions: openRouterPromptState.promptInstructions,
