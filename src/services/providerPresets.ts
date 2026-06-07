@@ -55,12 +55,7 @@ export const OPENAI_COMPATIBLE_MODEL_ID_SETTING = 'providers.openaiCompatible.mo
 
 export const KNOWN_LOCAL_MODEL_TAG_RULES: readonly KnownLocalModelTagRule[] = [
   {
-    pattern: 'hy[-_ ]?mt2.*1\\.8b',
-    flags: 'i',
-    tags: ['local', 'slow'],
-  },
-  {
-    pattern: 'hy[-_ ]?mt2.*7b',
+    pattern: 'hy[-_ ]?mt2',
     flags: 'i',
     tags: ['local', 'slow'],
   },
@@ -281,6 +276,7 @@ function uniqueModelTags(tags: readonly ModelTag[]): ModelTag[] {
   return result;
 }
 
+// Keep this endpoint heuristic in sync with the webview copy in settingsHtml.ts.
 function parseIpv4Literal(hostname: string): number[] | undefined {
   const parts = hostname.split('.');
   if (parts.length !== 4) return undefined;

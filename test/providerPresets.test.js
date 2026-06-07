@@ -67,6 +67,14 @@ test('exposes curated model tags and conservative local model tags', () => {
     getProviderModelTags('openaiCompatible', 'http://127.0.0.1:8080/v1', 'hy-mt2-1.8b-q4'),
     ['local', 'slow'],
   );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'http://127.0.0.1:8080/v1', 'hy-mt2'),
+    ['local', 'slow'],
+  );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'http://127.0.0.1:8080/v1', 'hy-mt2-base'),
+    ['local', 'slow'],
+  );
   assert.equal(isLocalEndpoint('https://192.168.1.20/v1'), true);
   assert.equal(isLocalEndpoint('https://10.0.0.2/v1'), true);
   assert.equal(isLocalEndpoint('https://172.16.0.1/v1'), true);

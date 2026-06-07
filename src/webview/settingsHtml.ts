@@ -1195,6 +1195,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       return result;
     }
 
+    // Keep this endpoint heuristic in sync with providerPresets.ts.
     function parseIpv4Literal(hostname) {
       const parts = String(hostname || '').split('.');
       if (parts.length !== 4) return undefined;
