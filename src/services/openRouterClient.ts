@@ -223,7 +223,7 @@ export async function getStoredOpenRouterApiKey(
   return undefined;
 }
 
-function resolveModelId(cfg: vscode.WorkspaceConfiguration, providerType: ProviderType): string {
+export function resolveConfiguredModelId(cfg: vscode.WorkspaceConfiguration, providerType: ProviderType): string {
   const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
     ? readStringSetting(cfg, 'openrouter.modelId')
     : '';
@@ -269,7 +269,7 @@ export async function getOpenRouterSettings(context: vscode.ExtensionContext): P
   }
 
   const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
-  const modelId = resolveModelId(cfg, providerType);
+  const modelId = resolveConfiguredModelId(cfg, providerType);
   if (!modelId.trim()) {
     await openProviderSetupSettings();
   }

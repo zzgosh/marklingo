@@ -12,12 +12,11 @@ import { setOpenRouterModelId } from './commands/openRouterModelId.js';
 import { setTargetLanguage } from './commands/targetLanguage.js';
 import { ignoreTranslatedFilesInGit } from './commands/ignoreTranslatedFilesInGit.js';
 import { openSettingsPanel } from './webview/settingsPanel.js';
-import { seedOpenRouterApiKeyForTest, resolveConfiguredProvider } from './services/openRouterClient.js';
 import {
-  coerceProviderModelId,
-  getProviderDefaultModelId,
-  getProviderModelIdSetting,
-} from './services/providerPresets.js';
+  resolveConfiguredModelId,
+  resolveConfiguredProvider,
+  seedOpenRouterApiKeyForTest,
+} from './services/openRouterClient.js';
 import { storeVerifiedTranslationAdapterMode } from './services/modelCapabilities.js';
 import type { TranslationAdapterMode } from './translation/translationAdapters.js';
 import { compactPrivateStorage, readPrivateStorageStats } from './storage/privateStorage.js';
@@ -101,13 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
         const origin = await seedOpenRouterApiKeyForTest(context, apiKey);
         const cfg = vscode.workspace.getConfiguration('marklingo');
         const provider = resolveConfiguredProvider();
-        const modelIdSetting = getProviderModelIdSetting(provider.providerType);
-        const rawModelId = (
-          (modelIdSetting ? cfg.get<string>(modelIdSetting) : '') ||
-          cfg.get<string>('openrouter.modelId') ||
-          getProviderDefaultModelId(provider.providerType)
-        ).trim();
-        const modelId = coerceProviderModelId(provider.providerType, rawModelId);
+        const modelId = resolveConfiguredModelId(cfg, provider.providerType);
         if (!options?.skipVerifiedAdapterMode) {
           await storeVerifiedTranslationAdapterMode(context, {
             providerType: provider.providerType,

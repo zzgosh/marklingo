@@ -27,7 +27,3 @@ export function getProviderApiKeyInputPrompt(
     ? `Paste the API key for ${endpoint}. MarkLingo stores it securely in VS Code.`
     : `Paste the API key for ${providerName}. MarkLingo stores it securely in VS Code.`;
 }
-
-export function getMissingProviderApiKeyMessage(providerType: ProviderDisplayType): string {
-  return `No ${getProviderDisplayName(providerType)} API key saved. Add one in Settings, or run translation again.`;
-}

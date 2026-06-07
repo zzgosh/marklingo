@@ -50,7 +50,6 @@ import {
 import { getTranslationModelPromptPreview } from '../translation/translationModelPrompts.js';
 import {
   acceptVisibleOnboardingDefaults,
-  markOpenRouterModelAccepted,
   markTargetLanguageSelected,
 } from '../onboardingState.js';
 import {
@@ -469,9 +468,6 @@ async function updateSingleSetting(context: vscode.ExtensionContext, key: string
   if (key === 'translation.targetLanguage' || key === 'translation.targetLanguageCustom') {
     await markTargetLanguageSelected(context);
   }
-  if (key === 'openrouter.modelId') {
-    await markOpenRouterModelAccepted(context);
-  }
   return value;
 }
 
@@ -519,7 +515,6 @@ async function saveVerifiedProviderSettings(
   if (providerSupportsApiKey(settings.providerType) && settings.apiKey.trim()) {
     await storeOpenRouterApiKey(context, settings.apiKey, settings.baseUrl);
   }
-  await markOpenRouterModelAccepted(context);
   await acceptVisibleOnboardingDefaults(context);
 }
 

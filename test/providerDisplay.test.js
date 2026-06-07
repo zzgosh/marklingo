@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  getMissingProviderApiKeyMessage,
   getProviderApiKeyInputPrompt,
   getProviderApiKeyInputTitle,
   getProviderDisplayName,
@@ -31,9 +30,5 @@ test('builds provider-specific API key copy', () => {
   assert.equal(
     getProviderApiKeyInputPrompt('openaiCompatible', ''),
     'Paste the API key for Custom OpenAI Compatible. MarkLingo stores it securely in VS Code.',
-  );
-  assert.equal(
-    getMissingProviderApiKeyMessage('openaiCompatible'),
-    'No Custom OpenAI Compatible API key saved. Add one in Settings, or run translation again.',
   );
 });

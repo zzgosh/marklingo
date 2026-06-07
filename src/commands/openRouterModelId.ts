@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { DEFAULT_OPENROUTER_MODEL_ID, OPENROUTER_PROVIDER_MODEL_ID_SETTING } from '../services/openRouterClient.js';
-import { markOpenRouterModelAccepted } from '../onboardingState.js';
 
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
 
@@ -27,7 +26,6 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   const modelId = input.trim();
   await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, modelId);
-  await markOpenRouterModelAccepted(context);
 
   const inspected = cfg.inspect<string>('openrouter.modelId');
   const hasWorkspaceFolderValue = typeof inspected?.workspaceFolderValue === 'string' && inspected.workspaceFolderValue.trim();
