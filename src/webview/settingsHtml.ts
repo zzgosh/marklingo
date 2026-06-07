@@ -136,6 +136,13 @@ const MODEL_TAG_LABELS: Record<ModelTag, string> = {
   local: 'Local',
 };
 
+// Inline glyphs shown inside model tag badges. Tags without an icon render text only.
+const MODEL_TAG_ICONS: Partial<Record<ModelTag, string>> = {
+  fast: '<svg class="model-tag-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 9H21L11 24V15H4L13 0V9ZM11 11V7.22063L7.53238 13H13V17.3944L17.263 11H11Z"></path></svg>',
+};
+
+// The dropdown intentionally lists the raw model id (no display name, no tags). Curated
+// tags are surfaced separately as badges below the control.
 function renderModelIdSelectOptions(providerType: ProviderType, modelId: string): string {
   const preset = getProviderPreset(providerType);
   const normalizedModelId = modelId.trim();
@@ -143,9 +150,7 @@ function renderModelIdSelectOptions(providerType: ProviderType, modelId: string)
   const hasSelectedOption = concreteOptions.some((option) => option.modelId === normalizedModelId);
   const optionsHtml = concreteOptions.map((option) => {
     const selectedAttr = option.modelId === normalizedModelId ? ' selected' : '';
-    const tags = option.tags?.map((tag) => MODEL_TAG_LABELS[tag]).join(' · ');
-    const label = tags ? `${option.label} · ${tags}` : option.label;
-    return `<option value="${escapeHtml(option.modelId)}"${selectedAttr}>${escapeHtml(label)}</option>`;
+    return `<option value="${escapeHtml(option.modelId)}"${selectedAttr}>${escapeHtml(option.modelId)}</option>`;
   }).join('');
   if (!preset.modelIdEditable) return optionsHtml;
 
@@ -154,9 +159,10 @@ function renderModelIdSelectOptions(providerType: ProviderType, modelId: string)
 }
 
 function renderModelTagBadges(tags: readonly ModelTag[]): string {
-  return tags.map((tag) => (
-    `<span class="model-tag model-tag-${escapeHtml(tag)}">${escapeHtml(MODEL_TAG_LABELS[tag])}</span>`
-  )).join('');
+  return tags.map((tag) => {
+    const icon = MODEL_TAG_ICONS[tag] ?? '';
+    return `<span class="model-tag model-tag-${escapeHtml(tag)}">${icon}${escapeHtml(MODEL_TAG_LABELS[tag])}</span>`;
+  }).join('');
 }
 
 function getShortcutWarningText(warning: string): string {
@@ -275,8 +281,16 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     ? ` value="${escapeHtml(API_KEY_MASK_VALUE)}" data-masked="true"`
     : '';
   const providerBaseUrlHidden = activeProviderPreset.baseUrlEditable ? '' : ' hidden';
-  const providerModelInputHidden = activeProviderPreset.modelIdEditable ? '' : ' hidden';
-  const activeProviderHasModelSelect = activeProviderPreset.modelOptions.some((option) => option.modelId);
+  const activeProviderConcreteModelOptions = activeProviderPreset.modelOptions.filter((option) => option.modelId);
+  const activeProviderHasModelSelect = activeProviderConcreteModelOptions.length > 0;
+  const activeModelIsPresetOption = activeProviderConcreteModelOptions.some(
+    (option) => option.modelId === activeProviderState.modelId.trim(),
+  );
+  // The free-text input is reserved for custom model ids: editable providers either with no
+  // preset list, or whose current model is not one of the presets.
+  const activeModelCustomMode = activeProviderPreset.modelIdEditable
+    && (!activeProviderHasModelSelect || !activeModelIsPresetOption);
+  const providerModelInputHidden = activeModelCustomMode ? '' : ' hidden';
   const providerModelSelectHidden = activeProviderHasModelSelect ? '' : ' hidden';
   const activeProviderModelTags = getProviderModelTags(
     activeProviderType,
@@ -297,7 +311,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         </svg>
       </span>`
     : '';
-  const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' style="display:none"';
+  const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' hidden';
   const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
   const pluralize = (count: number, singular: string, plural: string): string =>
     `${count} ${count === 1 ? singular : plural}`;
@@ -543,9 +557,20 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .control-full {
       min-width: 0;
     }
-    .model-control {
+    .field-stack {
       display: grid;
       gap: 8px;
+    }
+    /* Rows whose control stacks derived elements (e.g. a Custom input) below the
+       primary control: keep the left label centered with the first control, and let
+       the derived elements flow downward instead of recentering the label. */
+    .row.stacked-row {
+      align-items: start;
+    }
+    .row.stacked-row > div:first-child {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
     }
     .model-tags {
       display: flex;
@@ -558,6 +583,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       display: inline-flex;
       min-height: 20px;
       align-items: center;
+      gap: 3px;
       border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
       border-radius: 4px;
       padding: 1px 7px;
@@ -565,6 +591,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--muted);
       font-size: 11px;
       line-height: 1.4;
+    }
+    .model-tag-icon {
+      width: 11px;
+      height: 11px;
+      flex: none;
+      fill: currentColor;
     }
     .model-tag-quality {
       border-color: color-mix(in srgb, var(--button) 38%, var(--border));
@@ -931,15 +963,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <input id="apiKey" type="password" autocomplete="off"${apiKeyInitialAttrs}>
             </div>
           </div>
-          <div class="row">
+          <div class="row stacked-row">
             <div>
               <div class="label">Model ID</div>
             </div>
-            <div class="control-full model-control">
-              <input id="modelId"${providerModelInputHidden} value="${escapeHtml(activeProviderState.modelId)}">
+            <div class="control-full field-stack">
               <span class="select-wrap" id="modelIdSelectWrap"${providerModelSelectHidden}>
                 <select id="modelIdSelect">${renderModelIdSelectOptions(activeProviderType, activeProviderState.modelId)}</select>
               </span>
+              <input id="modelId"${providerModelInputHidden} value="${escapeHtml(activeProviderState.modelId)}" placeholder="Enter model ID">
               <div class="model-tags" id="model-tags"${providerModelTagsHidden}>${renderModelTagBadges(activeProviderModelTags)}</div>
             </div>
           </div>
@@ -957,21 +989,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
         <h2>Translation</h2>
         <section class="card">
-          <div class="row">
+          <div class="row stacked-row">
             <div>
               <div class="label">Target Language</div>
             </div>
-            <div class="control-full">
+            <div class="control-full field-stack">
               <span class="select-wrap"><select id="targetLanguage">${renderOptions(state.targetLanguage)}</select></span>
-            </div>
-          </div>
-          <div class="row" id="customLanguageRow"${customLanguageHidden}>
-            <div>
-              <div class="label">Custom Language</div>
-            </div>
-            <div class="inline">
-              <input id="targetLanguageCustom" value="${escapeHtml(state.targetLanguageCustom)}">
-              <button class="save-btn" type="button" data-field="targetLanguageCustom" data-key="translation.targetLanguageCustom" disabled>Save</button>
+              <input id="targetLanguageCustom"${customLanguageHidden} value="${escapeHtml(state.targetLanguageCustom)}" placeholder="Enter target language">
             </div>
           </div>
           <div class="row top-align">
@@ -1113,12 +1137,18 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     const targetLanguageSelect = document.getElementById('targetLanguage');
-    const customLanguageRow = document.getElementById('customLanguageRow');
     const customLanguageInput = document.getElementById('targetLanguageCustom');
     function syncCustomLanguageVisibility(focus) {
       const isCustom = targetLanguageSelect && targetLanguageSelect.value === CUSTOM_LANGUAGE_LABEL;
-      if (customLanguageRow) customLanguageRow.style.display = isCustom ? '' : 'none';
-      if (isCustom && focus && customLanguageInput) customLanguageInput.focus();
+      if (customLanguageInput) {
+        customLanguageInput.hidden = !isCustom;
+        if (isCustom && focus) customLanguageInput.focus();
+      }
+    }
+    if (customLanguageInput) {
+      customLanguageInput.addEventListener('change', () => {
+        vscode.postMessage({ type: 'updateSetting', key: 'translation.targetLanguageCustom', value: customLanguageInput.value });
+      });
     }
 
     registerInstant('targetLanguage', 'translation.targetLanguage');
@@ -1128,6 +1158,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const PROVIDER_SMALL_BATCH_STATUS = ${scriptJson(PROVIDER_SMALL_BATCH_STATUS)};
     const PROVIDER_SMALL_BATCH_TOOLTIP = ${scriptJson(PROVIDER_SMALL_BATCH_TOOLTIP)};
     const MODEL_TAG_LABELS = ${scriptJson(MODEL_TAG_LABELS)};
+    const MODEL_TAG_ICONS = ${scriptJson(MODEL_TAG_ICONS)};
     const KNOWN_LOCAL_MODEL_TAG_RULES = ${scriptJson(KNOWN_LOCAL_MODEL_TAG_RULES)};
     const providerTypeSelect = document.getElementById('providerType');
     const baseUrlRow = document.getElementById('baseUrlRow');
@@ -1159,6 +1190,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const providerDrafts = ${scriptJson(providerDrafts)};
     let selectedProviderType = activeProvider.providerType;
     let providerSelectionTouched = false;
+    // True when the free-text model input drives the value instead of the preset dropdown.
+    let modelCustomMode = false;
 
     function getProviderPreset(providerType) {
       return providerClientPresets[providerType] || providerClientPresets.openrouter;
@@ -1182,6 +1215,18 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
     function providerHasModelOptions(providerType) {
       return getProviderModelOptions(providerType).some((option) => option.modelId);
+    }
+
+    function modelIdMatchesConcreteOption(providerType, modelId) {
+      const trimmed = String(modelId || '').trim();
+      if (!trimmed) return false;
+      return getProviderModelOptions(providerType).some((option) => option.modelId && option.modelId === trimmed);
+    }
+
+    function computeModelCustomMode(providerType, modelId) {
+      if (!providerModelIdEditable(providerType)) return false;
+      if (!providerHasModelOptions(providerType)) return true;
+      return !modelIdMatchesConcreteOption(providerType, modelId);
     }
 
     function uniqueModelTags(tags) {
@@ -1262,7 +1307,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       for (const tag of tags) {
         const el = document.createElement('span');
         el.className = 'model-tag model-tag-' + tag;
-        el.textContent = MODEL_TAG_LABELS[tag] || tag;
+        const icon = MODEL_TAG_ICONS[tag];
+        if (icon) el.innerHTML = icon;
+        el.appendChild(document.createTextNode(MODEL_TAG_LABELS[tag] || tag));
         modelTags.appendChild(el);
       }
     }
@@ -1334,20 +1381,16 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     function syncModelIdSelection() {
       const providerType = providerTypeSelect.value;
       const modelId = modelIdInput.value.trim();
-      const modelOptions = getProviderModelOptions(providerType);
-      const concreteOptions = modelOptions
+      const concreteOptions = getProviderModelOptions(providerType)
         .filter((option) => option.modelId)
-        .map((option) => ({
-          label: option.tags && option.tags.length > 0
-            ? option.label + ' · ' + option.tags.map((tag) => MODEL_TAG_LABELS[tag] || tag).join(' · ')
-            : option.label,
-          value: option.modelId,
-        }));
+        .map((option) => ({ label: option.modelId, value: option.modelId }));
       if (!providerModelIdEditable(providerType) && concreteOptions.length > 0 && !concreteOptions.some((option) => option.value === modelId)) {
         modelIdInput.value = concreteOptions[0].value;
       }
       const selectedModelId = modelIdInput.value.trim();
-      const selectedSelectValue = concreteOptions.some((option) => option.value === selectedModelId) ? selectedModelId : '';
+      const selectedSelectValue = modelCustomMode
+        ? ''
+        : (concreteOptions.some((option) => option.value === selectedModelId) ? selectedModelId : '');
       renderSelectOptions(modelIdSelect, concreteOptions, selectedSelectValue, providerModelIdEditable(providerType));
       renderSelectedModelTags();
     }
@@ -1359,15 +1402,16 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
 
     function syncProviderModelVisibility() {
-      const editable = providerModelIdEditable(providerTypeSelect.value);
-      if (modelIdInput) {
-        modelIdInput.hidden = !editable;
-        modelIdInput.disabled = !editable;
-      }
       const hasOptions = providerHasModelOptions(providerTypeSelect.value);
+      // Render the dropdown first so its selected value reflects the current model id.
+      syncModelIdSelection();
       if (modelIdSelectWrap) modelIdSelectWrap.hidden = !hasOptions;
       if (modelIdSelect) modelIdSelect.disabled = !hasOptions;
-      syncModelIdSelection();
+      // The free-text input only appears in custom mode and sits below the dropdown.
+      if (modelIdInput) {
+        modelIdInput.hidden = !modelCustomMode;
+        modelIdInput.disabled = !modelCustomMode;
+      }
     }
 
     function syncProviderApiKeyVisibility() {
@@ -1430,6 +1474,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       providerTypeSelect.value = providerType;
       baseUrlInput.value = draft.baseUrl;
       modelIdInput.value = draft.modelId;
+      modelCustomMode = computeModelCustomMode(providerType, draft.modelId);
       if (!providerSupportsKey(providerType)) {
         showEmptyApiKey();
       } else if (draft.hasApiKey) {
@@ -1566,15 +1611,18 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     function handleModelIdSelectChange() {
       if (!modelIdSelect) return;
       clearProviderSuccessFeedback();
+      const providerType = providerTypeSelect.value;
       const selectedModelId = modelIdSelect.value.trim();
       if (selectedModelId) {
+        modelCustomMode = false;
         modelIdInput.value = selectedModelId;
-      } else if (providerModelIdEditable(providerTypeSelect.value)) {
+      } else if (providerModelIdEditable(providerType)) {
+        modelCustomMode = true;
         modelIdInput.value = '';
-        modelIdInput.focus();
       }
       saveCurrentProviderDraft();
-      syncModelIdSelection();
+      syncProviderModelVisibility();
+      if (modelCustomMode && modelIdInput && !modelIdInput.hidden) modelIdInput.focus();
       updateProviderVerificationState();
     }
 
