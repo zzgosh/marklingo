@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {
   getOpenRouterModelContextLength,
   getOpenRouterSettings,
+  openProviderSetupSettings,
   openRouterChatCompletion,
   type ChatCompletionOptions,
   type OpenRouterSettings,
@@ -513,13 +514,17 @@ async function resolveMarkdownDocument(sourceUri?: vscode.Uri): Promise<{ doc?: 
 }
 
 async function resolveTranslationRuntime(context: vscode.ExtensionContext): Promise<TranslationRuntime | null> {
+  const settings = await getOpenRouterSettings(context);
+  const verifiedAdapterMode = await readVerifiedTranslationAdapterMode(context, settings);
+  if (!verifiedAdapterMode) {
+    await openProviderSetupSettings();
+  }
+
   const targetLanguage = await ensureTargetLanguage(context);
   if (!targetLanguage) return null;
 
-  const settings = await getOpenRouterSettings(context);
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const requestMode = coerceTranslationRequestMode(cfg.get<string>('translation.requestMode') ?? DEFAULT_TRANSLATION_REQUEST_MODE);
-  const verifiedAdapterMode = await readVerifiedTranslationAdapterMode(context, settings);
   const adapterMode = resolveTranslationAdapterMode(requestMode, verifiedAdapterMode);
   const maxBlocksPerRequest = Math.max(1, cfg.get<number>('translation.maxBlocksPerRequest') ?? DEFAULT_MAX_BLOCKS_PER_REQUEST);
   const maxContextUsageRatio = clampContextUsageRatio(cfg.get<number>('translation.maxContextUsageRatio') ?? DEFAULT_MAX_CONTEXT_USAGE_RATIO);

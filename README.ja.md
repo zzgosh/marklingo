@@ -36,7 +36,7 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-`MarkLingo: Translate Current Markdown` から直接始めることもできます。初回実行時、MarkLingo はターゲット言語と Provider を尋ねます。`OpenRouter` を選ぶと素早く設定できます。`Custom OpenAI Compatible` を選ぶとカスタム endpoint を設定できます。MarkLingo Settings を開いて任意の Provider preset を設定することもできます。
+`MarkLingo: Translate Current Markdown` から直接始めることもできます。Provider がまだ保存および検証されていない場合、MarkLingo は先に Settings を開きます。Provider、API key、表示される場合は Base URL、Model ID を設定し、`Save and Verify` をクリックしてから、翻訳コマンドをもう一度実行してください。
 
 Markdown エディターを右クリックして `MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内の Markdown ファイルを右クリックすると `MarkLingo: Translate This Markdown File` を実行できます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。エクスプローラーで複数の Markdown ファイルやフォルダーを選択し、`MarkLingo: Translate Selected Markdown Files` で 1 つのバッチとして翻訳することもできます。
 

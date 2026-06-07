@@ -7,7 +7,7 @@ import {
   getProviderDisplayName,
 } from '../out/services/providerDisplay.js';
 
-test('builds provider-specific command onboarding copy', () => {
+test('builds provider-specific API key copy', () => {
   assert.equal(getProviderDisplayName('openrouter'), 'OpenRouter');
   assert.equal(getProviderDisplayName('openaiCompatible'), 'Custom OpenAI Compatible');
   assert.equal(getProviderDisplayName('moonshot'), 'Moonshot');

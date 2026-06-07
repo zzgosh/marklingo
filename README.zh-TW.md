@@ -36,7 +36,7 @@ MarkLingo 會把已儲存的 Markdown 翻譯成多語系草稿，同時保持原
 - macOS：`Option + Command + T`
 - Windows/Linux：`Control + Alt + T`
 
-你也可以直接從 `MarkLingo: Translate Current Markdown` 開始。首次執行時，MarkLingo 會詢問目標語言和 Provider。選擇 `OpenRouter` 可快速設定；選擇 `Custom OpenAI Compatible` 可設定自訂 endpoint；也可以開啟 MarkLingo Settings 設定任意 Provider preset。
+你也可以直接從 `MarkLingo: Translate Current Markdown` 開始。如果還沒有儲存並驗證過 Provider，MarkLingo 會先開啟 Settings。設定 Provider、API key、顯示時的 Base URL 和 Model ID，點擊 `Save and Verify`，然後再次執行翻譯命令。
 
 也可以在 Markdown 編輯器上按右鍵執行 `MarkLingo: Translate Current Markdown`。在資源管理器中的 Markdown 檔案上按右鍵執行 `MarkLingo: Translate This Markdown File`。在資源管理器中的資料夾上按右鍵執行 `MarkLingo: Translate All Markdown in This Folder`，可翻譯該資料夾及其子資料夾中的 `.md` 與 `.markdown` 檔案，並略過已產生的 `*_mdt.md` 輸出。也可以在資源管理器中多選 Markdown 檔案或資料夾，再執行 `MarkLingo: Translate Selected Markdown Files` 作為一批翻譯。
 

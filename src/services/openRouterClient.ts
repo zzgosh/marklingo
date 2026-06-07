@@ -1,11 +1,5 @@
 import * as vscode from 'vscode';
 import { createHash } from 'node:crypto';
-import { hasOpenRouterModelAccepted, markOpenRouterModelAccepted } from '../onboardingState.js';
-import {
-  getMissingProviderApiKeyMessage,
-  getProviderApiKeyInputPrompt,
-  getProviderApiKeyInputTitle,
-} from './providerDisplay.js';
 import {
   coerceProviderType,
   DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
@@ -21,12 +15,12 @@ import {
   OPENAI_COMPATIBLE_MODEL_ID_SETTING,
   OPENROUTER_PROVIDER_MODEL_ID_SETTING,
   coerceProviderModelId,
+  getProviderPreset,
   providerRequiresApiKey,
   providerSupportsApiKey,
   providerSupportsOpenRouterHeaders,
   providerSupportsOpenRouterReasoningControl,
   providerSupportsTemperatureControl,
-  PROVIDER_PRESETS,
   type ProviderType,
 } from './providerPresets.js';
 
@@ -95,9 +89,12 @@ const OPENROUTER_API_KEY_SECRET_PREFIX = 'marklingo.openrouter.apiKey.v2.';
 const OPENROUTER_API_KEY_ORIGINS_STATE = 'marklingo.openrouter.apiKeyOrigins';
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
 const MODEL_CONTEXT_CACHE_TTL_MS = 30 * 60 * 1000;
-const OPEN_MARKLINGO_SETTINGS_LABEL = 'Open MarkLingo Settings';
+const OPEN_MARKLINGO_SETTINGS_COMMAND = 'marklingo.openSettings';
 
 const modelContextCache = new Map<string, { expiresAt: number; contextLength: number | undefined }>();
+
+export const PROVIDER_SETUP_REQUIRED_MESSAGE =
+  'MarkLingo needs a verified provider before translating. Configure Provider, API key, Base URL, and Model ID in Settings, then Save and Verify.';
 
 export function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim();
@@ -145,73 +142,6 @@ function hasImplicitOpenAiCompatibleConfiguration(cfg: vscode.WorkspaceConfigura
   if (hasExplicitProviderConfiguration(cfg)) return false;
   const rawBaseUrl = cfg.get<string>('openrouter.baseUrl') ?? DEFAULT_OPENROUTER_BASE_URL;
   return normalizeBaseUrl(rawBaseUrl) !== DEFAULT_OPENROUTER_BASE_URL;
-}
-
-async function shouldPromptInitialProviderChoice(
-  context: vscode.ExtensionContext,
-  cfg: vscode.WorkspaceConfiguration,
-): Promise<boolean> {
-  if (hasExplicitProviderConfiguration(cfg) || hasImplicitOpenAiCompatibleConfiguration(cfg)) return false;
-  if (hasOpenRouterModelAccepted(context)) return false;
-  return !await hasOpenRouterApiKey(context, DEFAULT_OPENROUTER_BASE_URL, { includeLegacy: true });
-}
-
-type ProviderChoiceItem = vscode.QuickPickItem & {
-  providerType?: ProviderType;
-  openSettings?: boolean;
-};
-
-async function resolveProviderTypeForTranslation(
-  context: vscode.ExtensionContext,
-  cfg: vscode.WorkspaceConfiguration,
-): Promise<ProviderType> {
-  if (!await shouldPromptInitialProviderChoice(context, cfg)) {
-    return getConfiguredProviderType(cfg);
-  }
-
-  const picked = await vscode.window.showQuickPick<ProviderChoiceItem>([
-    ...PROVIDER_PRESETS.slice(0, 1).map((preset) => ({
-      label: preset.label,
-      description: 'Recommended',
-      detail: preset.description,
-      providerType: preset.id,
-    })),
-    {
-      label: 'Custom OpenAI Compatible',
-      description: 'Custom endpoint',
-      detail: 'Set Base URL, model, and key in Settings.',
-      providerType: 'openaiCompatible' as ProviderType,
-      openSettings: true,
-    },
-    {
-      label: OPEN_MARKLINGO_SETTINGS_LABEL,
-      description: 'Full setup',
-      detail: 'Open Settings to configure any provider.',
-      openSettings: true,
-    },
-  ], {
-    title: 'MarkLingo: Choose Provider',
-    placeHolder: 'Choose a provider. You can change this later in Settings.',
-    ignoreFocusOut: true,
-  });
-
-  if (!picked) throw new vscode.CancellationError();
-
-  if (picked.providerType === 'openrouter') {
-    await cfg.update('openrouter.provider', 'openrouter', vscode.ConfigurationTarget.Global);
-    return 'openrouter';
-  }
-
-  if (picked.providerType) {
-    await cfg.update('openrouter.provider', picked.providerType, vscode.ConfigurationTarget.Global);
-  }
-
-  if (picked.openSettings) {
-    await vscode.commands.executeCommand('marklingo.openSettings');
-    throw new vscode.CancellationError();
-  }
-
-  throw new vscode.CancellationError();
 }
 
 function readStringSetting(cfg: vscode.WorkspaceConfiguration, key: string): string {
@@ -272,6 +202,12 @@ async function rememberApiKeyOrigin(context: vscode.ExtensionContext, origin: st
   await context.globalState.update(OPENROUTER_API_KEY_ORIGINS_STATE, [...origins].sort());
 }
 
+export async function openProviderSetupSettings(message = PROVIDER_SETUP_REQUIRED_MESSAGE): Promise<never> {
+  await vscode.commands.executeCommand(OPEN_MARKLINGO_SETTINGS_COMMAND);
+  await vscode.window.showWarningMessage(message);
+  throw new vscode.CancellationError();
+}
+
 export async function getStoredOpenRouterApiKey(
   context: vscode.ExtensionContext,
   baseUrl?: string,
@@ -287,57 +223,7 @@ export async function getStoredOpenRouterApiKey(
   return undefined;
 }
 
-async function resolveApiKey(
-  context: vscode.ExtensionContext,
-  options: { providerType: ProviderType; baseUrl: string; origin: string; allowLegacyMigration: boolean },
-): Promise<string> {
-  if (!providerSupportsApiKey(options.providerType)) return '';
-
-  const fromSecret = await context.secrets.get(getApiKeySecretName(options.origin));
-  if (fromSecret?.trim()) return fromSecret.trim();
-
-  const legacySecret = await context.secrets.get(LEGACY_OPENROUTER_API_KEY_SECRET);
-  if (options.allowLegacyMigration && legacySecret?.trim()) {
-    const apiKey = legacySecret.trim();
-    await context.secrets.store(getApiKeySecretName(options.origin), apiKey);
-    await rememberApiKeyOrigin(context, options.origin);
-    await context.secrets.delete(LEGACY_OPENROUTER_API_KEY_SECRET);
-    return apiKey;
-  }
-
-  if (!providerRequiresApiKey(options.providerType)) return '';
-
-  const input = await vscode.window.showInputBox({
-    title: getProviderApiKeyInputTitle(options.providerType),
-    prompt: getProviderApiKeyInputPrompt(options.providerType, options.baseUrl),
-    password: true,
-    ignoreFocusOut: true,
-  });
-  if (!input?.trim()) {
-    throw new Error(getMissingProviderApiKeyMessage(options.providerType));
-  }
-  const apiKey = input.trim();
-  await context.secrets.store(getApiKeySecretName(options.origin), apiKey);
-  await rememberApiKeyOrigin(context, options.origin);
-  return apiKey;
-}
-
-function hasExplicitModelConfiguration(cfg: vscode.WorkspaceConfiguration): boolean {
-  const legacy = cfg.inspect<string>('openrouter.modelId');
-  const openRouterProvider = cfg.inspect<string>(OPENROUTER_PROVIDER_MODEL_ID_SETTING);
-  return [
-    legacy?.globalValue,
-    legacy?.workspaceValue,
-    legacy?.workspaceFolderValue,
-    openRouterProvider?.globalValue,
-    openRouterProvider?.workspaceValue,
-    openRouterProvider?.workspaceFolderValue,
-  ]
-    .some((value) => typeof value === 'string' && value.trim().length > 0);
-}
-
-async function resolveModelId(context: vscode.ExtensionContext, providerType: ProviderType): Promise<string> {
-  const cfg = getConfiguration();
+function resolveModelId(cfg: vscode.WorkspaceConfiguration, providerType: ProviderType): string {
   const legacyModelId = hasExplicitStringConfiguration(cfg, 'openrouter.modelId')
     ? readStringSetting(cfg, 'openrouter.modelId')
     : '';
@@ -349,65 +235,52 @@ async function resolveModelId(context: vscode.ExtensionContext, providerType: Pr
       providerType,
       providerModelId || legacyModelId || getProviderDefaultModelId(providerType),
     );
-    if (!modelId) {
-      throw new Error('Missing Provider modelId. Open MarkLingo settings, select a model, then save and verify the provider.');
-    }
     return modelId;
   }
 
   const providerModelId = hasExplicitStringConfiguration(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
     ? readStringSetting(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
     : '';
-  const modelId = providerModelId || legacyModelId || DEFAULT_OPENROUTER_MODEL_ID;
-  if (hasExplicitModelConfiguration(cfg) || hasOpenRouterModelAccepted(context)) {
-    await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, modelId);
-    await markOpenRouterModelAccepted(context);
-    return modelId;
-  }
+  return providerModelId || legacyModelId || DEFAULT_OPENROUTER_MODEL_ID;
+}
 
-  const lastUsed = (context.globalState.get<string>(OPENROUTER_MODEL_ID_LAST_USED) ?? '').trim();
-  const defaultModelId = lastUsed || modelId || DEFAULT_OPENROUTER_MODEL_ID;
+function readProviderBaseUrlForTranslation(cfg: vscode.WorkspaceConfiguration, providerType: ProviderType): string {
+  if (providerType === 'openrouter') return DEFAULT_OPENROUTER_BASE_URL;
 
-  const input = await vscode.window.showInputBox({
-    title: 'MarkLingo: OpenRouter Model ID',
-    prompt: `Model ID. Press Enter for ${defaultModelId}.`,
-    password: false,
-    value: defaultModelId,
-    placeHolder: `Default: ${defaultModelId}`,
-    ignoreFocusOut: true,
-  });
-
-  // Pressing ESC or closing the prompt returns undefined.
-  if (input === undefined) {
-    throw new Error('Missing OpenRouter modelId. Configure marklingo.openrouter.modelId in settings or enter it in the prompt.');
-  }
-
-  const finalModelId = input.trim() || defaultModelId;
-
-  await context.globalState.update(OPENROUTER_MODEL_ID_LAST_USED, finalModelId);
-  await cfg.update('openrouter.modelId', finalModelId, vscode.ConfigurationTarget.Global);
-  await markOpenRouterModelAccepted(context);
-  return finalModelId;
+  const preset = getProviderPreset(providerType);
+  const providerBaseUrlSetting = getProviderBaseUrlSetting(providerType);
+  const configuredBaseUrl = providerBaseUrlSetting ? readStringSetting(cfg, providerBaseUrlSetting) : '';
+  const legacyBaseUrl = readLegacyProviderBaseUrl(cfg);
+  if (configuredBaseUrl || legacyBaseUrl) return configuredBaseUrl || legacyBaseUrl;
+  if (preset.baseUrlEditable) return '';
+  return getProviderDefaultBaseUrl(providerType);
 }
 
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
-  let cfg = getConfiguration();
-  const providerType = await resolveProviderTypeForTranslation(context, cfg);
-  cfg = getConfiguration();
-  const providerBaseUrlSetting = getProviderBaseUrlSetting(providerType);
-  const rawBaseUrl = providerType === 'openrouter'
-    ? DEFAULT_OPENROUTER_BASE_URL
-    : (providerBaseUrlSetting ? readStringSetting(cfg, providerBaseUrlSetting) : '') ||
-      readLegacyProviderBaseUrl(cfg) ||
-      getProviderDefaultBaseUrl(providerType);
+  const cfg = getConfiguration();
+  if (!hasExplicitProviderConfiguration(cfg)) {
+    await openProviderSetupSettings();
+  }
+
+  const providerType = getConfiguredProviderType(cfg);
+  const rawBaseUrl = readProviderBaseUrlForTranslation(cfg, providerType);
+  if (!rawBaseUrl.trim()) {
+    await openProviderSetupSettings();
+  }
+
   const { baseUrl, origin } = resolveProviderBaseUrl(providerType, rawBaseUrl);
-  const apiKey = await resolveApiKey(context, {
-    providerType,
-    baseUrl,
-    origin,
-    allowLegacyMigration: !hasExplicitProviderConfiguration(cfg),
-  });
-  const modelId = await resolveModelId(context, providerType);
+  const modelId = resolveModelId(cfg, providerType);
+  if (!modelId.trim()) {
+    await openProviderSetupSettings();
+  }
+
+  const apiKey = providerSupportsApiKey(providerType)
+    ? (await context.secrets.get(getApiKeySecretName(origin)) ?? '').trim()
+    : '';
+
+  if (providerRequiresApiKey(providerType) && !apiKey) {
+    await openProviderSetupSettings();
+  }
 
   return { providerType, baseUrl, modelId, apiKey };
 }

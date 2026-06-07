@@ -139,18 +139,41 @@ async function configureExtension(mockServer) {
   assert.ok(extension, `expected extension ${EXTENSION_ID}`);
   await extension.activate();
 
+  return configureMockProvider(mockServer);
+}
+
+async function configureMockProvider(mockServer, options = {}) {
   const cfg = vscode.workspace.getConfiguration('marklingo');
   await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
   await cfg.update('openrouter.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
-  await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
+  await cfg.update('openrouter.modelId', options.modelId ?? MODEL_ID, vscode.ConfigurationTarget.Global);
   await cfg.update('providers.openaiCompatible.baseUrl', mockServer.baseUrl, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openaiCompatible.modelId', options.modelId ?? MODEL_ID, vscode.ConfigurationTarget.Global);
   await cfg.update('translation.targetLanguage', 'English', vscode.ConfigurationTarget.Global);
   await cfg.update('translation.requestMode', 'auto', vscode.ConfigurationTarget.Global);
 
-  const seeded = await vscode.commands.executeCommand('marklingo.test.seedState', { apiKey: 'test-key' });
+  const seeded = await vscode.commands.executeCommand('marklingo.test.seedState', {
+    apiKey: options.apiKey ?? 'test-key',
+    skipVerifiedAdapterMode: options.skipVerifiedAdapterMode,
+    verifiedAdapterMode: options.verifiedAdapterMode,
+  });
   assert.equal(seeded.origin, new URL(mockServer.baseUrl).origin);
   return seeded;
+}
+
+async function clearProviderConfiguration() {
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  await cfg.update('openrouter.provider', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('openrouter.baseUrl', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openai.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.deepseek.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.moonshot.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.glm.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.xiaomiMimo.modelId', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openaiCompatible.baseUrl', undefined, vscode.ConfigurationTarget.Global);
+  await cfg.update('providers.openaiCompatible.modelId', undefined, vscode.ConfigurationTarget.Global);
 }
 
 async function writeMarkdown(name, content) {
@@ -908,72 +931,16 @@ function createMemoryExtensionContext() {
   };
 }
 
-async function testCommandProviderOnboardingShowsProviderChoice(context) {
+async function testCommandProviderSetupOpensSettingsWhenProviderNeverSaved(context) {
   const { getOpenRouterSettings, DEFAULT_OPENROUTER_BASE_URL } = await import(pathToFileURL(
     path.join(__dirname, '..', '..', 'out', 'services', 'openRouterClient.js'),
   ).href);
   const cfg = vscode.workspace.getConfiguration('marklingo');
-  await cfg.update('openrouter.provider', undefined, vscode.ConfigurationTarget.Global);
+  await clearProviderConfiguration();
   await cfg.update('openrouter.baseUrl', DEFAULT_OPENROUTER_BASE_URL, vscode.ConfigurationTarget.Global);
-  await cfg.update('openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openaiCompatible.baseUrl', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openaiCompatible.modelId', undefined, vscode.ConfigurationTarget.Global);
-
-  const quickPickCalls = [];
-  const inputCalls = [];
-  const fakeContext = createMemoryExtensionContext();
-
-  try {
-    const settings = await withWindowMessageStubs({
-      showQuickPick: async (items, options) => {
-        quickPickCalls.push({ items: [...items], options });
-        return items.find((item) => item.label === 'OpenRouter');
-      },
-      showInputBox: async (options) => {
-        inputCalls.push(options);
-        if (options.title === 'MarkLingo: OpenRouter API Key') return 'test-key';
-        if (options.title === 'MarkLingo: OpenRouter Model ID') return 'openrouter/test-model';
-        return undefined;
-      },
-    }, async () => getOpenRouterSettings(fakeContext));
-
-    assert.equal(settings.providerType, 'openrouter');
-    assert.equal(settings.baseUrl, DEFAULT_OPENROUTER_BASE_URL);
-    assert.equal(settings.apiKey, 'test-key');
-    assert.equal(settings.modelId, 'openrouter/test-model');
-    assert.equal(quickPickCalls.length, 1);
-    assert.equal(quickPickCalls[0].options.title, 'MarkLingo: Choose Provider');
-    assert.deepEqual(quickPickCalls[0].items.map((item) => item.label), [
-      'OpenRouter',
-      'Custom OpenAI Compatible',
-      'Open MarkLingo Settings',
-    ]);
-    assert.equal(inputCalls[0].title, 'MarkLingo: OpenRouter API Key');
-    assert.equal(inputCalls[0].prompt, 'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code.');
-  } finally {
-    await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
-    await cfg.update('openrouter.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
-    await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
-  }
-}
-
-async function testCommandProviderOnboardingOpensSettingsForOpenAiCompatible(context) {
-  const { getOpenRouterSettings, DEFAULT_OPENROUTER_BASE_URL } = await import(pathToFileURL(
-    path.join(__dirname, '..', '..', 'out', 'services', 'openRouterClient.js'),
-  ).href);
-  const cfg = vscode.workspace.getConfiguration('marklingo');
-  await cfg.update('openrouter.provider', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('openrouter.baseUrl', DEFAULT_OPENROUTER_BASE_URL, vscode.ConfigurationTarget.Global);
-  await cfg.update('openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openaiCompatible.baseUrl', undefined, vscode.ConfigurationTarget.Global);
-  await cfg.update('providers.openaiCompatible.modelId', undefined, vscode.ConfigurationTarget.Global);
 
   const commandCalls = [];
+  const warnings = [];
   const originalExecuteCommand = vscode.commands.executeCommand;
   const fakeContext = createMemoryExtensionContext();
 
@@ -984,9 +951,14 @@ async function testCommandProviderOnboardingOpensSettingsForOpenAiCompatible(con
     };
 
     await withWindowMessageStubs({
-      showQuickPick: async (items) => items.find((item) => item.label === 'Custom OpenAI Compatible'),
+      showQuickPick: async () => {
+        throw new Error('Expected provider setup to open Settings without a QuickPick.');
+      },
       showInputBox: async () => {
-        throw new Error('Expected Custom OpenAI Compatible onboarding to open Settings before prompting for credentials.');
+        throw new Error('Expected provider setup to open Settings without an input box.');
+      },
+      showWarningMessage: async (message) => {
+        warnings.push(message);
       },
     }, async () => {
       await assert.rejects(
@@ -996,15 +968,182 @@ async function testCommandProviderOnboardingOpensSettingsForOpenAiCompatible(con
     });
 
     assert.deepEqual(commandCalls, [['marklingo.openSettings']]);
-    assert.equal(vscode.workspace.getConfiguration('marklingo').get('openrouter.provider'), 'openaiCompatible');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /needs a verified provider before translating/);
   } finally {
     vscode.commands.executeCommand = originalExecuteCommand;
-    await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
-    await cfg.update('openrouter.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
-    await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openrouter.modelId', undefined, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
-    await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
+    await configureMockProvider(context.server);
+  }
+}
+
+async function testCommandProviderSetupOpensSettingsForIncompleteProviderConfiguration(context) {
+  const { getOpenRouterSettings } = await import(pathToFileURL(
+    path.join(__dirname, '..', '..', 'out', 'services', 'openRouterClient.js'),
+  ).href);
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  const commandCalls = [];
+  const warnings = [];
+  const originalExecuteCommand = vscode.commands.executeCommand;
+  const fakeContext = createMemoryExtensionContext();
+
+  const scenarios = [
+    {
+      name: 'missing required API key',
+      setup: async () => {
+        await cfg.update('openrouter.provider', 'openai', vscode.ConfigurationTarget.Global);
+        await cfg.update('providers.openai.modelId', 'gpt-5.4-mini', vscode.ConfigurationTarget.Global);
+      },
+    },
+    {
+      name: 'missing custom Base URL',
+      setup: async () => {
+        await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
+        await cfg.update('providers.openaiCompatible.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
+      },
+    },
+    {
+      name: 'missing custom Model ID',
+      setup: async () => {
+        await cfg.update('openrouter.provider', 'openaiCompatible', vscode.ConfigurationTarget.Global);
+        await cfg.update('providers.openaiCompatible.baseUrl', context.server.baseUrl, vscode.ConfigurationTarget.Global);
+      },
+    },
+  ];
+
+  try {
+    vscode.commands.executeCommand = async (command, ...args) => {
+      commandCalls.push([command, ...args]);
+      return undefined;
+    };
+
+    await withWindowMessageStubs({
+      showQuickPick: async () => {
+        throw new Error('Expected incomplete provider setup to open Settings without a QuickPick.');
+      },
+      showInputBox: async () => {
+        throw new Error('Expected incomplete provider setup to open Settings without an input box.');
+      },
+      showWarningMessage: async (message) => {
+        warnings.push(message);
+      },
+    }, async () => {
+      for (const scenario of scenarios) {
+        commandCalls.length = 0;
+        warnings.length = 0;
+        await clearProviderConfiguration();
+        await scenario.setup();
+
+        await assert.rejects(
+          () => getOpenRouterSettings(fakeContext),
+          (error) => error instanceof vscode.CancellationError,
+          scenario.name,
+        );
+
+        assert.deepEqual(commandCalls, [['marklingo.openSettings']], scenario.name);
+        assert.equal(warnings.length, 1, scenario.name);
+        assert.match(warnings[0], /needs a verified provider before translating/, scenario.name);
+      }
+    });
+  } finally {
+    vscode.commands.executeCommand = originalExecuteCommand;
+    await configureMockProvider(context.server);
+  }
+}
+
+async function testTranslateCommandOpensSettingsWhenProviderIsNotVerified(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown('unverified-provider.md', '# Setup\n\nTranslate only after verification.\n');
+  await configureMockProvider(context.server, {
+    modelId: 'test/unverified-model',
+    skipVerifiedAdapterMode: true,
+  });
+  context.server.state.chatRequests = [];
+
+  const commandCalls = [];
+  const warnings = [];
+  const originalExecuteCommand = vscode.commands.executeCommand;
+
+  try {
+    vscode.commands.executeCommand = async (command, ...args) => {
+      if (command === 'marklingo.openSettings') {
+        commandCalls.push([command, ...args]);
+        return undefined;
+      }
+      return originalExecuteCommand(command, ...args);
+    };
+
+    await withWindowMessageStubs({
+      showQuickPick: async () => {
+        throw new Error('Expected unverified provider setup to skip QuickPick prompts.');
+      },
+      showInputBox: async () => {
+        throw new Error('Expected unverified provider setup to skip input prompts.');
+      },
+      showWarningMessage: async (message) => {
+        warnings.push(message);
+      },
+      showErrorMessage: async (message) => {
+        throw new Error(`Expected provider setup cancellation, not an error notification: ${message}`);
+      },
+    }, async () => {
+      await translate(source);
+    });
+
+    assert.deepEqual(commandCalls, [['marklingo.openSettings']]);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /Save and Verify/);
+    assert.equal(context.server.state.chatRequests.length, 0, 'expected no translation request before provider verification');
+    assert.equal(fs.existsSync(translatedPath(source)), false, 'expected no translated file before provider verification');
+  } finally {
+    vscode.commands.executeCommand = originalExecuteCommand;
+    await configureMockProvider(context.server);
+  }
+}
+
+async function testTranslateCommandOpensSettingsAfterProviderSettingsAreCleared(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown('cleared-settings.md', '# Cleared\n\nSettings were removed.\n');
+  await configureMockProvider(context.server);
+  await clearProviderConfiguration();
+  context.server.state.chatRequests = [];
+
+  const commandCalls = [];
+  const originalExecuteCommand = vscode.commands.executeCommand;
+  const warnings = [];
+
+  try {
+    vscode.commands.executeCommand = async (command, ...args) => {
+      if (command === 'marklingo.openSettings') {
+        commandCalls.push([command, ...args]);
+        return undefined;
+      }
+      return originalExecuteCommand(command, ...args);
+    };
+
+    await withWindowMessageStubs({
+      showQuickPick: async () => {
+        throw new Error('Expected cleared provider settings to skip QuickPick prompts.');
+      },
+      showInputBox: async () => {
+        throw new Error('Expected cleared provider settings to skip input prompts.');
+      },
+      showWarningMessage: async (message) => {
+        warnings.push(message);
+      },
+      showErrorMessage: async (message) => {
+        throw new Error(`Expected provider setup cancellation, not an error notification: ${message}`);
+      },
+    }, async () => {
+      await translate(source);
+    });
+
+    assert.deepEqual(commandCalls, [['marklingo.openSettings']]);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /needs a verified provider before translating/);
+    assert.equal(context.server.state.chatRequests.length, 0, 'expected no request after provider settings were cleared');
+  } finally {
+    vscode.commands.executeCommand = originalExecuteCommand;
+    await configureMockProvider(context.server);
   }
 }
 
@@ -1064,8 +1203,10 @@ async function run() {
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
     await runTest('clear all data does not wait for notification dismissal', testClearAllDataDoesNotWaitForNotification, context);
     await runTest('provider draft settings are registered and writable', testProviderDraftSettingsAreRegistered, context);
-    await runTest('command provider onboarding shows provider choice', testCommandProviderOnboardingShowsProviderChoice, context);
-    await runTest('command provider onboarding opens settings for Custom OpenAI Compatible', testCommandProviderOnboardingOpensSettingsForOpenAiCompatible, context);
+    await runTest('command provider setup opens Settings when no provider was saved', testCommandProviderSetupOpensSettingsWhenProviderNeverSaved, context);
+    await runTest('command provider setup opens Settings for incomplete provider configuration', testCommandProviderSetupOpensSettingsForIncompleteProviderConfiguration, context);
+    await runTest('translate command opens Settings when provider is not verified', testTranslateCommandOpensSettingsWhenProviderIsNotVerified, context);
+    await runTest('translate command opens Settings after provider settings are cleared', testTranslateCommandOpensSettingsAfterProviderSettingsAreCleared, context);
   } finally {
     await server.close();
   }

@@ -36,7 +36,7 @@ Default shortcut:
 - macOS: `Option + Command + T`
 - Windows/Linux: `Control + Alt + T`
 
-You can also start with `MarkLingo: Translate Current Markdown`. On first run, MarkLingo asks for the target language and Provider. Choose `OpenRouter` for quick setup, choose `Custom OpenAI Compatible` for a custom endpoint, or open MarkLingo Settings to configure any provider preset.
+You can also start with `MarkLingo: Translate Current Markdown`. If no provider has been saved and verified yet, MarkLingo opens Settings first. Configure Provider, API key, Base URL when shown, and Model ID, click `Save and Verify`, then run the translation command again.
 
 Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Right-click a Markdown file in the Explorer to run `MarkLingo: Translate This Markdown File`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs. You can also select multiple Markdown files or folders in the Explorer and run `MarkLingo: Translate Selected Markdown Files` to translate them as one batch.
 
