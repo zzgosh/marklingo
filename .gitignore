@@ -3,6 +3,9 @@ out/
 dist/
 local-docs/
 .vscode-test/
+.playwright-cli/
+test-results/
+playwright-report/
 .vscode/marklingo/
 **/.vscode/marklingo/
 **/*_mdt.md

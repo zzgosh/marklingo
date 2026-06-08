@@ -5,6 +5,9 @@ CLAUDE.md
 .github/**
 .vscode/**
 .vscode-test/**
+.playwright-cli/**
+test-results/**
+playwright-report/**
 src/**
 test/**
 scripts/**

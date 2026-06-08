@@ -55,13 +55,14 @@ export async function verifyProviderConnectionAndCapability(
 ): Promise<ProviderVerificationResult> {
   let raw: string;
   try {
-    raw = await openRouterChatCompletion(settings, getChatJsonProbeMessages(), {
+    const result = await openRouterChatCompletion(settings, getChatJsonProbeMessages(), {
       temperature: 0,
       maxTokens: 256,
       timeoutMs: 15_000,
       responseFormat: { type: 'json_object' },
       reasoning: { effort: 'none', exclude: true },
     });
+    raw = result.content;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Verification failed. ${message}`);

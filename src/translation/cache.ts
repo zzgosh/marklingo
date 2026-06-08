@@ -21,6 +21,18 @@ export type TranslationDebugEvent = {
   message: string;
 };
 
+export type TranslationProviderUsageDebug = {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  cost?: number;
+  costCurrency?: string;
+  source: "reported";
+};
+
 export type TranslationRequestDebug = {
   index: number;
   blockCount: number;
@@ -28,6 +40,7 @@ export type TranslationRequestDebug = {
   maxTokens?: number;
   durationMs?: number;
   status?: "success" | "error";
+  providerUsage?: TranslationProviderUsageDebug;
 };
 
 export type TranslationMetaDebug = {
@@ -103,6 +116,7 @@ export type TranslationMetaDebug = {
     actualRequestCount?: number;
     chunks: TranslationRequestDebug[];
   };
+  usage?: TranslationProviderUsageDebug;
   result?: {
     outputHash?: string;
     translatedBlocks: number;

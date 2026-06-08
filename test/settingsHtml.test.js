@@ -60,6 +60,13 @@ function getState(overrides = {}) {
       reusePercent: undefined,
       estimatedInputTokens: 0,
       hasReportedTokens: false,
+      reportedInputTokens: 0,
+      reportedOutputTokens: 0,
+      reportedTotalTokens: 0,
+      cachedProviderTokens: 0,
+      hasReportedCost: false,
+      reportedCost: 0,
+      costCurrency: undefined,
       providers: [],
       models: [],
       targetLanguages: [],
@@ -375,7 +382,14 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
         fallbackBlocks: 0,
         reusePercent: 75,
         estimatedInputTokens: 12000,
-        hasReportedTokens: false,
+        hasReportedTokens: true,
+        reportedInputTokens: 10000,
+        reportedOutputTokens: 2400,
+        reportedTotalTokens: 12400,
+        cachedProviderTokens: 300,
+        hasReportedCost: true,
+        reportedCost: 0.0048,
+        costCurrency: 'credits',
         providers: [{ key: 'openrouter', runs: 5, files: 3 }],
         models: [{ key: 'm1', runs: 5, files: 3 }],
         targetLanguages: [{ key: '简体中文', runs: 5, files: 3 }],
@@ -394,8 +408,13 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
             reusedBlocks: 36,
             fallbackBlocks: 0,
             durationMs: 11000,
-            tokensInput: 9000,
-            tokensSource: 'estimated',
+            tokensInput: 7200,
+            tokensOutput: 1800,
+            tokensTotal: 9000,
+            cachedProviderTokens: 300,
+            tokensSource: 'reported',
+            costAmount: 0.003,
+            costCurrency: 'credits',
           },
         ],
         query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
@@ -411,12 +430,14 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
 
   assert.match(html, /<h2>Usage<\/h2>/);
   assert.match(html, /Files translated/);
-  assert.match(html, /Input tokens \(estimated\)/);
+  assert.match(html, /10\.0k input \/ 2\.4k output/);
+  assert.match(html, /0\.0048 credits/);
   assert.match(html, /class="usage-table"/);
   assert.match(html, /README\.md/);
   assert.match(html, /usage-status" data-status="success">Success</);
   assert.match(html, /75%/);
-  assert.match(html, /12\.0k/);
+  assert.match(html, /12\.4k/);
+  assert.match(html, /9\.0k tokens/);
   assert.match(html, /data-usage-control="range"/);
   assert.match(html, /class="usage-seg-btn active" data-usage-control="range" data-value="30d"/);
   assert.match(html, /class="usage-bars"/);

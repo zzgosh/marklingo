@@ -21,7 +21,12 @@ export type RecentRun = {
   fallbackBlocks?: number;
   durationMs?: number;
   tokensInput?: number;
+  tokensOutput?: number;
+  tokensTotal?: number;
+  cachedProviderTokens?: number;
   tokensSource: string;
+  costAmount?: number;
+  costCurrency?: string;
 };
 
 export type UsageSummary = {
@@ -38,6 +43,13 @@ export type UsageSummary = {
   estimatedInputTokens: number;
   /** True once any provider-reported token total is present (Phase 3). */
   hasReportedTokens: boolean;
+  reportedInputTokens: number;
+  reportedOutputTokens: number;
+  reportedTotalTokens: number;
+  cachedProviderTokens: number;
+  hasReportedCost: boolean;
+  reportedCost: number;
+  costCurrency?: string;
   providers: UsageBreakdownEntry[];
   models: UsageBreakdownEntry[];
   targetLanguages: UsageBreakdownEntry[];
@@ -61,6 +73,13 @@ function emptySummary(): UsageSummary {
     reusePercent: undefined,
     estimatedInputTokens: 0,
     hasReportedTokens: false,
+    reportedInputTokens: 0,
+    reportedOutputTokens: 0,
+    reportedTotalTokens: 0,
+    cachedProviderTokens: 0,
+    hasReportedCost: false,
+    reportedCost: 0,
+    costCurrency: undefined,
     providers: [],
     models: [],
     targetLanguages: [],
@@ -104,7 +123,12 @@ function toRecentRun(event: UsageEventV1): RecentRun {
     fallbackBlocks: event.fallbackBlocks,
     durationMs: event.durationMs,
     tokensInput: event.tokens?.input,
+    tokensOutput: event.tokens?.output,
+    tokensTotal: event.tokens?.total,
+    cachedProviderTokens: event.tokens?.cachedProviderTokens,
     tokensSource: event.tokens?.source ?? "unavailable",
+    costAmount: event.cost?.amount,
+    costCurrency: event.cost?.currency,
   };
 }
 
@@ -139,9 +163,22 @@ export function aggregateUsage(
 
     if (event.tokens?.source === "reported") {
       summary.hasReportedTokens = true;
+      summary.reportedInputTokens += event.tokens.input ?? 0;
+      summary.reportedOutputTokens += event.tokens.output ?? 0;
+      summary.reportedTotalTokens += event.tokens.total ?? 0;
+      summary.cachedProviderTokens += event.tokens.cachedProviderTokens ?? 0;
     }
     if (typeof event.tokens?.input === "number" && event.tokens.source === "estimated") {
       summary.estimatedInputTokens += event.tokens.input;
+    }
+    if (event.cost?.source === "reported") {
+      summary.hasReportedCost = true;
+      summary.reportedCost += event.cost.amount;
+      if (!summary.costCurrency) {
+        summary.costCurrency = event.cost.currency;
+      } else if (summary.costCurrency !== event.cost.currency) {
+        summary.costCurrency = "mixed";
+      }
     }
 
     addBreakdown(providers, event.providerType, event.sourceUriHash);

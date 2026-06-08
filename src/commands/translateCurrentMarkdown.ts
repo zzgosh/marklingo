@@ -6,6 +6,7 @@ import {
   getOpenRouterSettings,
   openProviderSetupSettings,
   openRouterChatCompletion,
+  type ChatCompletionUsage,
   type ChatCompletionOptions,
   type OpenRouterSettings,
 } from '../services/openRouterClient.js';
@@ -51,6 +52,7 @@ import {
   saveTranslationMeta,
   sha256,
   type TranslationMetaDebug,
+  type TranslationProviderUsageDebug,
 } from '../translation/cache.js';
 import { TRANSLATION_PROGRESS_MESSAGES, getBatchTranslationProgressMessage } from './progressMessages.js';
 import { buildUsageEventFromDebug } from '../usage/usageEvent.js';
@@ -168,6 +170,71 @@ function finishDebug(
     };
   }
   return debug;
+}
+
+function hasProviderUsageValue(usage: TranslationProviderUsageDebug): boolean {
+  return (
+    typeof usage.promptTokens === 'number' ||
+    typeof usage.completionTokens === 'number' ||
+    typeof usage.totalTokens === 'number' ||
+    typeof usage.cachedTokens === 'number' ||
+    typeof usage.cacheWriteTokens === 'number' ||
+    typeof usage.reasoningTokens === 'number' ||
+    typeof usage.cost === 'number'
+  );
+}
+
+function toProviderUsageDebug(usage: ChatCompletionUsage | undefined): TranslationProviderUsageDebug | undefined {
+  if (!usage) return undefined;
+  const normalized: TranslationProviderUsageDebug = {
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    cachedTokens: usage.cachedTokens,
+    cacheWriteTokens: usage.cacheWriteTokens,
+    reasoningTokens: usage.reasoningTokens,
+    cost: usage.cost,
+    costCurrency: usage.costCurrency,
+    source: 'reported',
+  };
+  return hasProviderUsageValue(normalized) ? normalized : undefined;
+}
+
+function sumOptionalNumber(a: number | undefined, b: number | undefined): number | undefined {
+  if (typeof a === 'number' && typeof b === 'number') return a + b;
+  return a ?? b;
+}
+
+function mergeProviderUsage(
+  current: TranslationProviderUsageDebug | undefined,
+  next: TranslationProviderUsageDebug | undefined,
+): TranslationProviderUsageDebug | undefined {
+  if (!next) return current;
+  if (!current) return { ...next };
+  const costCurrency =
+    current.costCurrency && next.costCurrency && current.costCurrency !== next.costCurrency
+      ? 'mixed'
+      : current.costCurrency ?? next.costCurrency;
+  return {
+    promptTokens: sumOptionalNumber(current.promptTokens, next.promptTokens),
+    completionTokens: sumOptionalNumber(current.completionTokens, next.completionTokens),
+    totalTokens: sumOptionalNumber(current.totalTokens, next.totalTokens),
+    cachedTokens: sumOptionalNumber(current.cachedTokens, next.cachedTokens),
+    cacheWriteTokens: sumOptionalNumber(current.cacheWriteTokens, next.cacheWriteTokens),
+    reasoningTokens: sumOptionalNumber(current.reasoningTokens, next.reasoningTokens),
+    cost: sumOptionalNumber(current.cost, next.cost),
+    costCurrency,
+    source: 'reported',
+  };
+}
+
+function recordProviderUsage(
+  debug: TranslationMetaDebug,
+  usage: ChatCompletionUsage | undefined,
+): TranslationProviderUsageDebug | undefined {
+  const normalized = toProviderUsageDebug(usage);
+  if (normalized) debug.usage = mergeProviderUsage(debug.usage, normalized);
+  return normalized;
 }
 
 /**
@@ -323,6 +390,7 @@ type TranslationModelValidationResult = {
   restoredTexts: Map<string, string>;
   failedBlocks: Array<{ block: TranslationRequestBlock; reason: string }>;
   maxTokens?: number;
+  providerUsage?: TranslationProviderUsageDebug;
 };
 
 function hasMarkdownFileExtension(uri: vscode.Uri): boolean {
@@ -788,7 +856,7 @@ async function translateMarkdownDocument(
         const requestTranslatedBlocks = async (
           blocks: TranslationRequestBlock[],
           signal?: AbortSignal,
-        ): Promise<{ values: Record<string, unknown>; maxTokens?: number }> => {
+        ): Promise<{ values: Record<string, unknown>; maxTokens?: number; providerUsage?: TranslationProviderUsageDebug }> => {
           const prompt = buildAdapterPrompt(adapterMode, blocks, {
             targetLanguage,
             systemPrompt: effectiveSystemPrompt,
@@ -804,14 +872,16 @@ async function translateMarkdownDocument(
             estimatedPromptTokens: estimatedPrompt,
             translationModelMaxOutputTokens,
           });
-          const raw = await openRouterChatCompletion(
+          const completion = await openRouterChatCompletion(
             settings,
             prompt.messages,
             requestOptions,
           );
+          const providerUsage = recordProviderUsage(debug, completion.usage);
           return {
-            values: parseTranslatedBlockMap(raw, blocks),
+            values: parseTranslatedBlockMap(completion.content, blocks),
             maxTokens: requestOptions.maxTokens,
+            providerUsage,
           };
         };
 
@@ -851,8 +921,9 @@ async function translateMarkdownDocument(
           const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
           try {
             actualRequestCount += 1;
-            const { values, maxTokens } = await requestTranslatedBlocks(plannedChunk.blocks, abortSignal.signal);
+            const { values, maxTokens, providerUsage } = await requestTranslatedBlocks(plannedChunk.blocks, abortSignal.signal);
             if (requestDebug) requestDebug.maxTokens = maxTokens;
+            if (requestDebug && providerUsage) requestDebug.providerUsage = providerUsage;
             for (const [blockId, value] of Object.entries(values)) {
               translatedValuesById.set(blockId, value);
             }
@@ -889,7 +960,7 @@ async function translateMarkdownDocument(
           const requestStartedAt = Date.now();
           const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
           try {
-            const { values, maxTokens } = await requestTranslatedBlocks(blocks, abortSignal.signal);
+            const { values, maxTokens, providerUsage } = await requestTranslatedBlocks(blocks, abortSignal.signal);
             const validated = validateTranslationModelValues(values, blocks);
             const requestDurationMs = Date.now() - requestStartedAt;
             addDebugEvent(
@@ -898,6 +969,7 @@ async function translateMarkdownDocument(
               `Request ${requestIndex} finished in ${requestDurationMs}ms (${label}, ${blocks.length} blocks, maxTokens=${maxTokens ?? 'default'}).`,
             );
             validated.maxTokens = maxTokens;
+            validated.providerUsage = providerUsage;
             if (validated.failedBlocks.length === 0) return validated;
 
             const failedBlockSummary = validated.failedBlocks
@@ -920,6 +992,10 @@ async function translateMarkdownDocument(
                 restoredTexts: new Map([...validated.restoredTexts, ...left.restoredTexts, ...right.restoredTexts]),
                 failedBlocks: [...left.failedBlocks, ...right.failedBlocks],
                 maxTokens,
+                providerUsage: mergeProviderUsage(
+                  validated.providerUsage,
+                  mergeProviderUsage(left.providerUsage, right.providerUsage),
+                ),
               };
             }
 
@@ -936,6 +1012,7 @@ async function translateMarkdownDocument(
                 restoredTexts: new Map([...validated.restoredTexts, ...retry.restoredTexts]),
                 failedBlocks: retry.failedBlocks,
                 maxTokens,
+                providerUsage: mergeProviderUsage(validated.providerUsage, retry.providerUsage),
               };
             }
 
@@ -961,6 +1038,7 @@ async function translateMarkdownDocument(
                 restoredTexts: new Map([...left.restoredTexts, ...right.restoredTexts]),
                 failedBlocks: [...left.failedBlocks, ...right.failedBlocks],
                 maxTokens: left.maxTokens ?? right.maxTokens,
+                providerUsage: mergeProviderUsage(left.providerUsage, right.providerUsage),
               };
             }
             if (blocks.length === 1 && isModelOutputError(error)) {
@@ -994,6 +1072,7 @@ async function translateMarkdownDocument(
                 restoredTextsById.set(blockId, text);
               }
               if (requestDebug) requestDebug.maxTokens = validated.maxTokens;
+              if (requestDebug && validated.providerUsage) requestDebug.providerUsage = validated.providerUsage;
               if (requestDebug) {
                 requestDebug.durationMs = Date.now() - chunkStartedAt;
                 requestDebug.status = 'success';

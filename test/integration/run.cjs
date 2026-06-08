@@ -42,6 +42,24 @@ function extractBlocks(body) {
   return payload.blocks;
 }
 
+function buildMockUsage(blocks) {
+  const promptTokens = 100 + blocks.length * 50;
+  const completionTokens = blocks.length * 20;
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: promptTokens + completionTokens,
+    prompt_tokens_details: {
+      cached_tokens: blocks.length,
+      cache_write_tokens: blocks.length * 2,
+    },
+    completion_tokens_details: {
+      reasoning_tokens: 0,
+    },
+    cost: Number(((promptTokens + completionTokens) * 0.000001).toFixed(6)),
+  };
+}
+
 async function createMockOpenRouterServer() {
   const state = {
     chatRequests: [],
@@ -92,17 +110,20 @@ async function createMockOpenRouterServer() {
           if (state.invalidBlocksArrayThreshold && blocks.length > state.invalidBlocksArrayThreshold) {
             sendJson(res, 200, {
               choices: [{ message: { content: '{"blocks":[{"id":"broken","markdown":"unterminated}]}' } }],
+              usage: buildMockUsage(blocks),
             });
             return;
           }
           sendJson(res, 200, {
             choices: [{ message: { content: `---\n${JSON.stringify({ blocks: translatedBlocks })}` } }],
+            usage: buildMockUsage(blocks),
           });
           return;
         }
 
         sendJson(res, 200, {
           choices: [{ message: { content: JSON.stringify(translated) } }],
+          usage: buildMockUsage(blocks),
         });
         return;
       }
@@ -326,6 +347,10 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.equal(meta.debug.status, 'success');
   assert.equal(meta.debug.settings.request.stream, false);
   assert.equal(meta.debug.settings.request.reasoning, undefined);
+  assert.equal(meta.debug.usage.source, 'reported');
+  assert.ok(meta.debug.usage.promptTokens > 0, 'expected reported prompt tokens in debug metadata');
+  assert.ok(meta.debug.usage.totalTokens > 0, 'expected reported total tokens in debug metadata');
+  assert.ok(meta.debug.usage.cost >= 0, 'expected reported cost in debug metadata');
   assert.equal(meta.debug.result.warningCount, 0);
   assert.ok(!JSON.stringify(meta.debug).includes('test-key'), 'debug metadata must not include the API key');
 }
@@ -348,6 +373,14 @@ async function testRecordsUsageEventOnSuccess(context) {
   assert.ok(typeof event.batchRunId === 'string' && event.batchRunId.length > 0, 'expected a batch run id');
   assert.ok(typeof event.sourceUriHash === 'string' && event.sourceUriHash.length > 0, 'expected a hashed source uri');
   assert.ok(event.translatedBlocks >= 1, 'expected at least one translated block');
+  assert.equal(event.tokens.source, 'reported');
+  assert.ok(event.tokens.input > 0, 'expected reported input tokens');
+  assert.ok(event.tokens.output > 0, 'expected reported output tokens');
+  assert.ok(event.tokens.total > 0, 'expected reported total tokens');
+  assert.ok(event.tokens.cachedProviderTokens >= 0, 'expected cached provider token count');
+  assert.equal(event.cost.source, 'reported');
+  assert.equal(event.cost.currency, 'credits');
+  assert.ok(event.cost.amount >= 0, 'expected reported cost');
 
   const json = JSON.stringify(event);
   assert.ok(!json.includes('test-key'), 'usage event must not include the API key');

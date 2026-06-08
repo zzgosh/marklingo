@@ -9,6 +9,7 @@ MarkLingo は、保存済みの Markdown を多言語ドラフトに翻訳し、
 - Markdown 構造を保持します：見出し、リスト、表、コード、インラインコード、HTML、frontmatter 構文、リンク、画像パス。
 - 組み込み Provider presets として [OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo を選択できます。信頼できる Custom OpenAI Compatible エンドポイントも利用できます。
 - ソースの隣に翻訳済みの `*_<language>_mdt.md` ファイルを書き出し、翻訳タブとプレビューを開き、変更されていない Markdown ブロックのキャッシュ翻訳を再利用します。
+- Settings でローカルの Usage Insights を確認できます。ファイル、実行回数、モデル、token 使用量、利用可能な場合の provider 報告コスト、MarkLingo のブロックキャッシュ再利用を表示します。
 - 無料でオープンソースの拡張機能です。API キーは VS Code `SecretStorage` に保存され、テレメトリ SDK は含まれていません。
 
 ![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -49,7 +50,7 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 | `MarkLingo: Translate This Markdown File` | エクスプローラーのコンテキストメニューで選択した Markdown ファイルを翻訳します。 |
 | `MarkLingo: Translate Selected Markdown Files` | エクスプローラーで選択したファイルやフォルダーから集めた Markdown ファイルを 1 つのバッチとして翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
-| `MarkLingo: Open Settings` | プロバイダー検証、API キー、ターゲット言語、カスタム指示、ショートカットの状態、クリーンアップのための MarkLingo 設定を開きます。 |
+| `MarkLingo: Open Settings` | プロバイダー検証、API キー、ターゲット言語、カスタム指示、ショートカットの状態、Usage Insights、クリーンアップのための MarkLingo 設定を開きます。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
 | `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力を削除し、プライベートな翻訳メタデータ/キャッシュは保持します。 |
 
@@ -125,6 +126,10 @@ Provider または Model ID を変更して `Save and Verify` をクリックし
 
 設定ページでは、Provider の認証情報は `Save and Verify` で保存されます。その他のドロップダウンは即座に保存され、Provider 以外の自由入力フィールドにはそれぞれインライン `Save` ボタンがあります。
 
+### Usage Insights
+
+Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、実行回数、provider/model/language の内訳、MarkLingo のブロックキャッシュ再利用、最近の実行、token 使用量を表示します。provider が usage の詳細を返す場合、MarkLingo は報告された input/output/total tokens、provider cached tokens、provider credits としての報告コストを表示します。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
+
 ## 出力ファイル
 
 MarkLingo は、ソースの Markdown ファイルを常に変更しません。
@@ -151,6 +156,7 @@ MarkLingo はローカルの VS Code 拡張機能ですが、翻訳にはドキ�
 - API キーは endpoint origin ごとに分けて VS Code の `SecretStorage` に保存されます。
 - API キーは、ワークスペースのファイル、VS Code の設定、翻訳メタデータ、ログには保存されません。
 - 翻訳メタデータは、ワークスペースではなく VS Code の `globalStorageUri` の下に保存されます。
+- Usage Insights は、同じ VS Code プライベートストレージに月別の追記イベントファイルとして保存されます。イベントには hash、basename、カウント、provider/model ラベル、token/cost の要約、タイムスタンプ、ステータスのみが含まれます。API key、prompt、生のパス、完全なソース Markdown、完全な翻訳 Markdown は保存しません。
 - テレメトリ SDK は含まれていません。
 
 Provider または Base URL を変更すると、以降の翻訳リクエストが Markdown 内容を送信する先が変わります。信頼できるエンドポイントのみを使用してください。
@@ -163,13 +169,13 @@ Provider または Base URL を変更すると、以降の翻訳リクエスト�
 
 - 保存された API キー
 - MarkLingo のユーザー設定
-- グローバル翻訳メタデータ/キャッシュ
+- グローバル翻訳メタデータ/キャッシュ（Usage Insights イベントを含む）
 - （任意）追跡されている翻訳ワークスペース出力
 
 `Clear Current Project Data` では、表示されているプロジェクトディレクトリについて以下を削除できます。
 
 - 追跡されているプロジェクトの翻訳出力
-- プロジェクトの翻訳メタデータ/キャッシュ
+- プロジェクトの翻訳メタデータ/キャッシュ（Usage Insights イベントを含む）
 
 現在のプロジェクトで拡張機能が追跡する翻訳ファイルだけを整理したい場合は、`MarkLingo: Delete Current Project Translated Files` を使用します。このプロジェクト単位のコマンドは、生成後に編集されたものであっても、追跡対象の出力を意図的に削除します。
 

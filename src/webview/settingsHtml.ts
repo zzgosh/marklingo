@@ -305,10 +305,22 @@ function formatUsageCount(value: number): string {
 }
 
 function formatUsageTokens(value: number): string {
-  if (value <= 0) return '—';
+  if (!Number.isFinite(value) || value < 0) return '—';
+  if (value === 0) return '0';
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
   return `${value}`;
+}
+
+function formatUsageCost(value: number | undefined, currency: string | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
+  const amount = value >= 1
+    ? value.toFixed(2)
+    : value >= 0.01
+      ? value.toFixed(4)
+      : value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+  if (!currency || currency === 'credits') return `${amount} credits`;
+  return `${amount} ${currency}`;
 }
 
 function formatUsageDuration(ms?: number): string {
@@ -346,10 +358,20 @@ function renderUsageControls(query: UsageView['query']): string {
     .map((option) => `<option value="${option.value}"${option.value === query.groupBy ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
     .join('');
   return `<div class="usage-controls">
-            ${renderUsageSegmentControl('range', USAGE_RANGE_OPTIONS, query.range)}
-            ${renderUsageSegmentControl('scope', USAGE_SCOPE_OPTIONS, query.scope)}
-            ${renderUsageSegmentControl('breakdown', USAGE_BREAKDOWN_OPTIONS, query.breakdown)}
-            <label class="usage-groupby">Group by
+            <div class="usage-control-group">
+              <div class="usage-control-label">Range</div>
+              ${renderUsageSegmentControl('range', USAGE_RANGE_OPTIONS, query.range)}
+            </div>
+            <div class="usage-control-group">
+              <div class="usage-control-label">Scope</div>
+              ${renderUsageSegmentControl('scope', USAGE_SCOPE_OPTIONS, query.scope)}
+            </div>
+            <div class="usage-control-group">
+              <div class="usage-control-label">Breakdown</div>
+              ${renderUsageSegmentControl('breakdown', USAGE_BREAKDOWN_OPTIONS, query.breakdown)}
+            </div>
+            <label class="usage-control-group usage-groupby">
+              <span class="usage-control-label">Group by</span>
               <select data-usage-control="groupBy">${groupByOptions}</select>
             </label>
           </div>`;
@@ -449,24 +471,30 @@ function renderUsageRecentTable(view: UsageView): string {
   const rows = (view.recentRuns ?? [])
     .map((run) => {
       const blocks = run.status === 'success'
-        ? `${run.translatedBlocks ?? 0} new · ${run.reusedBlocks ?? 0} reused`
+        ? `${run.translatedBlocks ?? 0} new / ${run.reusedBlocks ?? 0} reused`
         : '—';
+      const tokenTotal = run.tokensSource === 'reported'
+        ? run.tokensTotal ?? ((run.tokensInput ?? 0) + (run.tokensOutput ?? 0))
+        : run.tokensInput;
+      const tokenLabel = typeof tokenTotal === 'number'
+        ? `${formatUsageTokens(tokenTotal)} ${run.tokensSource === 'reported' ? 'tokens' : 'est. input'}`
+        : '—';
+      const costLabel = formatUsageCost(run.costAmount, run.costCurrency);
       const statusLabel = run.status === 'success' ? 'Success' : 'Failed';
       return `<tr>
-                <td>${escapeHtml(formatUsageTime(run.finishedAt ?? run.startedAt))}</td>
-                <td>${escapeHtml(run.projectName)}</td>
-                <td class="usage-file" title="${escapeHtml(run.sourceFileName)}">${escapeHtml(run.sourceFileName)}</td>
+                <td><span class="usage-cell-stack"><span>${escapeHtml(formatUsageTime(run.finishedAt ?? run.startedAt))}</span><span class="usage-cell-sub">${escapeHtml(formatUsageDuration(run.durationMs))}</span></span></td>
+                <td class="usage-file" title="${escapeHtml(`${run.projectName} / ${run.sourceFileName}`)}"><span class="usage-cell-stack"><span>${escapeHtml(run.sourceFileName)}</span><span class="usage-cell-sub">${escapeHtml(run.projectName)}</span></span></td>
                 <td>${escapeHtml(run.targetLanguage ?? '—')}</td>
                 <td class="usage-file" title="${escapeHtml(run.modelId ?? '')}">${escapeHtml(run.modelId ?? '—')}</td>
                 <td>${escapeHtml(blocks)}</td>
-                <td>${escapeHtml(formatUsageDuration(run.durationMs))}</td>
+                <td><span class="usage-cell-stack"><span>${escapeHtml(tokenLabel)}</span><span class="usage-cell-sub">${escapeHtml(costLabel)}</span></span></td>
                 <td><span class="usage-status" data-status="${run.status}">${statusLabel}</span></td>
               </tr>`;
     })
     .join('');
   return `<div class="usage-table-wrap">
             <table class="usage-table">
-              <thead><tr><th>Time</th><th>Project</th><th>File</th><th>Target</th><th>Model</th><th>Blocks</th><th>Duration</th><th>Status</th></tr></thead>
+              <thead><tr><th>Time</th><th>File</th><th>Target</th><th>Model</th><th>Work</th><th>Usage</th><th>Status</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </div>`;
@@ -482,10 +510,19 @@ export function renderUsageSection(view: UsageView): string {
     return '<div class="usage-empty">No translations in this range yet. Translate a Markdown file, or widen the range, to see files, models, token estimates, and cache reuse here.</div>';
   }
   const reuseText = view.reusePercent === undefined ? '—' : `${Math.round(view.reusePercent)}%`;
+  const tokenTotal = view.hasReportedTokens
+    ? view.reportedTotalTokens || (view.reportedInputTokens + view.reportedOutputTokens)
+    : view.estimatedInputTokens;
+  const tokenCaption = view.hasReportedTokens
+    ? `${formatUsageTokens(view.reportedInputTokens)} input / ${formatUsageTokens(view.reportedOutputTokens)} output`
+    : 'Input tokens · estimated';
+  const costText = formatUsageCost(view.reportedCost, view.costCurrency);
+  const costCaption = view.hasReportedCost ? 'Cost · reported' : 'Cost unavailable';
   const cards = `<div class="usage-cards">
             <div class="usage-card"><div class="usage-value">${formatUsageCount(view.filesTranslated)}</div><div class="usage-caption">Files translated</div></div>
             <div class="usage-card"><div class="usage-value">${formatUsageCount(view.totalRuns)}</div><div class="usage-caption">Runs · ${formatUsageCount(view.successRuns)} ok / ${formatUsageCount(view.failedRuns)} failed</div></div>
-            <div class="usage-card"><div class="usage-value">${escapeHtml(formatUsageTokens(view.estimatedInputTokens))}</div><div class="usage-caption">Input tokens (estimated)</div></div>
+            <div class="usage-card"><div class="usage-value">${escapeHtml(formatUsageTokens(tokenTotal))}</div><div class="usage-caption">${escapeHtml(tokenCaption)}</div></div>
+            <div class="usage-card"><div class="usage-value">${escapeHtml(costText)}</div><div class="usage-caption">${escapeHtml(costCaption)}</div></div>
             <div class="usage-card"><div class="usage-value">${escapeHtml(reuseText)}</div><div class="usage-caption">Cache reuse · ${formatUsageCount(view.reusedBlocks)} reused / ${formatUsageCount(view.translatedBlocks)} new</div></div>
           </div>`;
   return `${cards}
@@ -1143,32 +1180,53 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       .provider-status { text-align: left; }
       .provider-actions .save-btn { justify-self: start; }
     }
+    .usage-section {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+    #usage-body {
+      min-width: 0;
+    }
     .usage-cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 10px;
-      margin-bottom: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      min-width: 0;
     }
     .usage-card {
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 12px 14px;
+      padding: 13px 14px;
       background: var(--panel);
+      min-width: 0;
     }
     .usage-value {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 600;
       line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .usage-caption {
       margin-top: 4px;
       color: var(--muted);
       font-size: 11px;
+      min-height: 16px;
+      overflow-wrap: anywhere;
     }
-    .usage-table-wrap { overflow-x: auto; }
+    .usage-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
     .usage-table {
       width: 100%;
+      min-width: 700px;
       border-collapse: collapse;
+      table-layout: fixed;
       font-size: 12px;
     }
     .usage-table th,
@@ -1182,10 +1240,38 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--muted);
       font-weight: 600;
     }
+    .usage-table th:nth-child(1),
+    .usage-table td:nth-child(1) { width: 16%; }
+    .usage-table th:nth-child(2),
+    .usage-table td:nth-child(2) { width: 16%; }
+    .usage-table th:nth-child(3),
+    .usage-table td:nth-child(3) { width: 8%; }
+    .usage-table th:nth-child(4),
+    .usage-table td:nth-child(4) { width: 22%; }
+    .usage-table th:nth-child(5),
+    .usage-table td:nth-child(5) { width: 14%; }
+    .usage-table th:nth-child(6),
+    .usage-table td:nth-child(6) { width: 14%; }
+    .usage-table th:nth-child(7),
+    .usage-table td:nth-child(7) { width: 10%; }
     .usage-table .usage-file {
-      max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .usage-cell-stack {
+      display: grid;
+      gap: 1px;
+      line-height: 1.25;
+      min-width: 0;
+    }
+    .usage-cell-stack > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .usage-cell-sub {
+      color: var(--muted);
+      font-size: 11px;
     }
     .usage-status {
       display: inline-block;
@@ -1198,30 +1284,47 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-status[data-status="error"] { color: var(--danger); }
     .usage-empty {
       color: var(--muted);
-      padding: 8px 0;
+      padding: 12px 0;
     }
     .usage-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      align-items: end;
+      min-width: 0;
+    }
+    .usage-control-group {
+      display: grid;
+      min-width: 0;
+      gap: 6px;
+    }
+    .usage-control-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0;
     }
     .usage-seg {
       display: inline-flex;
+      width: 100%;
       border: 1px solid var(--border);
       border-radius: 6px;
       overflow: hidden;
     }
     .usage-seg-btn {
       appearance: none;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 30px;
       border: 0;
       border-right: 1px solid var(--border);
       background: var(--input);
       color: var(--fg);
       font: inherit;
-      padding: 4px 10px;
+      padding: 4px 8px;
       cursor: pointer;
+      white-space: nowrap;
     }
     .usage-seg-btn:last-child { border-right: 0; }
     .usage-seg-btn.active {
@@ -1229,11 +1332,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--button-fg);
     }
     .usage-groupby {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
       color: var(--muted);
-      font-size: 12px;
     }
     .usage-groupby select {
       font: inherit;
@@ -1241,15 +1340,23 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       background: var(--input);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 3px 6px;
+      min-height: 30px;
+      padding: 4px 8px;
     }
     .usage-charts {
       display: grid;
       grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-      gap: 16px;
-      margin: 16px 0;
+      gap: 12px;
+      min-width: 0;
     }
     .usage-chart-bars { grid-column: 1 / -1; }
+    .usage-chart {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 13px 14px;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
     .usage-chart-head {
       display: flex;
       justify-content: space-between;
@@ -1262,7 +1369,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-bars-wrap { position: relative; }
     .usage-bars {
       width: 100%;
-      height: 120px;
+      height: 150px;
       display: block;
       border-bottom: 1px solid var(--border);
     }
@@ -1304,7 +1411,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-tops { display: flex; flex-direction: column; gap: 6px; }
     .usage-top-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 80px max-content;
+      grid-template-columns: minmax(0, 1fr) minmax(72px, 34%) max-content;
       gap: 8px;
       align-items: center;
       font-size: 12px;
@@ -1336,6 +1443,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-legend-swatch.translated { background: var(--vscode-charts-blue, #4e95d9); }
     .usage-legend-swatch.fallback { background: var(--vscode-charts-red, #e51400); }
     @media (max-width: 760px) {
+      .usage-controls { grid-template-columns: 1fr; }
       .usage-charts { grid-template-columns: 1fr; }
     }
   </style>
@@ -1481,7 +1589,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         </section>
 
         <h2>Usage</h2>
-        <section class="card usage-section">
+        <section class="usage-section">
           ${renderUsageControls(state.usage.query)}
           <div id="usage-body">${renderUsageSection(state.usage)}</div>
         </section>

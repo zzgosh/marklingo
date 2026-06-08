@@ -35,6 +35,9 @@ test('returns an empty summary for no events', () => {
   assert.equal(summary.projectsTouched, 0);
   assert.equal(summary.reusePercent, undefined);
   assert.equal(summary.estimatedInputTokens, 0);
+  assert.equal(summary.reportedTotalTokens, 0);
+  assert.equal(summary.hasReportedCost, false);
+  assert.equal(summary.reportedCost, 0);
   assert.deepEqual(summary.recentRuns, []);
   assert.deepEqual(summary.providers, []);
 });
@@ -65,11 +68,31 @@ test('aggregates runs, files, reuse, tokens and breakdowns', () => {
 test('does not add unavailable-source tokens to the estimated total', () => {
   const summary = aggregateUsage([
     event({ tokens: { input: 800, source: 'estimated' } }),
-    event({ tokens: { input: 999, source: 'reported' } }),
+    event({ tokens: { input: 999, output: 111, total: 1110, cachedProviderTokens: 222, source: 'reported' } }),
     event({ tokens: { source: 'unavailable' } }),
   ]);
   assert.equal(summary.estimatedInputTokens, 800);
   assert.equal(summary.hasReportedTokens, true);
+  assert.equal(summary.reportedInputTokens, 999);
+  assert.equal(summary.reportedOutputTokens, 111);
+  assert.equal(summary.reportedTotalTokens, 1110);
+  assert.equal(summary.cachedProviderTokens, 222);
+});
+
+test('aggregates reported cost and tracks mixed currencies', () => {
+  const summary = aggregateUsage([
+    event({ cost: { amount: 0.01, currency: 'credits', source: 'reported' } }),
+    event({ cost: { amount: 0.02, currency: 'credits', source: 'reported' } }),
+  ]);
+  assert.equal(summary.hasReportedCost, true);
+  assert.equal(Number(summary.reportedCost.toFixed(2)), 0.03);
+  assert.equal(summary.costCurrency, 'credits');
+
+  const mixed = aggregateUsage([
+    event({ cost: { amount: 1, currency: 'credits', source: 'reported' } }),
+    event({ cost: { amount: 1, currency: 'USD', source: 'reported' } }),
+  ]);
+  assert.equal(mixed.costCurrency, 'mixed');
 });
 
 test('sorts recent runs by finished time desc and applies the limit', () => {

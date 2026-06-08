@@ -9,6 +9,7 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 - 保留 Markdown 结构：标题、列表、表格、代码、行内代码、HTML、frontmatter 语法、链接和图片路径。
 - 可选择内置 Provider presets：[OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，或使用受信任的 Custom OpenAI Compatible 端点。
 - 在源文件旁写出翻译后的 `*_<language>_mdt.md` 文件，打开翻译标签页和预览，并复用未改动 Markdown 块的缓存翻译。
+- 在 Settings 中查看本地 Usage Insights，包括文件、运行次数、模型、token 使用量、可用时的 provider 报告成本，以及 MarkLingo 块缓存复用。
 - 使用免费、开源的扩展；API 密钥存储在 VS Code `SecretStorage` 中，不包含遥测 SDK。
 
 ![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -49,7 +50,7 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 | `MarkLingo: Translate This Markdown File` | 翻译从资源管理器右键菜单中选中的 Markdown 文件。 |
 | `MarkLingo: Translate Selected Markdown Files` | 将资源管理器中选中的文件和文件夹收集到的 Markdown 文件作为一批翻译，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 翻译所选文件夹及其子文件夹中的源 Markdown 文件，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
-| `MarkLingo: Open Settings` | 打开 MarkLingo 设置，管理提供方验证、API 密钥、目标语言、自定义指令、快捷键状态和清理操作。 |
+| `MarkLingo: Open Settings` | 打开 MarkLingo 设置，管理提供方验证、API 密钥、目标语言、自定义指令、快捷键状态、Usage Insights 和清理操作。 |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 将 `*_mdt.md` 添加到当前仓库的本地 Git 排除文件中。 |
 | `MarkLingo: Delete Current Project Translated Files` | 删除本项目中由扩展跟踪的翻译输出，同时保留私有翻译元数据/缓存。 |
 
@@ -125,6 +126,10 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 
 设置页面通过 `Save and Verify` 保存 Provider 凭据。其他下拉框会立即保存；Provider 之外的自由文本字段使用各自的内联 `Save` 按钮。
 
+### Usage Insights
+
+Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、运行次数、provider/model/language 分组、MarkLingo 块缓存复用、最近运行记录和 token 使用量。当 provider 返回 usage 明细时，MarkLingo 会显示报告的 input/output/total tokens、provider cached tokens，以及 provider credits 口径的报告成本。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
+
 ## 输出文件
 
 MarkLingo 始终保持源 Markdown 文件不变。
@@ -151,6 +156,7 @@ MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送�
 - API 密钥按 endpoint origin 分开存储在 VS Code 的 `SecretStorage` 中。
 - API 密钥不会存入工作区文件、VS Code 设置、翻译元数据或日志。
 - 翻译元数据存储在 VS Code 的 `globalStorageUri` 下，而非工作区中。
+- Usage Insights 以按月追加的事件文件形式存储在同一个 VS Code 私有存储中。事件只包含 hash、basename、计数、provider/model 标签、token/cost 摘要、时间戳和状态；不会存储 API key、prompt、原始路径、完整源 Markdown 或完整翻译 Markdown。
 - 不包含任何遥测 SDK。
 
 更改 Provider 或 Base URL 会改变后续翻译请求把 Markdown 内容发送到哪里。请仅使用你信任的端点。
@@ -163,13 +169,13 @@ MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送�
 
 - 已保存的 API 密钥
 - MarkLingo 用户设置
-- 全局翻译元数据/缓存
+- 全局翻译元数据/缓存，包括 Usage Insights 事件
 - （可选）已跟踪的翻译工作区输出
 
 `Clear Current Project Data` 可以删除当前显示项目目录下的：
 
 - 已跟踪的项目翻译输出
-- 项目翻译元数据/缓存
+- 项目翻译元数据/缓存，包括 Usage Insights 事件
 
 当你只想清理当前项目中由扩展跟踪的翻译文件时，使用 `MarkLingo: Delete Current Project Translated Files`。这个项目范围的命令会有意删除已跟踪的输出，即使它们在生成后被编辑过。
 

@@ -1,9 +1,6 @@
 import type { TranslationMetaDebug } from "../translation/cache.js";
 
-/**
- * Source label for token/cost values. Phase 1 only ever produces `estimated` (input tokens) or
- * `unavailable`. Provider-reported values (`reported`) arrive in Phase 3.
- */
+/** Source label for token/cost values. */
 export type UsageValueSource = "reported" | "estimated" | "unavailable";
 
 export type UsageTokens = {
@@ -79,6 +76,45 @@ function sumEstimatedPromptTokens(debug: TranslationMetaDebug): number | undefin
   return sum;
 }
 
+function hasReportedTokenUsage(debug: TranslationMetaDebug): boolean {
+  const usage = debug.usage;
+  return Boolean(
+    usage &&
+    (
+      typeof usage.promptTokens === "number" ||
+      typeof usage.completionTokens === "number" ||
+      typeof usage.totalTokens === "number" ||
+      typeof usage.cachedTokens === "number"
+    ),
+  );
+}
+
+function buildUsageTokens(debug: TranslationMetaDebug): UsageTokens {
+  if (hasReportedTokenUsage(debug)) {
+    return {
+      input: debug.usage?.promptTokens,
+      output: debug.usage?.completionTokens,
+      total: debug.usage?.totalTokens,
+      cachedProviderTokens: debug.usage?.cachedTokens,
+      source: "reported",
+    };
+  }
+
+  const estimatedInput = sumEstimatedPromptTokens(debug);
+  return typeof estimatedInput === "number"
+    ? { input: estimatedInput, source: "estimated" }
+    : { source: "unavailable" };
+}
+
+function buildUsageCost(debug: TranslationMetaDebug): UsageCost | undefined {
+  if (typeof debug.usage?.cost !== "number") return undefined;
+  return {
+    amount: debug.usage.cost,
+    currency: debug.usage.costCurrency ?? "credits",
+    source: "reported",
+  };
+}
+
 /**
  * Map a finished {@link TranslationMetaDebug} plus resolved identity into a privacy-safe usage event.
  * Pure: all environment/IO-derived values arrive via {@link UsageEventContext}. On the failure path
@@ -88,11 +124,8 @@ export function buildUsageEventFromDebug(
   debug: TranslationMetaDebug,
   ctx: UsageEventContext,
 ): UsageEventV1 {
-  const estimatedInput = sumEstimatedPromptTokens(debug);
-  const tokens: UsageTokens =
-    typeof estimatedInput === "number"
-      ? { input: estimatedInput, source: "estimated" }
-      : { source: "unavailable" };
+  const tokens = buildUsageTokens(debug);
+  const cost = buildUsageCost(debug);
 
   return {
     schemaVersion: 1,
@@ -121,5 +154,6 @@ export function buildUsageEventFromDebug(
     fallbackBlocks: debug.result?.fallbackBlocks,
     requestCount: debug.plan?.actualRequestCount ?? debug.plan?.chunkCount,
     tokens,
+    cost,
   };
 }

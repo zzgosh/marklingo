@@ -48,6 +48,22 @@ export type ChatCompletionOptions = {
   reasoning?: ReasoningOptions | null;
 };
 
+export type ChatCompletionUsage = {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  cost?: number;
+  costCurrency?: string;
+};
+
+export type ChatCompletionResult = {
+  content: string;
+  usage?: ChatCompletionUsage;
+};
+
 export type ResponseFormat =
   | { type: 'json_object' }
   | {
@@ -409,6 +425,38 @@ function readPositiveInteger(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
+function readNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
+function readNonNegativeNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function normalizeChatCompletionUsage(raw: unknown): ChatCompletionUsage | undefined {
+  const usage = readRecord(raw);
+  if (!usage) return undefined;
+  const promptDetails = readRecord(usage.prompt_tokens_details);
+  const completionDetails = readRecord(usage.completion_tokens_details);
+  const normalized: ChatCompletionUsage = {
+    promptTokens: readNonNegativeInteger(usage.prompt_tokens),
+    completionTokens: readNonNegativeInteger(usage.completion_tokens),
+    totalTokens: readNonNegativeInteger(usage.total_tokens),
+    cachedTokens: readNonNegativeInteger(promptDetails?.cached_tokens),
+    cacheWriteTokens: readNonNegativeInteger(promptDetails?.cache_write_tokens),
+    reasoningTokens: readNonNegativeInteger(completionDetails?.reasoning_tokens),
+    cost: readNonNegativeNumber(usage.cost),
+    costCurrency: readNonNegativeNumber(usage.cost) === undefined ? undefined : 'credits',
+  };
+  return Object.values(normalized).some((value) => value !== undefined) ? normalized : undefined;
+}
+
 function readModelContextLength(model: unknown): number | undefined {
   if (!model || typeof model !== 'object') return undefined;
   const value = model as Record<string, unknown>;
@@ -505,7 +553,7 @@ export async function openRouterChatCompletion(
   settings: OpenRouterSettings,
   messages: ChatMessage[],
   options: ChatCompletionOptions = {},
-): Promise<string> {
+): Promise<ChatCompletionResult> {
   const timeoutMs = options.timeoutMs ?? 60_000;
 
   const url = `${settings.baseUrl}/chat/completions`;
@@ -545,5 +593,8 @@ export async function openRouterChatCompletion(
   if (typeof content !== 'string' || !content.trim()) {
     throw new Error('Provider returned empty content or an unexpected response shape.');
   }
-  return content;
+  return {
+    content,
+    usage: normalizeChatCompletionUsage(data?.usage),
+  };
 }

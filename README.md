@@ -9,6 +9,7 @@ MarkLingo translates saved Markdown into multilingual drafts while keeping the o
 - Preserve Markdown structure: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths.
 - Choose from built-in provider presets for [OpenRouter](https://openrouter.ai), OpenAI, DeepSeek, Moonshot, GLM, Xiaomi MiMo, or use a trusted Custom OpenAI Compatible endpoint.
 - Write translated `*_<language>_mdt.md` files next to the source, open the translated tab and preview, and reuse cached translations for unchanged Markdown blocks.
+- Review local Usage Insights in Settings, including files, runs, models, token usage, reported cost when available, and MarkLingo block-cache reuse.
 - Use a free, open-source extension with API keys stored in VS Code `SecretStorage` and no telemetry SDK.
 
 ![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -49,7 +50,7 @@ Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Ri
 | `MarkLingo: Translate This Markdown File` | Translate the Markdown file selected from the Explorer context menu. |
 | `MarkLingo: Translate Selected Markdown Files` | Translate Markdown files gathered from selected Explorer files and folders as one batch, opening the first translated output and writing the rest next to their sources. |
 | `MarkLingo: Translate All Markdown in This Folder` | Translate source Markdown files in the selected folder and subfolders, opening the first translated output and writing the rest next to their sources. |
-| `MarkLingo: Open Settings` | Open MarkLingo settings for provider verification, API key, target language, custom instructions, shortcut status, and cleanup. |
+| `MarkLingo: Open Settings` | Open MarkLingo settings for provider verification, API key, target language, custom instructions, shortcut status, Usage Insights, and cleanup. |
 | `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
 | `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |
 
@@ -123,6 +124,10 @@ Fixed provider presets expose a curated set of model choices. OpenRouter and Cus
 
 The settings page saves Provider credentials through `Save and Verify`. Other dropdown changes save immediately, and free-text fields outside Provider use their own inline `Save` buttons.
 
+### Usage Insights
+
+Settings includes a local Usage section for translation history. It shows files translated, runs, provider/model/language breakdowns, MarkLingo block-cache reuse, recent runs, and token usage. When a provider reports usage details, MarkLingo shows reported input/output/total tokens, provider cached tokens, and reported cost in provider credits. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
+
 ## Output Files
 
 MarkLingo always keeps the source Markdown file unchanged.
@@ -149,6 +154,7 @@ MarkLingo is a local VS Code extension, but translation requires sending documen
 - API keys are stored in VS Code `SecretStorage`, separated by endpoint origin.
 - API keys are not stored in workspace files, VS Code settings, translation metadata, or logs.
 - Translation metadata is stored under VS Code `globalStorageUri`, not in the workspace.
+- Usage Insights are stored in the same private VS Code storage as append-only monthly event files. Events contain hashes, basenames, counts, provider/model labels, token/cost summaries, timestamps, and status only; they do not store API keys, prompts, raw paths, full source Markdown, or full translated Markdown.
 - No telemetry SDK is included.
 
 Changing Provider or the Custom OpenAI Compatible Base URL changes where future translation requests send Markdown content. Only use endpoints you trust.
@@ -161,13 +167,13 @@ Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data.
 
 - Saved API key
 - MarkLingo user settings
-- Global translation metadata/cache
+- Global translation metadata/cache, including Usage Insights events
 - Optionally, tracked translated workspace outputs
 
 `Clear Current Project Data` can delete, for the shown project directory:
 
 - Tracked translated project outputs
-- Project translation metadata/cache
+- Project translation metadata/cache, including Usage Insights events
 
 Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files. It intentionally deletes tracked outputs even if they were edited after generation.
 

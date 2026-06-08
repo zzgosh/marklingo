@@ -107,6 +107,34 @@ test('marks tokens unavailable when there is no plan', () => {
   assert.equal(event.requestCount, undefined);
 });
 
+test('uses provider-reported tokens and cost when available', () => {
+  const event = buildUsageEventFromDebug(baseDebug({
+    usage: {
+      promptTokens: 1234,
+      completionTokens: 345,
+      totalTokens: 1579,
+      cachedTokens: 222,
+      cacheWriteTokens: 111,
+      reasoningTokens: 12,
+      cost: 0.00042,
+      costCurrency: 'credits',
+      source: 'reported',
+    },
+  }), ctx);
+  assert.deepEqual(event.tokens, {
+    input: 1234,
+    output: 345,
+    total: 1579,
+    cachedProviderTokens: 222,
+    source: 'reported',
+  });
+  assert.deepEqual(event.cost, {
+    amount: 0.00042,
+    currency: 'credits',
+    source: 'reported',
+  });
+});
+
 test('does not leak the provider base URL into the serialized event', () => {
   const event = buildUsageEventFromDebug(baseDebug(), ctx);
   const json = JSON.stringify(event);
