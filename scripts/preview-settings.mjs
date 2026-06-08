@@ -262,6 +262,11 @@ function buildState(url) {
           models: [],
           targetLanguages: [],
           recentRuns: [],
+          query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+          buckets: [],
+          dimensionKeys: [],
+          tops: [],
+          reuse: { translated: 0, reused: 0, fallback: 0 },
         }
       : {
           totalRuns: 42,
@@ -292,6 +297,31 @@ function buildState(url) {
             { eventId: 'r2', startedAt: '2026-06-08T09:40:00.000Z', finishedAt: '2026-06-08T09:40:06.500Z', status: 'success', projectName: 'marklingo', sourceFileName: 'AGENTS.md', targetLanguage: '简体中文', providerType: 'openrouter', modelId: 'google/gemini-3.1-flash-lite', translatedBlocks: 4, reusedBlocks: 58, fallbackBlocks: 0, durationMs: 6500, tokensInput: 9000, tokensSource: 'estimated' },
             { eventId: 'r3', startedAt: '2026-06-07T22:10:00.000Z', finishedAt: '2026-06-07T22:10:02.100Z', status: 'error', projectName: 'docs-site', sourceFileName: 'guide.md', targetLanguage: 'English', providerType: 'openaiCompatible', modelId: 'hy-mt2', durationMs: 2100, tokensSource: 'unavailable' },
           ],
+          query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+          dimensionKeys: ['google/gemini-3.1-flash-lite', 'hy-mt2'],
+          buckets: (() => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const base = Date.UTC(2026, 5, 8);
+            return Array.from({ length: 14 }, (_, i) => {
+              const d = new Date(base - (13 - i) * 86400000);
+              const a = Math.round(Math.abs(Math.sin(i + 1)) * 6);
+              const b = Math.round(Math.abs(Math.cos(i + 1)) * 4);
+              return {
+                key: d.toISOString().slice(0, 10),
+                label: `${months[d.getUTCMonth()]} ${d.getUTCDate()}`,
+                totalRuns: a + b,
+                segments: [
+                  { key: 'google/gemini-3.1-flash-lite', runs: a },
+                  { key: 'hy-mt2', runs: b },
+                ],
+              };
+            });
+          })(),
+          tops: [
+            { key: 'google/gemini-3.1-flash-lite', runs: 24, files: 10 },
+            { key: 'hy-mt2', runs: 12, files: 6 },
+          ],
+          reuse: { translated: 512, reused: 1340, fallback: 7 },
         },
   };
 }

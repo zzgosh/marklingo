@@ -64,6 +64,11 @@ function getState(overrides = {}) {
       models: [],
       targetLanguages: [],
       recentRuns: [],
+      query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+      buckets: [],
+      dimensionKeys: [],
+      tops: [],
+      reuse: { translated: 0, reused: 0, fallback: 0 },
     },
     ...overrides,
   };
@@ -348,8 +353,10 @@ test('renders an empty Usage section when there is no usage history', () => {
   const html = renderSettingsHtml({ cspSource: "'self'", nonce: 'test-nonce', state: getState() });
 
   assert.match(html, /<h2>Usage<\/h2>/);
-  assert.match(html, /No translations recorded yet/);
+  assert.match(html, /No translations in this range yet/);
   assert.ok(!html.includes('class="usage-table"'));
+  // The persistent control shell renders even with no history.
+  assert.match(html, /data-usage-control="range"/);
 });
 
 test('renders Usage summary cards and recent runs when usage exists', () => {
@@ -391,6 +398,13 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
             tokensSource: 'estimated',
           },
         ],
+        query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+        dimensionKeys: ['google/gemini-3.1-flash-lite'],
+        buckets: [
+          { key: '2026-06-08', label: 'Jun 8', totalRuns: 5, segments: [{ key: 'google/gemini-3.1-flash-lite', runs: 5 }] },
+        ],
+        tops: [{ key: 'google/gemini-3.1-flash-lite', runs: 5, files: 3 }],
+        reuse: { translated: 20, reused: 60, fallback: 0 },
       },
     }),
   });
@@ -403,5 +417,11 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /usage-status" data-status="success">Success</);
   assert.match(html, /75%/);
   assert.match(html, /12\.0k/);
+  assert.match(html, /data-usage-control="range"/);
+  assert.match(html, /class="usage-seg-btn active" data-usage-control="range" data-value="30d"/);
+  assert.match(html, /class="usage-bars"/);
+  assert.match(html, /<rect class="usage-seg-c0"/);
+  assert.match(html, /class="usage-top-row"/);
+  assert.match(html, /class="usage-reuse-strip"/);
   assert.ok(!html.includes('No translations recorded yet'));
 });

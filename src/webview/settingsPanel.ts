@@ -35,9 +35,9 @@ import {
   PRIVATE_STORAGE_COMPACT_TARGET_BYTES,
   readPrivateStorageStats,
 } from '../storage/privateStorage.js';
-import { getProjectRootUri, getProjectsStorageRoot } from '../storage/paths.js';
+import { getProjectId, getProjectRootUri, getProjectsStorageRoot } from '../storage/paths.js';
 import { readUsageEvents } from '../usage/usageLedger.js';
-import { aggregateUsage } from '../usage/usageAggregate.js';
+import { aggregateUsageView, coerceUsageQuery, DEFAULT_USAGE_QUERY } from '../usage/usageAggregate.js';
 import { deleteProjectTranslationData, type ProjectTranslationDataScopes } from '../commands/deleteTranslatedFiles.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
 import {
@@ -66,7 +66,7 @@ import {
   type ShortcutState,
   type UserKeybinding,
 } from './shortcutState.js';
-import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, renderSettingsHtml, type SettingsState } from './settingsHtml.js';
+import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, renderSettingsHtml, renderUsageSection, type SettingsState } from './settingsHtml.js';
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
 // dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
@@ -275,13 +275,14 @@ async function hasStoredProviderApiKey(
   return false;
 }
 
-async function readUsageSummary(context: vscode.ExtensionContext) {
+async function readUsageView(context: vscode.ExtensionContext, projectUri?: vscode.Uri) {
+  const currentProjectId = projectUri ? getProjectId(projectUri) : undefined;
   try {
     const events = await readUsageEvents(context, { scope: 'allProjects' });
-    return aggregateUsage(events, { recentLimit: 25 });
+    return aggregateUsageView(events, DEFAULT_USAGE_QUERY, { now: new Date(), currentProjectId });
   } catch (error) {
     console.warn('[marklingo] failed to read usage events:', error instanceof Error ? error.message : String(error));
-    return aggregateUsage([]);
+    return aggregateUsageView([], DEFAULT_USAGE_QUERY, { now: new Date(), currentProjectId });
   }
 }
 
@@ -394,7 +395,7 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     storageRoot: getProjectsStorageRoot(context).fsPath,
     currentProjectPath: getCurrentProjectDirectoryPath(projectUri),
     storageStats: await readPrivateStorageStats(context),
-    usage: await readUsageSummary(context),
+    usage: await readUsageView(context, projectUri),
   };
 }
 
@@ -842,6 +843,14 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({ type: 'saveFailed', key: message.key, saveId: message.saveId });
           throw error;
         }
+        return;
+      }
+      if (message?.type === 'usageQuery') {
+        const query = coerceUsageQuery(message);
+        const events = await readUsageEvents(context, { scope: query.scope, projectUri: currentPanelProjectUri });
+        const currentProjectId = currentPanelProjectUri ? getProjectId(currentPanelProjectUri) : undefined;
+        const view = aggregateUsageView(events, query, { now: new Date(), currentProjectId });
+        await panel.webview.postMessage({ type: 'usageSection', html: renderUsageSection(view), query });
         return;
       }
       if (message?.type === 'verifyProvider') {

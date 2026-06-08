@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateUsage } from '../out/usage/usageAggregate.js';
+import { aggregateUsage, aggregateUsageView, coerceUsageQuery } from '../out/usage/usageAggregate.js';
 
 let counter = 0;
 function event(overrides = {}) {
@@ -82,4 +82,78 @@ test('sorts recent runs by finished time desc and applies the limit', () => {
   assert.equal(summary.recentRuns.length, 2);
   assert.equal(summary.recentRuns[0].eventId, 'new');
   assert.equal(summary.recentRuns[1].eventId, 'mid');
+});
+
+const VIEW_NOW = new Date('2026-06-08T12:00:00.000Z');
+
+test('aggregateUsageView filters by range', () => {
+  const events = [
+    event({ finishedAt: '2026-06-08T10:00:00.000Z' }),
+    event({ finishedAt: '2026-05-01T10:00:00.000Z' }),
+  ];
+  const recent = aggregateUsageView(events, { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(recent.totalRuns, 1);
+  const all = aggregateUsageView(events, { range: 'all', groupBy: 'month', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(all.totalRuns, 2);
+});
+
+test('aggregateUsageView filters by scope and project id', () => {
+  const events = [
+    event({ projectId: 'p1', finishedAt: '2026-06-08T10:00:00.000Z' }),
+    event({ projectId: 'p2', finishedAt: '2026-06-08T10:00:00.000Z' }),
+  ];
+  const view = aggregateUsageView(events, { range: 'all', groupBy: 'day', scope: 'currentProject', breakdown: 'model' }, { now: VIEW_NOW, currentProjectId: 'p1' });
+  assert.equal(view.totalRuns, 1);
+  assert.equal(view.projectsTouched, 1);
+});
+
+test('aggregateUsageView builds continuous day buckets with stacked segments', () => {
+  const events = [
+    event({ finishedAt: '2026-06-08T09:00:00.000Z', modelId: 'm1', sourceUriHash: 'h1' }),
+    event({ finishedAt: '2026-06-08T10:00:00.000Z', modelId: 'm2', sourceUriHash: 'h2' }),
+    event({ finishedAt: '2026-06-06T10:00:00.000Z', modelId: 'm1', sourceUriHash: 'h3' }),
+  ];
+  const view = aggregateUsageView(events, { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(view.buckets.length, 7);
+  const last = view.buckets[view.buckets.length - 1];
+  assert.equal(last.key, '2026-06-08');
+  assert.equal(last.totalRuns, 2);
+  assert.deepEqual([...view.dimensionKeys].sort(), ['m1', 'm2']);
+  assert.equal(last.segments.length, view.dimensionKeys.length);
+});
+
+test('aggregateUsageView truncates beyond the top stack keys into Other', () => {
+  const events = [];
+  for (let i = 0; i < 8; i += 1) {
+    events.push(event({ finishedAt: '2026-06-08T10:00:00.000Z', modelId: `model-${i}`, sourceUriHash: `h-${i}` }));
+  }
+  const view = aggregateUsageView(events, { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(view.dimensionKeys.includes('Other'), true);
+  assert.equal(view.dimensionKeys.length, 7);
+});
+
+test('aggregateUsageView exposes tops and reuse totals', () => {
+  const events = [
+    event({ finishedAt: '2026-06-08T10:00:00.000Z', modelId: 'm1', translatedBlocks: 10, reusedBlocks: 30 }),
+    event({ finishedAt: '2026-06-08T11:00:00.000Z', modelId: 'm1', translatedBlocks: 5, reusedBlocks: 15 }),
+  ];
+  const view = aggregateUsageView(events, { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(view.tops[0].key, 'm1');
+  assert.equal(view.tops[0].runs, 2);
+  assert.deepEqual(view.reuse, { translated: 15, reused: 45, fallback: 0 });
+});
+
+test('coerceUsageQuery keeps valid values and falls back otherwise', () => {
+  assert.deepEqual(
+    coerceUsageQuery({ range: '7d', groupBy: 'week', scope: 'currentProject', breakdown: 'provider' }),
+    { range: '7d', groupBy: 'week', scope: 'currentProject', breakdown: 'provider' },
+  );
+  assert.deepEqual(
+    coerceUsageQuery({ range: 'bogus', breakdown: 42 }),
+    { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+  );
+  assert.deepEqual(
+    coerceUsageQuery(null),
+    { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+  );
 });
