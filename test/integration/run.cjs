@@ -976,6 +976,43 @@ async function testCommandProviderSetupOpensSettingsWhenProviderNeverSaved(conte
   }
 }
 
+async function testDefaultOpenRouterSetupWorksWithoutProviderSelector(context) {
+  const {
+    DEFAULT_OPENROUTER_BASE_URL,
+    getOpenRouterSettings,
+    storeOpenRouterApiKey,
+  } = await import(pathToFileURL(
+    path.join(__dirname, '..', '..', 'out', 'services', 'openRouterClient.js'),
+  ).href);
+  const cfg = vscode.workspace.getConfiguration('marklingo');
+  const fakeContext = createMemoryExtensionContext();
+  const originalExecuteCommand = vscode.commands.executeCommand;
+
+  try {
+    await clearProviderConfiguration();
+    await cfg.update('openrouter.baseUrl', DEFAULT_OPENROUTER_BASE_URL, vscode.ConfigurationTarget.Global);
+    await cfg.update('openrouter.modelId', MODEL_ID, vscode.ConfigurationTarget.Global);
+    await storeOpenRouterApiKey(fakeContext, 'test-key', DEFAULT_OPENROUTER_BASE_URL);
+
+    vscode.commands.executeCommand = async (command, ...args) => {
+      if (command === 'marklingo.openSettings') {
+        throw new Error('Expected saved default OpenRouter setup to skip Settings.');
+      }
+      return originalExecuteCommand(command, ...args);
+    };
+
+    const settings = await getOpenRouterSettings(fakeContext);
+
+    assert.equal(settings.providerType, 'openrouter');
+    assert.equal(settings.baseUrl, DEFAULT_OPENROUTER_BASE_URL);
+    assert.equal(settings.modelId, MODEL_ID);
+    assert.equal(settings.apiKey, 'test-key');
+  } finally {
+    vscode.commands.executeCommand = originalExecuteCommand;
+    await configureMockProvider(context.server);
+  }
+}
+
 async function testCommandProviderSetupOpensSettingsForIncompleteProviderConfiguration(context) {
   const { getOpenRouterSettings } = await import(pathToFileURL(
     path.join(__dirname, '..', '..', 'out', 'services', 'openRouterClient.js'),
@@ -1203,6 +1240,7 @@ async function run() {
     await runTest('deletes current project translations without skipping edited outputs', testDeletesCurrentProjectTranslations, context);
     await runTest('clear all data does not wait for notification dismissal', testClearAllDataDoesNotWaitForNotification, context);
     await runTest('provider draft settings are registered and writable', testProviderDraftSettingsAreRegistered, context);
+    await runTest('default OpenRouter setup works without provider selector', testDefaultOpenRouterSetupWorksWithoutProviderSelector, context);
     await runTest('command provider setup opens Settings when no provider was saved', testCommandProviderSetupOpensSettingsWhenProviderNeverSaved, context);
     await runTest('command provider setup opens Settings for incomplete provider configuration', testCommandProviderSetupOpensSettingsForIncompleteProviderConfiguration, context);
     await runTest('translate command opens Settings when provider is not verified', testTranslateCommandOpensSettingsWhenProviderIsNotVerified, context);

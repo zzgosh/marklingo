@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {
   coerceProviderType,
   DEFAULT_OPENROUTER_BASE_URL,
+  DEFAULT_PROVIDER_TYPE,
   hasExplicitOpenRouterProviderConfiguration,
   hasOpenRouterApiKey,
   getStoredOpenRouterApiKey,
@@ -53,6 +54,10 @@ import {
   markTargetLanguageSelected,
 } from '../onboardingState.js';
 import {
+  ConfigurationRegistryRefreshRequired,
+  isConfigurationRegistryRefreshRequired,
+} from '../vscodeConfigurationErrors.js';
+import {
   getDefaultTranslateKeybindingSearchQuery,
   getDefaultTranslateKeys,
   getShortcutStateFromKeybindings,
@@ -69,6 +74,7 @@ const UPDATABLE_SETTING_KEYS = new Set<string>([
   'translation.targetLanguageCustom',
   'translation.customPrompt',
 ]);
+const RELOAD_WINDOW_ACTION = 'Reload Window';
 
 let currentPanel: vscode.WebviewPanel | undefined;
 let currentPanelProjectUri: vscode.Uri | undefined;
@@ -458,13 +464,70 @@ function coerceSettingValue(key: string, raw: unknown): unknown {
   return value;
 }
 
+function getUserFacingSettingsErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function offerReloadWindowForConfigurationRegistryError(error: unknown): Promise<void> {
+  if (!isConfigurationRegistryRefreshRequired(error)) return;
+
+  const selected = await vscode.window.showErrorMessage(
+    `MarkLingo: ${error.message}`,
+    RELOAD_WINDOW_ACTION,
+  );
+  if (selected === RELOAD_WINDOW_ACTION) {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
+}
+
+async function showSettingsWriteError(error: unknown): Promise<string> {
+  const messageText = getUserFacingSettingsErrorMessage(error);
+  await offerReloadWindowForConfigurationRegistryError(error);
+  if (!isConfigurationRegistryRefreshRequired(error)) {
+    await vscode.window.showErrorMessage(`MarkLingo: ${messageText}`);
+  }
+  return messageText;
+}
+
+function isConfigurationSettingRegistered(cfg: vscode.WorkspaceConfiguration, key: string): boolean {
+  return cfg.inspect(key)?.defaultValue !== undefined;
+}
+
+function requireConfigurationSettingRegistered(cfg: vscode.WorkspaceConfiguration, key: string): void {
+  if (!isConfigurationSettingRegistered(cfg, key)) {
+    throw new ConfigurationRegistryRefreshRequired(`marklingo.${key}`);
+  }
+}
+
+async function updateRequiredSetting(
+  cfg: vscode.WorkspaceConfiguration,
+  key: string,
+  value: unknown,
+): Promise<void> {
+  requireConfigurationSettingRegistered(cfg, key);
+  await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+}
+
+async function updateOptionalSettingIfRegistered(
+  cfg: vscode.WorkspaceConfiguration,
+  key: string,
+  value: unknown,
+): Promise<boolean> {
+  if (!isConfigurationSettingRegistered(cfg, key)) {
+    console.warn(`[marklingo] skipped optional setting "marklingo.${key}" because VS Code has not refreshed the extension settings schema.`);
+    return false;
+  }
+  await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+  return true;
+}
+
 async function updateSingleSetting(context: vscode.ExtensionContext, key: string, raw: unknown): Promise<unknown> {
   if (!UPDATABLE_SETTING_KEYS.has(key)) {
     throw new Error(`MarkLingo: Unsupported setting "${key}".`);
   }
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const value = coerceSettingValue(key, raw);
-  await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+  await updateRequiredSetting(cfg, key, value);
   if (key === 'translation.targetLanguage' || key === 'translation.targetLanguageCustom') {
     await markTargetLanguageSelected(context);
   }
@@ -500,18 +563,22 @@ async function saveVerifiedProviderSettings(
   settings: OpenRouterSettings,
 ): Promise<void> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
-  await cfg.update('openrouter.provider', settings.providerType, vscode.ConfigurationTarget.Global);
-  await cfg.update('openrouter.baseUrl', settings.baseUrl, vscode.ConfigurationTarget.Global);
-  await cfg.update('openrouter.modelId', settings.modelId, vscode.ConfigurationTarget.Global);
+  if (settings.providerType === DEFAULT_PROVIDER_TYPE) {
+    await updateOptionalSettingIfRegistered(cfg, 'openrouter.provider', settings.providerType);
+  } else {
+    await updateRequiredSetting(cfg, 'openrouter.provider', settings.providerType);
+  }
+  await updateRequiredSetting(cfg, 'openrouter.baseUrl', settings.baseUrl);
+  await updateRequiredSetting(cfg, 'openrouter.modelId', settings.modelId);
   const providerBaseUrlSetting = getProviderBaseUrlSetting(settings.providerType);
   const providerModelIdSetting = getProviderModelIdSetting(settings.providerType);
   if (providerBaseUrlSetting) {
-    await cfg.update(providerBaseUrlSetting, settings.baseUrl, vscode.ConfigurationTarget.Global);
+    await updateOptionalSettingIfRegistered(cfg, providerBaseUrlSetting, settings.baseUrl);
   }
   if (providerModelIdSetting) {
-    await cfg.update(providerModelIdSetting, settings.modelId, vscode.ConfigurationTarget.Global);
+    await updateOptionalSettingIfRegistered(cfg, providerModelIdSetting, settings.modelId);
   }
-  await cfg.update('translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE, vscode.ConfigurationTarget.Global);
+  await updateOptionalSettingIfRegistered(cfg, 'translation.requestMode', DEFAULT_TRANSLATION_REQUEST_MODE);
   if (providerSupportsApiKey(settings.providerType) && settings.apiKey.trim()) {
     await storeOpenRouterApiKey(context, settings.apiKey, settings.baseUrl);
   }
@@ -817,7 +884,8 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
             saveId,
           });
         } catch (error) {
-          const messageText = error instanceof Error ? error.message : String(error);
+          const messageText = getUserFacingSettingsErrorMessage(error);
+          await offerReloadWindowForConfigurationRegistryError(error);
           console.warn('[marklingo] provider verification failed:', messageText);
           await panel.webview.postMessage({
             type: 'providerVerification',
@@ -863,8 +931,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         await vscode.commands.executeCommand('revealFileInOS', getProjectsStorageRoot(context));
       }
     } catch (error) {
-      const messageText = error instanceof Error ? error.message : String(error);
-      await vscode.window.showErrorMessage(`MarkLingo: ${messageText}`);
+      await showSettingsWriteError(error);
     }
   });
 

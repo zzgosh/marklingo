@@ -39,7 +39,9 @@ async function clearUserSettings(context: vscode.ExtensionContext): Promise<numb
   let cleared = 0;
 
   for (const key of MARKLINGO_CONFIGURATION_KEYS) {
-    if (cfg.inspect(key)?.globalValue !== undefined) cleared++;
+    const inspected = cfg.inspect(key);
+    if (inspected?.globalValue === undefined) continue;
+    cleared++;
     await cfg.update(key, undefined, vscode.ConfigurationTarget.Global);
   }
 

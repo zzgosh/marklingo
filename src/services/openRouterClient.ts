@@ -133,6 +133,12 @@ export function hasExplicitOpenRouterProviderConfiguration(): boolean {
   return hasExplicitProviderConfiguration(getConfiguration());
 }
 
+function hasSavedProviderSetupConfiguration(cfg: vscode.WorkspaceConfiguration): boolean {
+  return hasExplicitProviderConfiguration(cfg) ||
+    hasExplicitStringConfiguration(cfg, 'openrouter.baseUrl') ||
+    hasExplicitStringConfiguration(cfg, 'openrouter.modelId');
+}
+
 function getConfiguredProviderType(cfg: vscode.WorkspaceConfiguration): ProviderType {
   if (hasImplicitOpenAiCompatibleConfiguration(cfg)) return 'openaiCompatible';
   return coerceProviderType(cfg.get<string>('openrouter.provider') ?? DEFAULT_PROVIDER_TYPE);
@@ -258,7 +264,7 @@ function readProviderBaseUrlForTranslation(cfg: vscode.WorkspaceConfiguration, p
 
 export async function getOpenRouterSettings(context: vscode.ExtensionContext): Promise<OpenRouterSettings> {
   const cfg = getConfiguration();
-  if (!hasExplicitProviderConfiguration(cfg)) {
+  if (!hasSavedProviderSetupConfiguration(cfg)) {
     await openProviderSetupSettings();
   }
 
