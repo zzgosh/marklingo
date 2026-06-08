@@ -53,6 +53,8 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 | `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
 | `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力を削除し、プライベートな翻訳メタデータ/キャッシュは保持します。 |
 
+Provider または Model ID を変更して `Save and Verify` をクリックした後、新しく検証した provider/model で既存ファイルを最初から翻訳し直したい場合は、`MarkLingo: Retranslate Current Markdown` を使用してください。`MarkLingo: Translate Current Markdown` は増分翻訳です。以前の provider/model が作成したキャッシュ済みブロック翻訳を再利用し、変更または追加されたブロックだけを現在の provider/model に送信することがあります。
+
 ## 設定
 
 ほとんどのユーザーに必要な設定は、`MarkLingo: Open Settings` から利用できます。

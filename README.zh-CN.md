@@ -53,6 +53,8 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 | `MarkLingo: Add Translated Files to .git/info/exclude` | 将 `*_mdt.md` 添加到当前仓库的本地 Git 排除文件中。 |
 | `MarkLingo: Delete Current Project Translated Files` | 删除本项目中由扩展跟踪的翻译输出，同时保留私有翻译元数据/缓存。 |
 
+更改 Provider 或 Model ID 并点击 `Save and Verify` 后，如果希望用新验证的 provider/model 从头重新翻译已有文件，请使用 `MarkLingo: Retranslate Current Markdown`。`MarkLingo: Translate Current Markdown` 是增量翻译：它可能会复用上一个 provider/model 生成的缓存块翻译，只把已更改或新增的块发送给当前 provider/model。
+
 ## 设置
 
 大多数用户需要的设置，可通过 `MarkLingo: Open Settings` 访问。
