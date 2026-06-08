@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   getOpenRouterModelContextLength,
   getOpenRouterSettings,
@@ -16,7 +17,7 @@ import {
 import { getProviderDisplayName } from '../services/providerDisplay.js';
 import { readVerifiedTranslationAdapterMode } from '../services/modelCapabilities.js';
 import { enforcePrivateStorageQuota } from '../storage/privateStorage.js';
-import { getMetaFileUri, getOutputLocation, getTranslatedFileUri } from '../storage/paths.js';
+import { getMetaFileUri, getOutputLocation, getProjectDisplayName, getProjectId, getTranslatedFileUri } from '../storage/paths.js';
 import { restoreTranslatedBlock } from '../translation/blockResults.js';
 import { compactPlaceholderTokens, protectMarkdown } from '../translation/placeholders.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
@@ -52,6 +53,8 @@ import {
   type TranslationMetaDebug,
 } from '../translation/cache.js';
 import { TRANSLATION_PROGRESS_MESSAGES, getBatchTranslationProgressMessage } from './progressMessages.js';
+import { buildUsageEventFromDebug } from '../usage/usageEvent.js';
+import { appendUsageEvent } from '../usage/usageLedger.js';
 
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
@@ -167,6 +170,34 @@ function finishDebug(
   return debug;
 }
 
+/**
+ * Append one usage-insights event for a finished translation attempt (success or failure). Resolves
+ * identity/hashes from the live context and delegates normalization to the pure event builder. Never
+ * throws into the translation flow: ledger problems are logged and swallowed.
+ */
+async function recordUsageEvent(
+  context: vscode.ExtensionContext,
+  sourceUri: vscode.Uri,
+  debug: TranslationMetaDebug,
+  options: { batchRunId?: string; outputUri?: vscode.Uri },
+): Promise<void> {
+  try {
+    const event = buildUsageEventFromDebug(debug, {
+      eventId: randomUUID(),
+      batchRunId: options.batchRunId ?? debug.runId,
+      projectId: getProjectId(sourceUri),
+      projectName: getProjectDisplayName(sourceUri),
+      sourceFileName: path.basename(sourceUri.fsPath),
+      sourceUriHash: sha256(sourceUri.toString()),
+      outputUriHash: options.outputUri ? sha256(options.outputUri.toString()) : undefined,
+    });
+    await appendUsageEvent(context, sourceUri, event);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    outputChannel.appendLine(`[${new Date().toISOString()}] Warning: failed to record usage event: ${message}`);
+  }
+}
+
 async function promptCustomTargetLanguage(current: string): Promise<string | null> {
   const input = await vscode.window.showInputBox({
     title: 'MarkLingo: Custom Target Language',
@@ -269,6 +300,8 @@ type TranslateMarkdownOptions = {
   progress?: TranslationProgress;
   cancellationToken?: vscode.CancellationToken;
   enforceQuota?: boolean;
+  /** Shared id for all files in a folder/batch run. Single-file runs fall back to the run's own id. */
+  batchRunId?: string;
 };
 
 type TranslateMarkdownResult =
@@ -1077,6 +1110,10 @@ async function translateMarkdownDocument(
       vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(translatedMarkdown, 'utf8')),
       saveTranslationMeta(currentMetaUri, nextMeta),
     ]);
+    await recordUsageEvent(context, doc.uri, debug, {
+      batchRunId: options.batchRunId,
+      outputUri: currentTranslatedUri,
+    });
     if (options.enforceQuota !== false) {
       await enforcePrivateStorageQuotaWithWarning(context);
     }
@@ -1093,18 +1130,23 @@ async function translateMarkdownDocument(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     addDebugEvent(debug, 'error', msg);
+    finishDebug(debug, debugStartedAtMs, 'error', err);
     try {
       if (metaUri && translatedUri) {
         const meta = await loadTranslationMeta(metaUri) ?? createEmptyMeta(doc.uri);
         meta.updatedAt = new Date().toISOString();
         meta.outputUri = translatedUri.toString();
-        meta.debug = finishDebug(debug, debugStartedAtMs, 'error', err);
+        meta.debug = debug;
         await saveTranslationMeta(metaUri, meta);
       }
     } catch (metaError) {
       const metaMessage = metaError instanceof Error ? metaError.message : String(metaError);
       outputChannel.appendLine(`[${new Date().toISOString()}] Error: failed to write translation debug metadata: ${metaMessage}`);
     }
+    await recordUsageEvent(context, doc.uri, debug, {
+      batchRunId: options.batchRunId,
+      outputUri: translatedUri,
+    });
     throw err;
   }
 }
@@ -1302,6 +1344,7 @@ async function translateMarkdownFilesBatch(
   };
   const outputViewColumn = vscode.ViewColumn.One;
   let openedFirstOutput = false;
+  const batchRunId = randomUUID();
 
   await vscode.window.withProgress(
     {
@@ -1338,6 +1381,7 @@ async function translateMarkdownFilesBatch(
             progress: fileProgress,
             cancellationToken: token,
             enforceQuota: false,
+            batchRunId,
           });
           if (result.status === 'translated') {
             summary.translated += 1;

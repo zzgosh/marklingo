@@ -48,6 +48,23 @@ function getState(overrides = {}) {
       evictedCacheCount: 1,
       cachePayloadBytes: 35 * 1024 * 1024,
     },
+    usage: {
+      totalRuns: 0,
+      successRuns: 0,
+      failedRuns: 0,
+      filesTranslated: 0,
+      projectsTouched: 0,
+      translatedBlocks: 0,
+      reusedBlocks: 0,
+      fallbackBlocks: 0,
+      reusePercent: undefined,
+      estimatedInputTokens: 0,
+      hasReportedTokens: false,
+      providers: [],
+      models: [],
+      targetLanguages: [],
+      recentRuns: [],
+    },
     ...overrides,
   };
 }
@@ -325,4 +342,66 @@ test('renders the Target Language custom input inline without a separate row or 
     state: getState({ targetLanguage: 'Custom...', targetLanguageCustom: 'Brazilian Portuguese' }),
   });
   assert.match(customHtml, /<input id="targetLanguageCustom" value="Brazilian Portuguese" placeholder="Enter target language">/);
+});
+
+test('renders an empty Usage section when there is no usage history', () => {
+  const html = renderSettingsHtml({ cspSource: "'self'", nonce: 'test-nonce', state: getState() });
+
+  assert.match(html, /<h2>Usage<\/h2>/);
+  assert.match(html, /No translations recorded yet/);
+  assert.ok(!html.includes('class="usage-table"'));
+});
+
+test('renders Usage summary cards and recent runs when usage exists', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({
+      usage: {
+        totalRuns: 5,
+        successRuns: 4,
+        failedRuns: 1,
+        filesTranslated: 3,
+        projectsTouched: 2,
+        translatedBlocks: 20,
+        reusedBlocks: 60,
+        fallbackBlocks: 0,
+        reusePercent: 75,
+        estimatedInputTokens: 12000,
+        hasReportedTokens: false,
+        providers: [{ key: 'openrouter', runs: 5, files: 3 }],
+        models: [{ key: 'm1', runs: 5, files: 3 }],
+        targetLanguages: [{ key: '简体中文', runs: 5, files: 3 }],
+        recentRuns: [
+          {
+            eventId: 'e1',
+            startedAt: '2026-06-08T10:00:00.000Z',
+            finishedAt: '2026-06-08T10:00:11.000Z',
+            status: 'success',
+            projectName: 'marklingo',
+            sourceFileName: 'README.md',
+            targetLanguage: '简体中文',
+            providerType: 'openrouter',
+            modelId: 'google/gemini-3.1-flash-lite',
+            translatedBlocks: 12,
+            reusedBlocks: 36,
+            fallbackBlocks: 0,
+            durationMs: 11000,
+            tokensInput: 9000,
+            tokensSource: 'estimated',
+          },
+        ],
+      },
+    }),
+  });
+
+  assert.match(html, /<h2>Usage<\/h2>/);
+  assert.match(html, /Files translated/);
+  assert.match(html, /Input tokens \(estimated\)/);
+  assert.match(html, /class="usage-table"/);
+  assert.match(html, /README\.md/);
+  assert.match(html, /usage-status" data-status="success">Success</);
+  assert.match(html, /75%/);
+  assert.match(html, /12\.0k/);
+  assert.ok(!html.includes('No translations recorded yet'));
 });

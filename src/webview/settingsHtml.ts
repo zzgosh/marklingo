@@ -9,6 +9,7 @@ import {
   type ModelTag,
   type ProviderType,
 } from '../services/providerPresets.js';
+import type { UsageSummary } from '../usage/usageAggregate.js';
 
 export const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 
@@ -80,6 +81,7 @@ export type SettingsState = {
     evictedCacheCount: number;
     cachePayloadBytes: number;
   };
+  usage: UsageSummary;
 };
 
 export type RenderSettingsHtmlOptions = {
@@ -331,6 +333,63 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     ? Math.min(100, Math.max(0, Math.round((state.storageStats.totalBytes / state.storageStats.quotaBytes) * 100)))
     : 0;
   const storageMeterState = storagePercent >= 90 ? 'warning' : 'normal';
+  const usage = state.usage;
+  const usageHasRuns = usage.totalRuns > 0;
+  const formatUsageCount = (value: number): string => value.toLocaleString('en-US');
+  const formatUsageTokens = (value: number): string => {
+    if (value <= 0) return '—';
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+    return `${value}`;
+  };
+  const formatUsageDuration = (ms?: number): string => {
+    if (typeof ms !== 'number' || ms <= 0) return '—';
+    if (ms < 1000) return `${ms} ms`;
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m ${Math.round(seconds % 60)}s`;
+  };
+  const formatUsageTime = (iso?: string): string => {
+    if (!iso) return '—';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+  const usageReuseText = usage.reusePercent === undefined ? '—' : `${Math.round(usage.reusePercent)}%`;
+  const usageTokensText = formatUsageTokens(usage.estimatedInputTokens);
+  const usageRecentRows = usage.recentRuns
+    .map((run) => {
+      const blocks = run.status === 'success'
+        ? `${run.translatedBlocks ?? 0} new · ${run.reusedBlocks ?? 0} reused`
+        : '—';
+      const statusLabel = run.status === 'success' ? 'Success' : 'Failed';
+      return `<tr>
+              <td>${escapeHtml(formatUsageTime(run.finishedAt ?? run.startedAt))}</td>
+              <td>${escapeHtml(run.projectName)}</td>
+              <td class="usage-file" title="${escapeHtml(run.sourceFileName)}">${escapeHtml(run.sourceFileName)}</td>
+              <td>${escapeHtml(run.targetLanguage ?? '—')}</td>
+              <td class="usage-file" title="${escapeHtml(run.modelId ?? '')}">${escapeHtml(run.modelId ?? '—')}</td>
+              <td>${escapeHtml(blocks)}</td>
+              <td>${escapeHtml(formatUsageDuration(run.durationMs))}</td>
+              <td><span class="usage-status" data-status="${run.status}">${statusLabel}</span></td>
+            </tr>`;
+    })
+    .join('');
+  const usageSectionBody = usageHasRuns
+    ? `<div class="usage-cards">
+            <div class="usage-card"><div class="usage-value">${formatUsageCount(usage.filesTranslated)}</div><div class="usage-caption">Files translated</div></div>
+            <div class="usage-card"><div class="usage-value">${formatUsageCount(usage.totalRuns)}</div><div class="usage-caption">Runs · ${formatUsageCount(usage.successRuns)} ok / ${formatUsageCount(usage.failedRuns)} failed</div></div>
+            <div class="usage-card"><div class="usage-value">${escapeHtml(usageTokensText)}</div><div class="usage-caption">Input tokens (estimated)</div></div>
+            <div class="usage-card"><div class="usage-value">${escapeHtml(usageReuseText)}</div><div class="usage-caption">Cache reuse · ${formatUsageCount(usage.reusedBlocks)} reused / ${formatUsageCount(usage.translatedBlocks)} new</div></div>
+          </div>
+          <div class="usage-table-wrap">
+            <table class="usage-table">
+              <thead><tr><th>Time</th><th>Project</th><th>File</th><th>Target</th><th>Model</th><th>Blocks</th><th>Duration</th><th>Status</th></tr></thead>
+              <tbody>${usageRecentRows}</tbody>
+            </table>
+          </div>`
+    : `<div class="usage-empty">No translations recorded yet. Translate a Markdown file to see files, models, token estimates, and cache reuse here.</div>`;
   const currentProjectPath = state.currentProjectPath?.trim();
   const currentProjectDataDisabled = currentProjectPath ? '' : ' disabled';
   const currentProjectDataDescription = currentProjectPath
@@ -916,6 +975,63 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       .provider-status { text-align: left; }
       .provider-actions .save-btn { justify-self: start; }
     }
+    .usage-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .usage-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      background: var(--panel);
+    }
+    .usage-value {
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .usage-caption {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .usage-table-wrap { overflow-x: auto; }
+    .usage-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .usage-table th,
+    .usage-table td {
+      text-align: left;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .usage-table th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .usage-table .usage-file {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .usage-status {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+    }
+    .usage-status[data-status="success"] { color: var(--vscode-testing-iconPassed, #3fb950); }
+    .usage-status[data-status="error"] { color: var(--danger); }
+    .usage-empty {
+      color: var(--muted);
+      padding: 8px 0;
+    }
   </style>
 </head>
 <body>
@@ -1056,6 +1172,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <button class="secondary" id="optimize-storage" type="button">Optimize</button>
             </div>
           </div>
+        </section>
+
+        <h2>Usage</h2>
+        <section class="card usage-section">
+          ${usageSectionBody}
         </section>
 
         <h2 class="danger-title">Danger Zone</h2>

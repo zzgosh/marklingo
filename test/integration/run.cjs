@@ -49,6 +49,7 @@ async function createMockOpenRouterServer() {
     responseShape: 'mapping',
     invalidBlocksArrayThreshold: undefined,
     translationOverrides: new Map(),
+    failChatCompletions: false,
   };
 
   const server = http.createServer(async (req, res) => {
@@ -66,6 +67,11 @@ async function createMockOpenRouterServer() {
         const body = JSON.parse(raw);
         const blocks = extractBlocks(body);
         state.chatRequests.push({ body, blocks });
+
+        if (state.failChatCompletions) {
+          sendJson(res, 500, { error: 'mock chat completion failure' });
+          return;
+        }
 
         const translated = {};
         const translatedBlocks = [];
@@ -267,6 +273,31 @@ function findMetaForSource(globalStorageUri, sourceUri) {
   return matches[0];
 }
 
+function readUsageEvents(globalStorageUri) {
+  const root = vscode.Uri.parse(globalStorageUri).fsPath;
+  const events = [];
+  const visit = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(entryPath);
+      } else if (entry.isFile() && /^events-\d{4}-\d{2}\.jsonl$/.test(entry.name)) {
+        for (const line of fs.readFileSync(entryPath, 'utf8').split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed) events.push(JSON.parse(trimmed));
+        }
+      }
+    }
+  };
+  visit(root);
+  return events;
+}
+
+function findUsageEventsByFile(globalStorageUri, sourceFileName) {
+  return readUsageEvents(globalStorageUri).filter((event) => event.sourceFileName === sourceFileName);
+}
+
 async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   await cleanWorkspace();
   const source = await writeMarkdown('translate.md', '# Title\n\nSee [docs](https://example.com).\n');
@@ -297,6 +328,54 @@ async function testTranslatesMarkdownAndWritesDebugMeta(context) {
   assert.equal(meta.debug.settings.request.reasoning, undefined);
   assert.equal(meta.debug.result.warningCount, 0);
   assert.ok(!JSON.stringify(meta.debug).includes('test-key'), 'debug metadata must not include the API key');
+}
+
+async function testRecordsUsageEventOnSuccess(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown('usage-success.md', '# Usage\n\nHello world.\n');
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+
+  const events = findUsageEventsByFile(context.seeded.globalStorageUri, 'usage-success.md');
+  assert.equal(events.length, 1, 'expected one usage event for the translated file');
+  const event = events[0];
+  assert.equal(event.schemaVersion, 1);
+  assert.equal(event.status, 'success');
+  assert.equal(event.sourceFileName, 'usage-success.md');
+  assert.equal(event.targetLanguage, 'English');
+  assert.ok(typeof event.eventId === 'string' && event.eventId.length > 0, 'expected an event id');
+  assert.ok(typeof event.batchRunId === 'string' && event.batchRunId.length > 0, 'expected a batch run id');
+  assert.ok(typeof event.sourceUriHash === 'string' && event.sourceUriHash.length > 0, 'expected a hashed source uri');
+  assert.ok(event.translatedBlocks >= 1, 'expected at least one translated block');
+
+  const json = JSON.stringify(event);
+  assert.ok(!json.includes('test-key'), 'usage event must not include the API key');
+  assert.ok(!json.includes('Hello world'), 'usage event must not include raw source text');
+  assert.ok(!json.includes('127.0.0.1'), 'usage event must not include the provider base URL');
+}
+
+async function testRecordsUsageEventOnFailure(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown('usage-failure.md', '# Fails\n\nThis run will error.\n');
+
+  context.server.state.chatRequests = [];
+  context.server.state.failChatCompletions = true;
+  try {
+    await withWindowMessageStubs(
+      { showErrorMessage: async () => undefined },
+      async () => {
+        await translate(source);
+      },
+    );
+  } finally {
+    context.server.state.failChatCompletions = false;
+  }
+
+  const events = findUsageEventsByFile(context.seeded.globalStorageUri, 'usage-failure.md');
+  assert.equal(events.length, 1, 'expected one usage event for the failed translation');
+  assert.equal(events[0].status, 'error');
+  assert.ok(!fs.existsSync(translatedPath(source)), 'failed translation must not write a translated file');
 }
 
 async function testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks(context) {
@@ -1208,6 +1287,7 @@ async function runTest(name, fn, context) {
     context.server.state.corruptPlaceholderOutput = false;
     context.server.state.responseShape = 'mapping';
     context.server.state.invalidBlocksArrayThreshold = undefined;
+    context.server.state.failChatCompletions = false;
     await fn(context);
     console.log(`ok - ${name}`);
   } catch (error) {
@@ -1222,6 +1302,8 @@ async function run() {
     const seeded = await configureExtension(server);
     const context = { server, seeded };
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
+    await runTest('records a usage event on successful translation', testRecordsUsageEventOnSuccess, context);
+    await runTest('records an error usage event on failed translation', testRecordsUsageEventOnFailure, context);
     await runTest('translation-model mode parses blocks arrays and splits invalid chunks', testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks, context);
     await runTest('translation-model mode retries only failed blocks', testTranslationModelModeRetriesOnlyFailedBlocks, context);
     await runTest('translation-model mode split-retries repeated validation failures', testTranslationModelModeSplitRetriesRepeatedValidationFailures, context);

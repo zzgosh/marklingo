@@ -245,6 +245,54 @@ function buildState(url) {
       evictedCacheCount: 3,
       cachePayloadBytes: url.searchParams.get('storage') === 'full' ? 250 * 1024 * 1024 : 38 * 1024 * 1024,
     },
+    usage: url.searchParams.get('usage') === 'empty'
+      ? {
+          totalRuns: 0,
+          successRuns: 0,
+          failedRuns: 0,
+          filesTranslated: 0,
+          projectsTouched: 0,
+          translatedBlocks: 0,
+          reusedBlocks: 0,
+          fallbackBlocks: 0,
+          reusePercent: undefined,
+          estimatedInputTokens: 0,
+          hasReportedTokens: false,
+          providers: [],
+          models: [],
+          targetLanguages: [],
+          recentRuns: [],
+        }
+      : {
+          totalRuns: 42,
+          successRuns: 39,
+          failedRuns: 3,
+          filesTranslated: 18,
+          projectsTouched: 3,
+          translatedBlocks: 512,
+          reusedBlocks: 1340,
+          fallbackBlocks: 7,
+          reusePercent: (1340 / (1340 + 512)) * 100,
+          estimatedInputTokens: 184000,
+          hasReportedTokens: false,
+          providers: [
+            { key: 'openrouter', runs: 30, files: 12 },
+            { key: 'openaiCompatible', runs: 12, files: 6 },
+          ],
+          models: [
+            { key: 'google/gemini-3.1-flash-lite', runs: 24, files: 10 },
+            { key: 'hy-mt2', runs: 12, files: 6 },
+          ],
+          targetLanguages: [
+            { key: '简体中文', runs: 28, files: 12 },
+            { key: 'English', runs: 14, files: 6 },
+          ],
+          recentRuns: [
+            { eventId: 'r1', startedAt: '2026-06-08T09:58:00.000Z', finishedAt: '2026-06-08T09:58:11.000Z', status: 'success', projectName: 'marklingo', sourceFileName: 'README.md', targetLanguage: '简体中文', providerType: 'openrouter', modelId: 'google/gemini-3.1-flash-lite', translatedBlocks: 12, reusedBlocks: 36, fallbackBlocks: 0, durationMs: 11230, tokensInput: 18000, tokensSource: 'estimated' },
+            { eventId: 'r2', startedAt: '2026-06-08T09:40:00.000Z', finishedAt: '2026-06-08T09:40:06.500Z', status: 'success', projectName: 'marklingo', sourceFileName: 'AGENTS.md', targetLanguage: '简体中文', providerType: 'openrouter', modelId: 'google/gemini-3.1-flash-lite', translatedBlocks: 4, reusedBlocks: 58, fallbackBlocks: 0, durationMs: 6500, tokensInput: 9000, tokensSource: 'estimated' },
+            { eventId: 'r3', startedAt: '2026-06-07T22:10:00.000Z', finishedAt: '2026-06-07T22:10:02.100Z', status: 'error', projectName: 'docs-site', sourceFileName: 'guide.md', targetLanguage: 'English', providerType: 'openaiCompatible', modelId: 'hy-mt2', durationMs: 2100, tokensSource: 'unavailable' },
+          ],
+        },
   };
 }
 

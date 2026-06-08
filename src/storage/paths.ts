@@ -42,6 +42,25 @@ export function getProjectStorageRoot(context: vscode.ExtensionContext, sourceUr
   return vscode.Uri.joinPath(getProjectsStorageRoot(context), getProjectStorageName(sourceUri));
 }
 
+/**
+ * Per-project usage-insights ledger directory. Lives under the same `<project-id>` directory as
+ * `meta/`, so the existing `Clear Current Project Data` and `Clear All Data` flows (which delete the
+ * whole project storage root / the whole global storage) remove usage data automatically.
+ */
+export function getProjectUsageDirUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri): vscode.Uri {
+  return vscode.Uri.joinPath(getProjectStorageRoot(context, sourceUri), 'usage');
+}
+
+/** Stable hashed project identifier, matching the suffix used by the project storage directory name. */
+export function getProjectId(sourceUri: vscode.Uri): string {
+  return sha256(getProjectRootUri(sourceUri).toString()).slice(0, 12);
+}
+
+/** Human-readable project display name (folder basename), for usage UI rows. */
+export function getProjectDisplayName(sourceUri: vscode.Uri): string {
+  return path.basename(getProjectRootUri(sourceUri).fsPath) || 'project';
+}
+
 export function getMetaFileUri(context: vscode.ExtensionContext, sourceUri: vscode.Uri, targetLanguage: string): vscode.Uri {
   const parsed = path.parse(sourceUri.fsPath);
   const id = sha256(sourceUri.toString()).slice(0, 16);

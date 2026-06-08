@@ -45,6 +45,9 @@ For code changes, run at least `npm run check`. For extension-host behavior, sto
 - `src/storage/paths.ts` resolves source-folder translated output paths and VS Code private global storage roots for metadata/cache.
 - `src/webview/settingsHtml.ts` renders the custom settings webview HTML.
 - `src/webview/settingsPanel.ts` hosts the settings webview inside VS Code and wires VS Code messages, settings, SecretStorage, and cleanup actions.
+- `src/usage/usageEvent.ts` defines the append-only `UsageEventV1` shape and a pure builder that maps finished translation debug metadata into a privacy-safe usage event.
+- `src/usage/usageLedger.ts` appends usage events as monthly JSONL shards under each project's private storage and reads them back for the current project or across all projects.
+- `src/usage/usageAggregate.ts` aggregates usage events into the Settings Usage summary: files, runs, provider/model/language breakdowns, cache reuse, estimated input tokens, and recent runs.
 
 ## Storage And Privacy
 
@@ -53,6 +56,8 @@ API keys must only use VS Code `SecretStorage`. Keys are separated by endpoint o
 Provider form values are intentionally remembered per provider. `providers.openrouter.modelId`, `providers.<preset>.modelId`, `providers.openaiCompatible.baseUrl`, and `providers.openaiCompatible.modelId` hold Settings UI drafts. The legacy `openrouter.provider`, `openrouter.baseUrl`, and `openrouter.modelId` keys remain the active provider compatibility path used by translation commands, including the internally selected endpoint for fixed presets. Fixed preset Base URLs should stay hidden from the custom Settings UI unless the user explicitly asks for manual endpoint control. When changing Provider UX, update both the per-provider remembered values and the active compatibility values deliberately.
 
 Translation metadata lives under VS Code private global storage through `context.globalStorageUri`, not in the workspace. It stores source block hashes, cached translated blocks, output hashes, cache state, and structured debug metadata. Visible translated Markdown output is always written as `*_<language>_mdt.md` next to the source Markdown file.
+
+Usage Insights events live in an append-only ledger under the same per-project private storage directory as metadata, at `<project-id>/usage/events-YYYY-MM.jsonl`. Because `Clear Current Project Data` deletes the whole project storage root and `Clear All Data` deletes the whole global storage, both flows already remove usage events without a separate option. Usage events are privacy-safe: only hashed source/output URIs, the source file basename, counts, labels, timestamps, and token/cost summaries — never API keys, prompts, raw paths, or full source/translated text. One event is recorded per source-file translation attempt, on both success and failure. Phase 1 records estimated input tokens only; provider-reported tokens and cost are a later phase.
 
 Private storage is quota-managed. Successful translation writes active cache payloads, then enforces the 300 MB private storage quota by evicting least-recently-used cache payloads into tracking stubs. Settings `Optimize` compacts toward 150 MB. Tracking stubs must preserve `sourceUri`, `outputUri`, `outputHash`, and `targetLanguage` so cleanup can still identify generated outputs after cached translations are reclaimed.
 

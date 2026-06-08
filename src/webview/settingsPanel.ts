@@ -36,6 +36,8 @@ import {
   readPrivateStorageStats,
 } from '../storage/privateStorage.js';
 import { getProjectRootUri, getProjectsStorageRoot } from '../storage/paths.js';
+import { readUsageEvents } from '../usage/usageLedger.js';
+import { aggregateUsage } from '../usage/usageAggregate.js';
 import { deleteProjectTranslationData, type ProjectTranslationDataScopes } from '../commands/deleteTranslatedFiles.js';
 import { resolveSystemPrompt } from '../translation/prompts.js';
 import {
@@ -273,6 +275,16 @@ async function hasStoredProviderApiKey(
   return false;
 }
 
+async function readUsageSummary(context: vscode.ExtensionContext) {
+  try {
+    const events = await readUsageEvents(context, { scope: 'allProjects' });
+    return aggregateUsage(events, { recentLimit: 25 });
+  } catch (error) {
+    console.warn('[marklingo] failed to read usage events:', error instanceof Error ? error.message : String(error));
+    return aggregateUsage([]);
+  }
+}
+
 async function readSettingsState(context: vscode.ExtensionContext, projectUri?: vscode.Uri): Promise<SettingsState> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const shortcutState = await getShortcutState(context);
@@ -382,6 +394,7 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     storageRoot: getProjectsStorageRoot(context).fsPath,
     currentProjectPath: getCurrentProjectDirectoryPath(projectUri),
     storageStats: await readPrivateStorageStats(context),
+    usage: await readUsageSummary(context),
   };
 }
 
