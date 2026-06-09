@@ -213,9 +213,9 @@
         },
         "marklingo.translation.maxBlocksPerRequest": {
           "type": "number",
-          "default": 24,
+          "default": 80,
           "minimum": 1,
-          "description": "Fallback max number of blocks per API request when the model context window cannot be read."
+          "description": "Maximum number of Markdown blocks per Chat JSON request. When the smaller-batch request path is active, MarkLingo uses the lower of this value and the Model Blocks setting."
         },
         "marklingo.translation.maxContextUsageRatio": {
           "type": "number",

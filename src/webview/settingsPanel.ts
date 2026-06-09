@@ -69,7 +69,7 @@ import {
 import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, renderSettingsHtml, renderUsageSection, type SettingsState } from './settingsHtml.js';
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
-// dropdowns save on change. The full system prompt, context-usage ratio and fallback-block count
+// dropdowns save on change. The full system prompt, context-usage ratio and Chat JSON block cap
 // remain configurable via settings.json but are intentionally not surfaced here.
 const UPDATABLE_SETTING_KEYS = new Set<string>([
   'translation.targetLanguage',

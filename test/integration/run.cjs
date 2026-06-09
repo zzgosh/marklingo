@@ -410,6 +410,29 @@ async function testRecordsUsageEventOnFailure(context) {
   assert.ok(!fs.existsSync(translatedPath(source)), 'failed translation must not write a translated file');
 }
 
+async function testChatJsonCapsLargeContextWindowBatches(context) {
+  await cleanWorkspace();
+  const source = await writeMarkdown(
+    'large-chat-json.md',
+    Array.from({ length: 95 }, (_, index) => `Paragraph ${index + 1}.`).join('\n\n'),
+  );
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+
+  assert.deepEqual(
+    context.server.state.chatRequests.map((request) => request.blocks.length),
+    [80, 15],
+    'expected Chat JSON to keep the block cap even when model context is known',
+  );
+
+  const { meta } = findMetaForSource(context.seeded.globalStorageUri, source);
+  assert.equal(meta.debug.plan.strategy, 'contextWindow');
+  assert.equal(meta.debug.plan.chunkCount, 2);
+  assert.deepEqual(meta.debug.plan.chunks.map((chunk) => chunk.blockCount), [80, 15]);
+  assert.equal(meta.debug.plan.actualRequestCount, 2);
+}
+
 async function testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks(context) {
   await cleanWorkspace();
   const source = await writeMarkdown(
@@ -1336,6 +1359,7 @@ async function run() {
     await runTest('translates markdown through mock OpenRouter and writes debug metadata', testTranslatesMarkdownAndWritesDebugMeta, context);
     await runTest('records a usage event on successful translation', testRecordsUsageEventOnSuccess, context);
     await runTest('records an error usage event on failed translation', testRecordsUsageEventOnFailure, context);
+    await runTest('chat JSON caps large context-window batches', testChatJsonCapsLargeContextWindowBatches, context);
     await runTest('translation-model mode parses blocks arrays and splits invalid chunks', testTranslationModelModeParsesBlocksArrayAndSplitsInvalidChunks, context);
     await runTest('translation-model mode retries only failed blocks', testTranslationModelModeRetriesOnlyFailedBlocks, context);
     await runTest('translation-model mode split-retries repeated validation failures', testTranslationModelModeSplitRetriesRepeatedValidationFailures, context);

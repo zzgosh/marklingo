@@ -59,8 +59,9 @@ import { buildUsageEventFromDebug } from '../usage/usageEvent.js';
 import { appendUsageEvent } from '../usage/usageLedger.js';
 
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
-const DEFAULT_MAX_BLOCKS_PER_REQUEST = 24;
+const DEFAULT_MAX_BLOCKS_PER_REQUEST = 80;
 const DEFAULT_MAX_CONTEXT_USAGE_RATIO = 0.5;
+const CHAT_COMPLETION_TIMEOUT_MS = 180_000;
 const TARGET_LANGUAGE_OPTIONS = [
   '简体中文',
   '繁体中文',
@@ -512,7 +513,7 @@ function buildChatCompletionOptions(options: {
     });
     const localHttp = isLocalHttpBaseUrl(options.baseUrl);
     return {
-      timeoutMs: 120_000,
+      timeoutMs: CHAT_COMPLETION_TIMEOUT_MS,
       temperature: 0.7,
       topP: 0.6,
       topK: localHttp ? 20 : undefined,
@@ -525,7 +526,7 @@ function buildChatCompletionOptions(options: {
   }
 
   return {
-    timeoutMs: 120_000,
+    timeoutMs: CHAT_COMPLETION_TIMEOUT_MS,
     temperature: 0,
     signal: options.signal,
     responseFormat: { type: 'json_object' },
@@ -818,7 +819,7 @@ async function translateMarkdownDocument(
           modelContextLength,
           maxContextUsageRatio,
           fallbackMaxBlocksPerRequest: adapterMode === 'translationModel' ? translationModelBlockLimit : maxBlocksPerRequest,
-          maxBlocksPerRequest: adapterMode === 'translationModel' ? translationModelBlockLimit : undefined,
+          maxBlocksPerRequest: adapterMode === 'translationModel' ? translationModelBlockLimit : maxBlocksPerRequest,
           buildPrompt,
         });
         const segById = new Map(toTranslate.map((seg) => [seg.id, seg]));
