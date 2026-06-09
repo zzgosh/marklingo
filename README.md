@@ -9,7 +9,7 @@ MarkLingo translates saved Markdown into multilingual drafts while keeping the o
 - Preserve Markdown structure: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths.
 - Choose from built-in provider presets for [OpenRouter](https://openrouter.ai), OpenAI, DeepSeek, Moonshot, GLM, Xiaomi MiMo, or use a trusted Custom OpenAI Compatible endpoint.
 - Write translated `*_<language>_mdt.md` files next to the source, open the translated tab and preview, and reuse cached translations for unchanged Markdown blocks.
-- Review local Usage Insights in Settings, including files, runs, models, token usage, reported cost when available, and MarkLingo block-cache reuse.
+- Review local Usage Insights in Settings, including files, runs, models, token usage, estimated USD cost when available, and MarkLingo block-cache reuse.
 - Use a free, open-source extension with API keys stored in VS Code `SecretStorage` and no telemetry SDK.
 
 ![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -126,7 +126,7 @@ The settings page saves Provider credentials through `Save and Verify`. Other dr
 
 ### Usage Insights
 
-Settings includes a local Usage section for translation history. It shows files translated, runs, provider/model/language breakdowns, MarkLingo block-cache reuse, recent runs, and token usage. When a provider reports usage details, MarkLingo shows reported input/output/total tokens, provider cached tokens, and reported cost in provider credits. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
+Settings includes a local Usage section for translation history. It shows files translated, runs, provider/model/language breakdowns, MarkLingo block-cache reuse, recent runs, token usage, and estimated USD cost when available. OpenRouter cost uses the provider-reported request cost, while built-in direct providers use provider-reported input/output tokens and MarkLingo's bundled Gateway pricing table. Custom and local OpenAI-compatible endpoints may show `Cost unavailable`. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
 
 ## Output Files
 

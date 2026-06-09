@@ -64,8 +64,8 @@ function getState(overrides = {}) {
       reportedOutputTokens: 0,
       reportedTotalTokens: 0,
       cachedProviderTokens: 0,
-      hasReportedCost: false,
-      reportedCost: 0,
+      hasEstimatedCost: false,
+      estimatedCost: 0,
       costCurrency: undefined,
       providers: [],
       models: [],
@@ -387,9 +387,9 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
         reportedOutputTokens: 2400,
         reportedTotalTokens: 12400,
         cachedProviderTokens: 300,
-        hasReportedCost: true,
-        reportedCost: 0.0048,
-        costCurrency: 'credits',
+        hasEstimatedCost: true,
+        estimatedCost: 0.0048,
+        costCurrency: 'USD',
         providers: [{ key: 'openrouter', runs: 5, files: 3 }],
         models: [{ key: 'm1', runs: 5, files: 3 }],
         targetLanguages: [{ key: '简体中文', runs: 5, files: 3 }],
@@ -414,7 +414,8 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
             cachedProviderTokens: 300,
             tokensSource: 'reported',
             costAmount: 0.003,
-            costCurrency: 'credits',
+            costCurrency: 'USD',
+            costSource: 'reported',
           },
         ],
         query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
@@ -431,7 +432,8 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /<h2>Usage<\/h2>/);
   assert.match(html, /Files translated/);
   assert.match(html, /10\.0k input \/ 2\.4k output/);
-  assert.match(html, /0\.0048 credits/);
+  assert.match(html, /\$0\.0048/);
+  assert.match(html, /Estimated cost/);
   assert.match(html, /class="usage-table"/);
   assert.match(html, /README\.md/);
   assert.match(html, /usage-status" data-status="success">Success</);

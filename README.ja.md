@@ -9,7 +9,7 @@ MarkLingo は、保存済みの Markdown を多言語ドラフトに翻訳し、
 - Markdown 構造を保持します：見出し、リスト、表、コード、インラインコード、HTML、frontmatter 構文、リンク、画像パス。
 - 組み込み Provider presets として [OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo を選択できます。信頼できる Custom OpenAI Compatible エンドポイントも利用できます。
 - ソースの隣に翻訳済みの `*_<language>_mdt.md` ファイルを書き出し、翻訳タブとプレビューを開き、変更されていない Markdown ブロックのキャッシュ翻訳を再利用します。
-- Settings でローカルの Usage Insights を確認できます。ファイル、実行回数、モデル、token 使用量、利用可能な場合の provider 報告コスト、MarkLingo のブロックキャッシュ再利用を表示します。
+- Settings でローカルの Usage Insights を確認できます。ファイル、実行回数、モデル、token 使用量、利用可能な場合の USD 推定コスト、MarkLingo のブロックキャッシュ再利用を表示します。
 - 無料でオープンソースの拡張機能です。API キーは VS Code `SecretStorage` に保存され、テレメトリ SDK は含まれていません。
 
 ![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -128,7 +128,7 @@ Provider または Model ID を変更して `Save and Verify` をクリックし
 
 ### Usage Insights
 
-Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、実行回数、provider/model/language の内訳、MarkLingo のブロックキャッシュ再利用、最近の実行、token 使用量を表示します。provider が usage の詳細を返す場合、MarkLingo は報告された input/output/total tokens、provider cached tokens、provider credits としての報告コストを表示します。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
+Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、実行回数、provider/model/language の内訳、MarkLingo のブロックキャッシュ再利用、最近の実行、token 使用量、利用可能な場合の USD 推定コストを表示します。OpenRouter のコストは provider が報告したリクエストコストを使い、組み込みの direct provider は provider が報告した input/output tokens と MarkLingo に同梱された Gateway 価格表で推定します。カスタムおよびローカルの OpenAI-compatible エンドポイントでは `Cost unavailable` と表示される場合があります。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
 
 ## 出力ファイル
 

@@ -36,8 +36,8 @@ test('returns an empty summary for no events', () => {
   assert.equal(summary.reusePercent, undefined);
   assert.equal(summary.estimatedInputTokens, 0);
   assert.equal(summary.reportedTotalTokens, 0);
-  assert.equal(summary.hasReportedCost, false);
-  assert.equal(summary.reportedCost, 0);
+  assert.equal(summary.hasEstimatedCost, false);
+  assert.equal(summary.estimatedCost, 0);
   assert.deepEqual(summary.recentRuns, []);
   assert.deepEqual(summary.providers, []);
 });
@@ -79,18 +79,18 @@ test('does not add unavailable-source tokens to the estimated total', () => {
   assert.equal(summary.cachedProviderTokens, 222);
 });
 
-test('aggregates reported cost and tracks mixed currencies', () => {
+test('aggregates cost and tracks mixed currencies', () => {
   const summary = aggregateUsage([
-    event({ cost: { amount: 0.01, currency: 'credits', source: 'reported' } }),
-    event({ cost: { amount: 0.02, currency: 'credits', source: 'reported' } }),
+    event({ cost: { amount: 0.01, currency: 'USD', source: 'reported' } }),
+    event({ cost: { amount: 0.02, currency: 'USD', source: 'estimated' } }),
   ]);
-  assert.equal(summary.hasReportedCost, true);
-  assert.equal(Number(summary.reportedCost.toFixed(2)), 0.03);
-  assert.equal(summary.costCurrency, 'credits');
+  assert.equal(summary.hasEstimatedCost, true);
+  assert.equal(Number(summary.estimatedCost.toFixed(2)), 0.03);
+  assert.equal(summary.costCurrency, 'USD');
 
   const mixed = aggregateUsage([
-    event({ cost: { amount: 1, currency: 'credits', source: 'reported' } }),
     event({ cost: { amount: 1, currency: 'USD', source: 'reported' } }),
+    event({ cost: { amount: 1, currency: 'EUR', source: 'reported' } }),
   ]);
   assert.equal(mixed.costCurrency, 'mixed');
 });

@@ -9,6 +9,7 @@ All notable changes to MarkLingo are documented in this file.
 - Route first-time, incomplete, or unverified provider setup to `MarkLingo: Open Settings` instead of showing simplified Command Palette setup prompts. After configuring Provider, API key, Base URL when shown, and Model ID, click `Save and Verify`, then run the translation command again.
 - Improve the Settings UI with provider-aware Model ID controls, model quality/speed/local tags, clearer provider status messages, inline custom target-language editing, and safer behavior after clearing extension data.
 - Add support for verified Translation Model adapters, model-specific translation prompts, provider capability probes, and advanced translation-model request tuning.
+- Add Usage Insights cost estimates. OpenRouter uses provider-reported request cost, and built-in direct providers estimate USD cost from reported input/output tokens and bundled Vercel AI Gateway pricing.
 - Improve translation failure actions and local-model handling, including broader HY-MT2 local model tag detection.
 - Update README guidance and expand unit and VS Code integration coverage for provider presets, verification, setup routing, request planning, placeholder protection, and translation adapters.
 

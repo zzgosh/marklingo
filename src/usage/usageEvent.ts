@@ -1,4 +1,5 @@
 import type { TranslationMetaDebug } from "../translation/cache.js";
+import { estimateProviderModelCost } from "./modelPricing.js";
 
 /** Source label for token/cost values. */
 export type UsageValueSource = "reported" | "estimated" | "unavailable";
@@ -107,11 +108,23 @@ function buildUsageTokens(debug: TranslationMetaDebug): UsageTokens {
 }
 
 function buildUsageCost(debug: TranslationMetaDebug): UsageCost | undefined {
-  if (typeof debug.usage?.cost !== "number") return undefined;
+  if (typeof debug.usage?.cost === "number") {
+    return {
+      amount: debug.usage.cost,
+      currency: "USD",
+      source: "reported",
+    };
+  }
+  const estimate = estimateProviderModelCost(debug.settings?.providerType, debug.settings?.modelId, {
+    input: debug.usage?.promptTokens,
+    output: debug.usage?.completionTokens,
+    total: debug.usage?.totalTokens,
+  });
+  if (!estimate) return undefined;
   return {
-    amount: debug.usage.cost,
-    currency: debug.usage.costCurrency ?? "credits",
-    source: "reported",
+    amount: estimate.amount,
+    currency: estimate.currency,
+    source: "estimated",
   };
 }
 

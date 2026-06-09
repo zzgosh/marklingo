@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   getProviderModelTags,
   getProviderBaseUrlCandidates,
+  getProviderGatewayModelId,
   getProviderPreset,
   isLocalEndpoint,
   PROVIDER_PRESETS,
@@ -93,6 +94,20 @@ test('keeps provider preset setting references registered', () => {
         MARKLINGO_CONFIGURATION_KEYS.includes(key),
         `unregistered preset setting: ${key}`,
       );
+    }
+  }
+});
+
+test('maps every direct provider model to Gateway pricing ids', () => {
+  for (const preset of PROVIDER_PRESETS) {
+    if (preset.id === 'openrouter' || preset.id === 'openaiCompatible') continue;
+    for (const option of preset.modelOptions) {
+      assert.equal(
+        getProviderGatewayModelId(preset.id, option.modelId),
+        option.gatewayModelId,
+        `missing Gateway pricing id for ${preset.id}:${option.modelId}`,
+      );
+      assert.match(option.gatewayModelId, /^[a-z0-9-]+\/[a-z0-9.-]+$/);
     }
   }
 });

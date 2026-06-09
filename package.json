@@ -304,6 +304,7 @@
     "check:integration": "npm run check && npm run test:vscode",
     "check": "npm run compile && npm test",
     "benchmark:postprocessing": "npm run compile && node scripts/benchmark-postprocessing.mjs",
+    "sync:model-pricing": "npm run compile && node scripts/sync-model-pricing.mjs",
     "preview:settings": "node scripts/preview-settings.mjs",
     "dev:vscode": "npm run package && node scripts/open-vscode-dev.mjs",
     "package": "npm run compile && npm run bundle",

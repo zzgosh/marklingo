@@ -27,6 +27,7 @@ export type RecentRun = {
   tokensSource: string;
   costAmount?: number;
   costCurrency?: string;
+  costSource?: string;
 };
 
 export type UsageSummary = {
@@ -47,8 +48,8 @@ export type UsageSummary = {
   reportedOutputTokens: number;
   reportedTotalTokens: number;
   cachedProviderTokens: number;
-  hasReportedCost: boolean;
-  reportedCost: number;
+  hasEstimatedCost: boolean;
+  estimatedCost: number;
   costCurrency?: string;
   providers: UsageBreakdownEntry[];
   models: UsageBreakdownEntry[];
@@ -77,8 +78,8 @@ function emptySummary(): UsageSummary {
     reportedOutputTokens: 0,
     reportedTotalTokens: 0,
     cachedProviderTokens: 0,
-    hasReportedCost: false,
-    reportedCost: 0,
+    hasEstimatedCost: false,
+    estimatedCost: 0,
     costCurrency: undefined,
     providers: [],
     models: [],
@@ -129,6 +130,7 @@ function toRecentRun(event: UsageEventV1): RecentRun {
     tokensSource: event.tokens?.source ?? "unavailable",
     costAmount: event.cost?.amount,
     costCurrency: event.cost?.currency,
+    costSource: event.cost?.source,
   };
 }
 
@@ -171,9 +173,9 @@ export function aggregateUsage(
     if (typeof event.tokens?.input === "number" && event.tokens.source === "estimated") {
       summary.estimatedInputTokens += event.tokens.input;
     }
-    if (event.cost?.source === "reported") {
-      summary.hasReportedCost = true;
-      summary.reportedCost += event.cost.amount;
+    if (event.cost) {
+      summary.hasEstimatedCost = true;
+      summary.estimatedCost += event.cost.amount;
       if (!summary.costCurrency) {
         summary.costCurrency = event.cost.currency;
       } else if (summary.costCurrency !== event.cost.currency) {

@@ -379,7 +379,7 @@ async function testRecordsUsageEventOnSuccess(context) {
   assert.ok(event.tokens.total > 0, 'expected reported total tokens');
   assert.ok(event.tokens.cachedProviderTokens >= 0, 'expected cached provider token count');
   assert.equal(event.cost.source, 'reported');
-  assert.equal(event.cost.currency, 'credits');
+  assert.equal(event.cost.currency, 'USD');
   assert.ok(event.cost.amount >= 0, 'expected reported cost');
 
   const json = JSON.stringify(event);

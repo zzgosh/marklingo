@@ -130,9 +130,47 @@ test('uses provider-reported tokens and cost when available', () => {
   });
   assert.deepEqual(event.cost, {
     amount: 0.00042,
-    currency: 'credits',
+    currency: 'USD',
     source: 'reported',
   });
+});
+
+test('estimates direct-provider cost from reported tokens and Gateway pricing', () => {
+  const event = buildUsageEventFromDebug(baseDebug({
+    settings: {
+      ...baseDebug().settings,
+      providerType: 'openai',
+      baseUrl: 'https://api.openai.com/v1',
+      modelId: 'gpt-5.4-mini',
+    },
+    usage: {
+      promptTokens: 1234,
+      completionTokens: 345,
+      totalTokens: 1579,
+      source: 'reported',
+    },
+  }), ctx);
+  assert.equal(event.cost?.currency, 'USD');
+  assert.equal(event.cost?.source, 'estimated');
+  assert.equal(Number(event.cost?.amount.toFixed(6)), 0.002478);
+});
+
+test('leaves local/custom provider cost unavailable without pricing', () => {
+  const event = buildUsageEventFromDebug(baseDebug({
+    settings: {
+      ...baseDebug().settings,
+      providerType: 'openaiCompatible',
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      modelId: 'hy-mt2',
+    },
+    usage: {
+      promptTokens: 1234,
+      completionTokens: 345,
+      totalTokens: 1579,
+      source: 'reported',
+    },
+  }), ctx);
+  assert.equal(event.cost, undefined);
 });
 
 test('does not leak the provider base URL into the serialized event', () => {

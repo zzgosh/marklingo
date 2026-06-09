@@ -19,6 +19,7 @@ export type ProviderBaseUrlOption = {
 export type ProviderModelOption = {
   label: string;
   modelId: string;
+  gatewayModelId?: string;
   tags?: readonly ModelTag[];
 };
 
@@ -92,10 +93,10 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     reasoningControl: 'reasoningEffortNone',
     modelIdSetting: 'providers.openai.modelId',
     modelOptions: [
-      { label: 'GPT-5.4 Mini', modelId: 'gpt-5.4-mini', tags: ['quality', 'fast'] },
-      { label: 'GPT-5.4 Nano', modelId: 'gpt-5.4-nano', tags: ['fast'] },
-      { label: 'GPT-5.4', modelId: 'gpt-5.4', tags: ['quality'] },
-      { label: 'GPT-5.5', modelId: 'gpt-5.5', tags: ['quality', 'slow'] },
+      { label: 'GPT-5.4 Mini', modelId: 'gpt-5.4-mini', gatewayModelId: 'openai/gpt-5.4-mini', tags: ['quality', 'fast'] },
+      { label: 'GPT-5.4 Nano', modelId: 'gpt-5.4-nano', gatewayModelId: 'openai/gpt-5.4-nano', tags: ['fast'] },
+      { label: 'GPT-5.4', modelId: 'gpt-5.4', gatewayModelId: 'openai/gpt-5.4', tags: ['quality'] },
+      { label: 'GPT-5.5', modelId: 'gpt-5.5', gatewayModelId: 'openai/gpt-5.5', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -110,8 +111,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     reasoningControl: 'thinkingDisabled',
     modelIdSetting: 'providers.deepseek.modelId',
     modelOptions: [
-      { label: 'DeepSeek V4 Flash', modelId: 'deepseek-v4-flash', tags: ['quality', 'fast'] },
-      { label: 'DeepSeek V4 Pro', modelId: 'deepseek-v4-pro', tags: ['quality', 'slow'] },
+      { label: 'DeepSeek V4 Flash', modelId: 'deepseek-v4-flash', gatewayModelId: 'deepseek/deepseek-v4-flash', tags: ['quality', 'fast'] },
+      { label: 'DeepSeek V4 Pro', modelId: 'deepseek-v4-pro', gatewayModelId: 'deepseek/deepseek-v4-pro', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -130,8 +131,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
       { label: 'China', baseUrl: 'https://api.moonshot.cn/v1' },
     ],
     modelOptions: [
-      { label: 'Kimi K2.6', modelId: 'kimi-k2.6', tags: ['quality'] },
-      { label: 'Kimi K2.5', modelId: 'kimi-k2.5', tags: ['quality'] },
+      { label: 'Kimi K2.6', modelId: 'kimi-k2.6', gatewayModelId: 'moonshotai/kimi-k2.6', tags: ['quality'] },
+      { label: 'Kimi K2.5', modelId: 'kimi-k2.5', gatewayModelId: 'moonshotai/kimi-k2.5', tags: ['quality'] },
     ],
   },
   {
@@ -150,9 +151,9 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
       { label: 'China', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     ],
     modelOptions: [
-      { label: 'GLM-4.7', modelId: 'glm-4.7', tags: ['quality'] },
-      { label: 'GLM-5', modelId: 'glm-5', tags: ['quality', 'slow'] },
-      { label: 'GLM-5.1', modelId: 'glm-5.1', tags: ['quality', 'slow'] },
+      { label: 'GLM-4.7', modelId: 'glm-4.7', gatewayModelId: 'zai/glm-4.7', tags: ['quality'] },
+      { label: 'GLM-5', modelId: 'glm-5', gatewayModelId: 'zai/glm-5', tags: ['quality', 'slow'] },
+      { label: 'GLM-5.1', modelId: 'glm-5.1', gatewayModelId: 'zai/glm-5.1', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -167,9 +168,9 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     reasoningControl: 'thinkingDisabled',
     modelIdSetting: 'providers.xiaomiMimo.modelId',
     modelOptions: [
-      { label: 'MiMo V2 Flash', modelId: 'mimo-v2-flash', tags: ['quality', 'fast'] },
-      { label: 'MiMo V2.5', modelId: 'mimo-v2.5', tags: ['quality', 'slow'] },
-      { label: 'MiMo V2.5 Pro', modelId: 'mimo-v2.5-pro', tags: ['quality', 'slow'] },
+      { label: 'MiMo V2 Flash', modelId: 'mimo-v2-flash', gatewayModelId: 'xiaomi/mimo-v2-flash', tags: ['quality', 'fast'] },
+      { label: 'MiMo V2.5', modelId: 'mimo-v2.5', gatewayModelId: 'xiaomi/mimo-v2.5', tags: ['quality', 'slow'] },
+      { label: 'MiMo V2.5 Pro', modelId: 'mimo-v2.5-pro', gatewayModelId: 'xiaomi/mimo-v2.5-pro', tags: ['quality', 'slow'] },
     ],
   },
   {
@@ -206,6 +207,12 @@ export function getProviderDefaultBaseUrl(providerType: ProviderType): string {
 
 export function getProviderDefaultModelId(providerType: ProviderType): string {
   return getProviderPreset(providerType).defaultModelId;
+}
+
+export function getProviderGatewayModelId(providerType: ProviderType, modelId: string): string | undefined {
+  const trimmed = modelId.trim();
+  if (!trimmed || providerType === 'openrouter' || providerType === 'openaiCompatible') return undefined;
+  return getProviderPreset(providerType).modelOptions.find((option) => option.modelId === trimmed)?.gatewayModelId;
 }
 
 export function getProviderBaseUrlSetting(providerType: ProviderType): string | undefined {

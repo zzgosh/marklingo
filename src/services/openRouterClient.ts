@@ -23,6 +23,7 @@ import {
   providerSupportsTemperatureControl,
   type ProviderType,
 } from './providerPresets.js';
+import { getGatewayModelContextWindow } from '../usage/modelPricing.js';
 
 export type OpenRouterSettings = {
   providerType: ProviderType;
@@ -495,6 +496,7 @@ export async function getOpenRouterModelContextLength(settings: OpenRouterSettin
   const cacheKey = `${settings.baseUrl}|${settings.modelId}`;
   const cached = modelContextCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.contextLength;
+  const gatewayContextWindow = getGatewayModelContextWindow(settings.providerType, settings.modelId);
 
   try {
     const res = await fetchJsonWithTimeout(
@@ -505,18 +507,18 @@ export async function getOpenRouterModelContextLength(settings: OpenRouterSettin
       },
       5_000,
     );
-    if (!res.ok || !res.json || typeof res.json !== 'object') return undefined;
+    if (!res.ok || !res.json || typeof res.json !== 'object') return gatewayContextWindow;
 
     const data = (res.json as { data?: unknown }).data;
-    if (!Array.isArray(data)) return undefined;
+    if (!Array.isArray(data)) return gatewayContextWindow;
 
     const model = data.find((item) => isMatchingModelId(item, settings.modelId));
-    const contextLength = readModelContextLength(model);
+    const contextLength = readModelContextLength(model) ?? gatewayContextWindow;
     modelContextCache.set(cacheKey, { contextLength, expiresAt: Date.now() + MODEL_CONTEXT_CACHE_TTL_MS });
     return contextLength;
   } catch {
-    modelContextCache.set(cacheKey, { contextLength: undefined, expiresAt: Date.now() + 60_000 });
-    return undefined;
+    modelContextCache.set(cacheKey, { contextLength: gatewayContextWindow, expiresAt: Date.now() + 60_000 });
+    return gatewayContextWindow;
   }
 }
 

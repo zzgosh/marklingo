@@ -9,7 +9,7 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 - 保留 Markdown 结构：标题、列表、表格、代码、行内代码、HTML、frontmatter 语法、链接和图片路径。
 - 可选择内置 Provider presets：[OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，或使用受信任的 Custom OpenAI Compatible 端点。
 - 在源文件旁写出翻译后的 `*_<language>_mdt.md` 文件，打开翻译标签页和预览，并复用未改动 Markdown 块的缓存翻译。
-- 在 Settings 中查看本地 Usage Insights，包括文件、运行次数、模型、token 使用量、可用时的 provider 报告成本，以及 MarkLingo 块缓存复用。
+- 在 Settings 中查看本地 Usage Insights，包括文件、运行次数、模型、token 使用量、可用时的 USD 预估成本，以及 MarkLingo 块缓存复用。
 - 使用免费、开源的扩展；API 密钥存储在 VS Code `SecretStorage` 中，不包含遥测 SDK。
 
 ![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -128,7 +128,7 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 
 ### Usage Insights
 
-Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、运行次数、provider/model/language 分组、MarkLingo 块缓存复用、最近运行记录和 token 使用量。当 provider 返回 usage 明细时，MarkLingo 会显示报告的 input/output/total tokens、provider cached tokens，以及 provider credits 口径的报告成本。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
+Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、运行次数、provider/model/language 分组、MarkLingo 块缓存复用、最近运行记录、token 使用量，以及可用时的 USD 预估成本。OpenRouter 成本来自 provider 报告的本次请求成本；内置 direct provider 使用 provider 报告的 input/output tokens 和 MarkLingo 随包附带的 Gateway 价格表估算。自定义和本地 OpenAI-compatible 端点可能显示 `Cost unavailable`。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
 
 ## 输出文件
 

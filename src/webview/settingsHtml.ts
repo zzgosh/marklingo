@@ -319,7 +319,7 @@ function formatUsageCost(value: number | undefined, currency: string | undefined
     : value >= 0.01
       ? value.toFixed(4)
       : value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
-  if (!currency || currency === 'credits') return `${amount} credits`;
+  if (!currency || currency === 'USD' || currency === 'credits') return `$${amount}`;
   return `${amount} ${currency}`;
 }
 
@@ -409,7 +409,7 @@ function renderUsageBars(view: UsageView): string {
     .map((bucket, index) => {
       if (index % labelStep !== 0 && index !== count - 1) return '';
       const x = index * slotWidth + slotWidth / 2;
-      return `<span class="usage-axis-label" style="left: ${x.toFixed(2)}%">${escapeHtml(bucket.label)}</span>`;
+      return `<span class="usage-axis-label" style="left: clamp(18px, ${x.toFixed(2)}%, calc(100% - 18px))">${escapeHtml(bucket.label)}</span>`;
     })
     .join('');
   const legend = dimensionKeys
@@ -479,7 +479,9 @@ function renderUsageRecentTable(view: UsageView): string {
       const tokenLabel = typeof tokenTotal === 'number'
         ? `${formatUsageTokens(tokenTotal)} ${run.tokensSource === 'reported' ? 'tokens' : 'est. input'}`
         : '—';
-      const costLabel = formatUsageCost(run.costAmount, run.costCurrency);
+      const costLabel = run.costAmount === undefined
+        ? 'Cost unavailable'
+        : formatUsageCost(run.costAmount, run.costCurrency);
       const statusLabel = run.status === 'success' ? 'Success' : 'Failed';
       return `<tr>
                 <td><span class="usage-cell-stack"><span>${escapeHtml(formatUsageTime(run.finishedAt ?? run.startedAt))}</span><span class="usage-cell-sub">${escapeHtml(formatUsageDuration(run.durationMs))}</span></span></td>
@@ -516,8 +518,8 @@ export function renderUsageSection(view: UsageView): string {
   const tokenCaption = view.hasReportedTokens
     ? `${formatUsageTokens(view.reportedInputTokens)} input / ${formatUsageTokens(view.reportedOutputTokens)} output`
     : 'Input tokens · estimated';
-  const costText = formatUsageCost(view.reportedCost, view.costCurrency);
-  const costCaption = view.hasReportedCost ? 'Cost · reported' : 'Cost unavailable';
+  const costText = formatUsageCost(view.hasEstimatedCost ? view.estimatedCost : undefined, view.costCurrency);
+  const costCaption = 'Estimated cost';
   const cards = `<div class="usage-cards">
             <div class="usage-card"><div class="usage-value">${formatUsageCount(view.filesTranslated)}</div><div class="usage-caption">Files translated</div></div>
             <div class="usage-card"><div class="usage-value">${formatUsageCount(view.totalRuns)}</div><div class="usage-caption">Runs · ${formatUsageCount(view.successRuns)} ok / ${formatUsageCount(view.failedRuns)} failed</div></div>
@@ -1366,7 +1368,10 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-chart-title { font-weight: 600; font-size: 12px; }
     .usage-chart-total { color: var(--muted); font-size: 11px; }
-    .usage-bars-wrap { position: relative; }
+    .usage-bars-wrap {
+      position: relative;
+      overflow: hidden;
+    }
     .usage-bars {
       width: 100%;
       height: 150px;
@@ -1377,6 +1382,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       position: relative;
       height: 16px;
       margin-top: 2px;
+      overflow: hidden;
     }
     .usage-axis-label {
       position: absolute;
