@@ -104,6 +104,10 @@ function toBreakdownEntries(acc: BreakdownAccumulator): UsageBreakdownEntry[] {
     .sort((a, b) => b.runs - a.runs || a.key.localeCompare(b.key));
 }
 
+function normalizeCostCurrency(currency: string | undefined): string | undefined {
+  return currency === "credits" ? "USD" : currency;
+}
+
 function runTimestamp(event: UsageEventV1): string {
   return event.finishedAt ?? event.startedAt;
 }
@@ -129,7 +133,7 @@ function toRecentRun(event: UsageEventV1): RecentRun {
     cachedProviderTokens: event.tokens?.cachedProviderTokens,
     tokensSource: event.tokens?.source ?? "unavailable",
     costAmount: event.cost?.amount,
-    costCurrency: event.cost?.currency,
+    costCurrency: normalizeCostCurrency(event.cost?.currency),
     costSource: event.cost?.source,
   };
 }
@@ -174,11 +178,12 @@ export function aggregateUsage(
       summary.estimatedInputTokens += event.tokens.input;
     }
     if (event.cost) {
+      const currency = normalizeCostCurrency(event.cost.currency);
       summary.hasEstimatedCost = true;
       summary.estimatedCost += event.cost.amount;
       if (!summary.costCurrency) {
-        summary.costCurrency = event.cost.currency;
-      } else if (summary.costCurrency !== event.cost.currency) {
+        summary.costCurrency = currency;
+      } else if (summary.costCurrency !== currency) {
         summary.costCurrency = "mixed";
       }
     }

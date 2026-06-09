@@ -108,7 +108,7 @@ function buildUsageTokens(debug: TranslationMetaDebug): UsageTokens {
 }
 
 function buildUsageCost(debug: TranslationMetaDebug): UsageCost | undefined {
-  if (typeof debug.usage?.cost === "number") {
+  if (debug.settings?.providerType === "openrouter" && typeof debug.usage?.cost === "number") {
     return {
       amount: debug.usage.cost,
       currency: "USD",

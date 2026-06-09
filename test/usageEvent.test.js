@@ -147,6 +147,8 @@ test('estimates direct-provider cost from reported tokens and Gateway pricing', 
       promptTokens: 1234,
       completionTokens: 345,
       totalTokens: 1579,
+      cost: 999,
+      costCurrency: 'USD',
       source: 'reported',
     },
   }), ctx);
@@ -167,6 +169,8 @@ test('leaves local/custom provider cost unavailable without pricing', () => {
       promptTokens: 1234,
       completionTokens: 345,
       totalTokens: 1579,
+      cost: 999,
+      costCurrency: 'USD',
       source: 'reported',
     },
   }), ctx);

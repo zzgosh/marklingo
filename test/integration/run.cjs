@@ -378,9 +378,8 @@ async function testRecordsUsageEventOnSuccess(context) {
   assert.ok(event.tokens.output > 0, 'expected reported output tokens');
   assert.ok(event.tokens.total > 0, 'expected reported total tokens');
   assert.ok(event.tokens.cachedProviderTokens >= 0, 'expected cached provider token count');
-  assert.equal(event.cost.source, 'reported');
-  assert.equal(event.cost.currency, 'USD');
-  assert.ok(event.cost.amount >= 0, 'expected reported cost');
+  assert.equal(event.providerType, 'openaiCompatible');
+  assert.equal(event.cost, undefined, 'custom OpenAI-compatible endpoints should not record provider cost');
 
   const json = JSON.stringify(event);
   assert.ok(!json.includes('test-key'), 'usage event must not include the API key');

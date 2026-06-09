@@ -5,6 +5,7 @@ import { PROVIDER_PRESETS } from '../out/services/providerPresets.js';
 
 const GATEWAY_MODELS_URL = 'https://ai-gateway.vercel.sh/v1/models';
 const OUTPUT_FILE = new URL('../src/usage/modelPricing.generated.ts', import.meta.url);
+const FETCH_TIMEOUT_MS = 30_000;
 
 function readNumberString(value) {
   if (typeof value !== 'string' || !value.trim()) return undefined;
@@ -39,7 +40,14 @@ export const MODEL_PRICING = ${JSON.stringify(table, null, 2)} as const;
 }
 
 async function main() {
-  const response = await fetch(GATEWAY_MODELS_URL);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(GATEWAY_MODELS_URL, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     throw new Error(`Failed to fetch Gateway models: HTTP ${response.status}`);
   }
@@ -100,4 +108,3 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
-

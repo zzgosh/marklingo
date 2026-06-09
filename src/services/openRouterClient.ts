@@ -453,7 +453,7 @@ function normalizeChatCompletionUsage(raw: unknown): ChatCompletionUsage | undef
     cacheWriteTokens: readNonNegativeInteger(promptDetails?.cache_write_tokens),
     reasoningTokens: readNonNegativeInteger(completionDetails?.reasoning_tokens),
     cost: readNonNegativeNumber(usage.cost),
-    costCurrency: readNonNegativeNumber(usage.cost) === undefined ? undefined : 'credits',
+    costCurrency: readNonNegativeNumber(usage.cost) === undefined ? undefined : 'USD',
   };
   return Object.values(normalized).some((value) => value !== undefined) ? normalized : undefined;
 }

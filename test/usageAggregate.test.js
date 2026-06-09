@@ -81,12 +81,13 @@ test('does not add unavailable-source tokens to the estimated total', () => {
 
 test('aggregates cost and tracks mixed currencies', () => {
   const summary = aggregateUsage([
-    event({ cost: { amount: 0.01, currency: 'USD', source: 'reported' } }),
+    event({ cost: { amount: 0.01, currency: 'credits', source: 'reported' } }),
     event({ cost: { amount: 0.02, currency: 'USD', source: 'estimated' } }),
   ]);
   assert.equal(summary.hasEstimatedCost, true);
   assert.equal(Number(summary.estimatedCost.toFixed(2)), 0.03);
   assert.equal(summary.costCurrency, 'USD');
+  assert.equal(summary.recentRuns[0].costCurrency, 'USD');
 
   const mixed = aggregateUsage([
     event({ cost: { amount: 1, currency: 'USD', source: 'reported' } }),
