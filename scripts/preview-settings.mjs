@@ -269,7 +269,7 @@ function getPreviewBridgeScript(nonce, url, usage) {
           const breakdown = ${serializeForScript(usagePreviewBreakdowns)}.includes(message.breakdown) ? message.breakdown : 'model';
           const usageResponse = usagePreviewResponses[range + ':' + breakdown] || usagePreviewResponses['7d:model'];
           if (usageResponse) {
-            reply({ type: 'usageSection', html: usageResponse.html, query: usageResponse.query });
+            reply({ type: 'usageSection', html: usageResponse.html, query: usageResponse.query, requestId: message.requestId });
           }
           return;
         }

@@ -1207,9 +1207,10 @@ async function translateMarkdownDocument(
       return result;
     };
 
-    const { meta: nextMeta } = options.progress
-      ? await translateAndWriteWithProgress(options.progress)
-      : await vscode.window.withProgress(
+    if (options.progress) {
+      await translateAndWriteWithProgress(options.progress);
+    } else {
+      await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: 'MarkLingo: Translating Markdown',
@@ -1217,6 +1218,7 @@ async function translateMarkdownDocument(
         },
         translateAndWriteWithProgress,
       );
+    }
     await recordUsageEvent(context, doc.uri, debug, {
       batchRunId: options.batchRunId,
       outputUri: currentTranslatedUri,

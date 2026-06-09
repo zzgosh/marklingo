@@ -871,8 +871,11 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
       if (message?.type === 'usageQuery') {
         const query = coerceUsageQuery(message);
+        const requestId = Number.isSafeInteger(message.requestId) && message.requestId > 0
+          ? message.requestId
+          : undefined;
         const view = await readUsageView(context, currentPanelProjectUri, query);
-        await panel.webview.postMessage({ type: 'usageSection', html: renderUsageSection(view), query });
+        await panel.webview.postMessage({ type: 'usageSection', html: renderUsageSection(view), query, requestId });
         return;
       }
       if (message?.type === 'verifyProvider') {

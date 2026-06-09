@@ -1358,7 +1358,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-skeleton-ranking-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) 7ch;
+      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) minmax(7ch, max-content);
       gap: 8px;
       align-items: center;
     }
@@ -1645,7 +1645,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-tops { display: flex; flex-direction: column; gap: 6px; }
     .usage-top-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) 7ch;
+      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) minmax(7ch, max-content);
       gap: 8px;
       align-items: center;
       font-size: 12px;
@@ -1660,7 +1660,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-top-fill.usage-seg-c4 { background: var(--vscode-charts-red, #e51400); }
     .usage-top-fill.usage-seg-c5 { background: var(--vscode-charts-yellow, #cca700); }
     .usage-top-fill.usage-seg-other { background: var(--muted); }
-    .usage-top-value { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .usage-top-value {
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .usage-reuse-strip {
       display: flex;
       height: 14px;
@@ -2555,6 +2562,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const usageQuery = ${scriptJson(usageQuery)};
     const usageBody = document.getElementById('usage-body');
     const usageControls = document.querySelector('.usage-controls');
+    let usageRequestSerial = 0;
+    let latestUsageRequestId = 0;
     const setUsageBusy = (busy) => {
       if (!usageBody) return;
       usageBody.setAttribute('aria-busy', busy ? 'true' : 'false');
@@ -2562,9 +2571,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       usageBody.classList.toggle('usage-loading', busy);
     };
     const requestUsage = () => {
+      const requestId = ++usageRequestSerial;
+      latestUsageRequestId = requestId;
       setUsageBusy(true);
       vscode.postMessage({
         type: 'usageQuery',
+        requestId,
         range: usageQuery.range,
         breakdown: usageQuery.breakdown,
       });
@@ -2621,6 +2633,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       const msg = event.data;
       if (!msg || typeof msg.type !== 'string') return;
       if (msg.type === 'usageSection') {
+        if (typeof msg.requestId === 'number' && msg.requestId !== latestUsageRequestId) return;
         if (msg.query && typeof msg.query === 'object') {
           if (typeof msg.query.range === 'string') usageQuery.range = msg.query.range;
           if (typeof msg.query.breakdown === 'string') usageQuery.breakdown = msg.query.breakdown;

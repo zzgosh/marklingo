@@ -383,6 +383,11 @@ test('renders a Usage skeleton when usage is deferred', () => {
   assert.match(html, /class="usage-skeleton"/);
   assert.match(html, /@keyframes usage-skeleton-shimmer/);
   assert.match(html, /requestUsage\(\);/);
+  assert.match(html, /let usageRequestSerial = 0;/);
+  assert.match(html, /let latestUsageRequestId = 0;/);
+  assert.match(html, /const requestId = \+\+usageRequestSerial;/);
+  assert.match(html, /type: 'usageQuery',\s*requestId,/);
+  assert.match(html, /msg\.requestId !== latestUsageRequestId/);
   assert.match(html, /"range":"7d"/);
   assert.match(html, /"breakdown":"model"/);
   assert.ok(!html.includes('No translations in this range yet'));
@@ -518,8 +523,8 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /class="usage-top-row"/);
   assert.match(html, /class="usage-top-fill usage-seg-c0"/);
   assert.match(html, /\.usage-charts \{\s*display: grid;\s*grid-template-columns: 1fr;/);
-  assert.match(html, /\.usage-top-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) minmax\(112px, 36%\) 7ch;/);
-  assert.match(html, /\.usage-top-value \{ color: var\(--muted\); text-align: right; font-variant-numeric: tabular-nums; \}/);
+  assert.match(html, /\.usage-top-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) minmax\(112px, 36%\) minmax\(7ch, max-content\);/);
+  assert.match(html, /\.usage-top-value \{\s*color: var\(--muted\);\s*text-align: right;\s*font-variant-numeric: tabular-nums;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*white-space: nowrap;\s*\}/);
   assert.match(html, /\.usage-top-bar \{ background: var\(--input\); border-radius: 0;/);
   assert.match(html, /\.usage-table th:nth-child\(1\),\s*\.usage-table td:nth-child\(1\) \{ width: 14%; \}/);
   assert.match(html, /\.usage-table th:nth-child\(2\),\s*\.usage-table td:nth-child\(2\) \{ width: 25%; \}/);
