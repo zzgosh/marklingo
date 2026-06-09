@@ -273,6 +273,8 @@ function buildState(url) {
           buckets: [],
           dimensionKeys: [],
           tops: [],
+          topModelsByTokens: [],
+          topModelsByCost: [],
           reuse: { translated: 0, reused: 0, fallback: 0 },
         }
       : {
@@ -334,6 +336,14 @@ function buildState(url) {
           tops: [
             { key: 'google/gemini-3.1-flash-lite', runs: 24, files: 10 },
             { key: 'hy-mt2', runs: 12, files: 6 },
+          ],
+          topModelsByTokens: [
+            { key: 'google/gemini-3.1-flash-lite', value: 154000, runs: 24 },
+            { key: 'hy-mt2', value: 44880, runs: 12 },
+          ],
+          topModelsByCost: [
+            { key: 'google/gemini-3.1-flash-lite', value: 0.0712, runs: 24 },
+            { key: 'hy-mt2', value: 0.0122, runs: 12 },
           ],
           reuse: { translated: 512, reused: 1340, fallback: 7 },
         },

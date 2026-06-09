@@ -847,7 +847,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
       if (message?.type === 'usageQuery') {
         const query = coerceUsageQuery(message);
-        const events = await readUsageEvents(context, { scope: query.scope, projectUri: currentPanelProjectUri });
+        const events = await readUsageEvents(context, { scope: 'allProjects' });
         const currentProjectId = currentPanelProjectUri ? getProjectId(currentPanelProjectUri) : undefined;
         const view = aggregateUsageView(events, query, { now: new Date(), currentProjectId });
         await panel.webview.postMessage({ type: 'usageSection', html: renderUsageSection(view), query });

@@ -75,6 +75,8 @@ function getState(overrides = {}) {
       buckets: [],
       dimensionKeys: [],
       tops: [],
+      topModelsByTokens: [],
+      topModelsByCost: [],
       reuse: { translated: 0, reused: 0, fallback: 0 },
     },
     ...overrides,
@@ -97,6 +99,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /System Instructions/);
   assert.match(html, /<h2>Provider<\/h2>/);
   assert.match(html, /<section class="card provider-card">/);
+  assert.ok(html.indexOf('<h2>Usage</h2>') < html.indexOf('<h2>Output</h2>'));
   assert.match(html, /<option value="openrouter" selected>OpenRouter<\/option>/);
   assert.match(html, /<option value="moonshot">Moonshot<\/option>/);
   assert.match(html, /<option value="glm">GLM<\/option>/);
@@ -364,6 +367,10 @@ test('renders an empty Usage section when there is no usage history', () => {
   assert.ok(!html.includes('class="usage-table"'));
   // The persistent control shell renders even with no history.
   assert.match(html, /data-usage-control="range"/);
+  assert.match(html, /data-usage-control="breakdown"/);
+  assert.ok(!html.includes('data-usage-control="scope"'));
+  assert.ok(!html.includes('data-usage-control="groupBy"'));
+  assert.ok(!html.includes('data-value="targetLanguage"'));
 });
 
 test('renders Usage summary cards and recent runs when usage exists', () => {
@@ -417,6 +424,19 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
             costCurrency: 'USD',
             costSource: 'reported',
           },
+          {
+            eventId: 'e2',
+            startedAt: '2026-06-08T09:00:00.000Z',
+            finishedAt: '2026-06-08T09:00:02.000Z',
+            status: 'error',
+            projectName: 'docs-site',
+            sourceFileName: 'very-long-reference-guide-file-name.md',
+            targetLanguage: 'English',
+            providerType: 'openaiCompatible',
+            modelId: 'very-long/custom-model-name-for-table.md',
+            durationMs: 2000,
+            tokensSource: 'unavailable',
+          },
         ],
         query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
         dimensionKeys: ['google/gemini-3.1-flash-lite'],
@@ -424,6 +444,8 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
           { key: '2026-06-08', label: 'Jun 8', totalRuns: 5, segments: [{ key: 'google/gemini-3.1-flash-lite', runs: 5 }] },
         ],
         tops: [{ key: 'google/gemini-3.1-flash-lite', runs: 5, files: 3 }],
+        topModelsByTokens: [{ key: 'google/gemini-3.1-flash-lite', value: 9000, runs: 1 }],
+        topModelsByCost: [{ key: 'google/gemini-3.1-flash-lite', value: 0.003, runs: 1 }],
         reuse: { translated: 20, reused: 60, fallback: 0 },
       },
     }),
@@ -431,20 +453,30 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
 
   assert.match(html, /<h2>Usage<\/h2>/);
   assert.match(html, /Files translated/);
-  assert.match(html, /10\.0k input \/ 2\.4k output/);
+  assert.match(html, /10\.0K input \/ 2\.4K output/);
   assert.match(html, /\$0\.0048/);
   assert.match(html, /Estimated cost/);
   assert.match(html, /class="usage-table"/);
   assert.match(html, /README\.md/);
-  assert.match(html, /usage-status" data-status="success">Success</);
-  assert.match(html, /75%/);
-  assert.match(html, /12\.4k/);
-  assert.match(html, /9\.0k tokens/);
+  assert.match(html, /usage-status-dot" data-status="success" title="Success"/);
+  assert.match(html, /usage-status-dot" data-status="error" title="Failed"/);
+  assert.match(html, />zh-CN<\/td>/);
+  assert.match(html, />en<\/td>/);
+  assert.match(html, /12\.4K/);
+  assert.match(html, /title="9,000 tokens">9\.0K/);
+  assert.match(html, /title="\$0\.0030">\$0\.0030/);
+  assert.match(html, /title="Cost unavailable">—/);
   assert.match(html, /data-usage-control="range"/);
-  assert.match(html, /class="usage-seg-btn active" data-usage-control="range" data-value="30d"/);
+  assert.match(html, /<option value="30d" selected>30D<\/option>/);
+  assert.match(html, /class="usage-seg-btn active" data-usage-control="breakdown" data-value="model"/);
   assert.match(html, /class="usage-bars"/);
   assert.match(html, /<rect class="usage-seg-c0"/);
+  assert.match(html, /Tokens ranking/);
+  assert.match(html, /Spend ranking/);
   assert.match(html, /class="usage-top-row"/);
-  assert.match(html, /class="usage-reuse-strip"/);
+  assert.match(html, /<th>Tokens<\/th><th>Cost<\/th><th>Status<\/th>/);
+  assert.ok(!html.includes('<th>Work</th>'));
+  assert.ok(!html.includes('Cache reuse'));
+  assert.ok(!html.includes('data-value="targetLanguage"'));
   assert.ok(!html.includes('No translations recorded yet'));
 });

@@ -9,7 +9,7 @@ MarkLingo 會把已儲存的 Markdown 翻譯成多語系草稿，同時保持原
 - 保留 Markdown 結構：標題、清單、表格、程式碼、行內程式碼、HTML、frontmatter 語法、連結與圖片路徑。
 - 可選擇內建 Provider presets：[OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，或使用受信任的 Custom OpenAI Compatible 端點。
 - 在來源檔案旁寫出翻譯後的 `*_<language>_mdt.md` 檔案，開啟翻譯分頁和預覽，並重複使用未更動 Markdown 區塊的快取翻譯。
-- 在 Settings 中查看本機 Usage Insights，包括檔案、執行次數、模型、token 使用量、可用時的 USD 預估成本，以及 MarkLingo 區塊快取重複使用情況。
+- 在 Settings 中查看本機 Usage Insights，包括檔案、執行次數、provider/model/project 分組、token 使用量，以及可用時的 USD 預估成本。
 - 使用免費、開源的擴充功能；API 金鑰儲存在 VS Code `SecretStorage` 中，不包含遙測 SDK。
 
 ![從命令選擇區執行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
@@ -128,7 +128,7 @@ MarkLingo 會把已儲存的 Markdown 翻譯成多語系草稿，同時保持原
 
 ### Usage Insights
 
-Settings 中包含一個本機 Usage 區塊，用來查看翻譯歷史。它會顯示已翻譯檔案、執行次數、provider/model/language 分組、MarkLingo 區塊快取重複使用情況、最近執行記錄、token 使用量，以及可用時的 USD 預估成本。OpenRouter 成本來自 provider 回報的本次請求成本；內建 direct provider 使用 provider 回報的 input/output tokens 和 MarkLingo 隨包附帶的 Gateway 價格表估算。自訂與本機 OpenAI-compatible 端點可能顯示 `Cost unavailable`。如果沒有 reported usage，MarkLingo 會退回到本次實際送出請求的 input token 估算值。
+Settings 中包含一個本機 Usage 區塊，用來查看翻譯歷史。它會顯示已翻譯檔案、執行次數、provider/model/project 分組、最近執行記錄、token 使用量，以及可用時的 USD 預估成本。OpenRouter 成本來自 provider 回報的本次請求成本；內建 direct provider 使用 provider 回報的 input/output tokens 和 MarkLingo 隨包附帶的 Gateway 價格表估算。自訂與本機 OpenAI-compatible 端點可能顯示 `Cost unavailable`。如果沒有 reported usage，MarkLingo 會退回到本次實際送出請求的 input token 估算值。
 
 ## 輸出檔案
 

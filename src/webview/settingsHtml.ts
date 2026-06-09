@@ -278,26 +278,32 @@ const USAGE_RANGE_OPTIONS = [
   { value: '90d', label: '90D' },
   { value: 'all', label: 'All' },
 ];
-const USAGE_SCOPE_OPTIONS = [
-  { value: 'allProjects', label: 'All Projects' },
-  { value: 'currentProject', label: 'Current Project' },
-];
 const USAGE_BREAKDOWN_OPTIONS = [
   { value: 'provider', label: 'Provider' },
   { value: 'model', label: 'Model' },
   { value: 'project', label: 'Project' },
-  { value: 'targetLanguage', label: 'Language' },
-];
-const USAGE_GROUPBY_OPTIONS = [
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
 ];
 const USAGE_BREAKDOWN_LABELS: Record<string, string> = {
   provider: 'provider',
   model: 'model',
   project: 'project',
-  targetLanguage: 'language',
+};
+const USAGE_LANGUAGE_LABELS: Record<string, string> = {
+  '简体中文': 'zh-CN',
+  '繁體中文': 'zh-TW',
+  'English': 'en',
+  '日本語': 'ja',
+  'Japanese': 'ja',
+  '한국어': 'ko',
+  'Korean': 'ko',
+  'Français': 'fr',
+  'French': 'fr',
+  'Deutsch': 'de',
+  'German': 'de',
+  'Español': 'es',
+  'Spanish': 'es',
+  'Português': 'pt',
+  'Portuguese': 'pt',
 };
 
 function formatUsageCount(value: number): string {
@@ -307,18 +313,15 @@ function formatUsageCount(value: number): string {
 function formatUsageTokens(value: number): string {
   if (!Number.isFinite(value) || value < 0) return '—';
   if (value === 0) return '0';
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return `${value}`;
 }
 
 function formatUsageCost(value: number | undefined, currency: string | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
-  const amount = value >= 1
-    ? value.toFixed(2)
-    : value >= 0.01
-      ? value.toFixed(4)
-      : value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+  const amount = value.toFixed(4);
   if (!currency || currency === 'USD' || currency === 'credits') return `$${amount}`;
   return `${amount} ${currency}`;
 }
@@ -339,40 +342,48 @@ function formatUsageTime(iso?: string): string {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+function formatUsageTargetLanguage(value?: string): string {
+  const label = value?.trim();
+  if (!label) return '—';
+  const known = USAGE_LANGUAGE_LABELS[label];
+  if (known) return known;
+  if (/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/i.test(label)) return label;
+  const words = label.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length >= 2) return words.map((word) => word[0]).join('').slice(0, 6).toUpperCase();
+  return label.length <= 8 ? label : `${label.slice(0, 7)}...`;
+}
+
 function renderUsageSegmentControl(
   control: string,
   options: ReadonlyArray<{ value: string; label: string }>,
   active: string,
 ): string {
+  const isTabs = control === 'breakdown';
   const buttons = options
     .map((option) => {
       const activeClass = option.value === active ? ' active' : '';
-      return `<button type="button" class="usage-seg-btn${activeClass}" data-usage-control="${control}" data-value="${option.value}">${escapeHtml(option.label)}</button>`;
+      const tabAttrs = isTabs ? ` role="tab" aria-selected="${option.value === active ? 'true' : 'false'}"` : '';
+      return `<button type="button" class="usage-seg-btn${activeClass}" data-usage-control="${control}" data-value="${option.value}"${tabAttrs}>${escapeHtml(option.label)}</button>`;
     })
     .join('');
-  return `<div class="usage-seg" role="group">${buttons}</div>`;
+  return `<div class="usage-seg" role="${isTabs ? 'tablist' : 'group'}" aria-label="${isTabs ? 'Usage breakdown' : 'Usage control'}">${buttons}</div>`;
+}
+
+function renderUsageRangeSelect(active: string): string {
+  const options = USAGE_RANGE_OPTIONS
+    .map((option) => `<option value="${option.value}"${option.value === active ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
+    .join('');
+  return `<select class="usage-range-select" data-usage-control="range">${options}</select>`;
 }
 
 function renderUsageControls(query: UsageView['query']): string {
-  const groupByOptions = USAGE_GROUPBY_OPTIONS
-    .map((option) => `<option value="${option.value}"${option.value === query.groupBy ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
-    .join('');
   return `<div class="usage-controls">
-            <div class="usage-control-group">
-              <div class="usage-control-label">Range</div>
-              ${renderUsageSegmentControl('range', USAGE_RANGE_OPTIONS, query.range)}
-            </div>
-            <div class="usage-control-group">
-              <div class="usage-control-label">Scope</div>
-              ${renderUsageSegmentControl('scope', USAGE_SCOPE_OPTIONS, query.scope)}
-            </div>
-            <div class="usage-control-group">
-              <div class="usage-control-label">Breakdown</div>
+            <div class="usage-tabs-wrap">
               ${renderUsageSegmentControl('breakdown', USAGE_BREAKDOWN_OPTIONS, query.breakdown)}
             </div>
-            <label class="usage-control-group usage-groupby">
-              <span class="usage-control-label">Group by</span>
-              <select data-usage-control="groupBy">${groupByOptions}</select>
+            <label class="usage-range-control">
+              <span class="usage-control-label">Range</span>
+              ${renderUsageRangeSelect(query.range)}
             </label>
           </div>`;
 }
@@ -404,7 +415,9 @@ function renderUsageBars(view: UsageView): string {
       rects.push(`<rect class="${usageSegmentClass(dimIndex, segment.key)}" x="${x.toFixed(2)}" y="${yTop.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}"><title>${escapeHtml(bucket.label)}: ${escapeHtml(segment.key)} ${segment.runs}</title></rect>`);
     });
   });
-  const labelStep = Math.max(1, Math.ceil(count / 8));
+  const labelStep = view.query.groupBy === 'day' && (view.query.range === '30d' || count > 14)
+    ? 7
+    : Math.max(1, Math.ceil(count / 8));
   const axisLabels = buckets
     .map((bucket, index) => {
       if (index % labelStep !== 0 && index !== count - 1) return '';
@@ -425,78 +438,86 @@ function renderUsageBars(view: UsageView): string {
           <div class="usage-legend">${legend}</div>`;
 }
 
-function renderUsageTops(view: UsageView): string {
-  const tops = view.tops ?? [];
-  const breakdownLabel = USAGE_BREAKDOWN_LABELS[view.query.breakdown] ?? view.query.breakdown;
-  if (tops.length === 0) {
-    return `<div class="usage-chart-head"><span class="usage-chart-title">Top ${escapeHtml(breakdownLabel)}</span></div><div class="usage-empty">No data.</div>`;
+function renderUsageMetricRanking(
+  title: string,
+  entries: UsageView['topModelsByTokens'],
+  formatValue: (value: number) => string,
+  valueTitle: (value: number) => string,
+  emptyText: string,
+  fillClass = '',
+): string {
+  if (entries.length === 0) {
+    return `<div class="usage-chart-head"><span class="usage-chart-title">${escapeHtml(title)}</span></div><div class="usage-empty">${escapeHtml(emptyText)}</div>`;
   }
-  const maxRuns = Math.max(1, ...tops.map((entry) => entry.runs));
-  const rows = tops
+  const maxValue = Math.max(1, ...entries.map((entry) => entry.value));
+  const rows = entries
     .map((entry) => {
-      const width = (entry.runs / maxRuns) * 100;
+      const width = (entry.value / maxValue) * 100;
+      const className = fillClass ? `usage-top-fill ${fillClass}` : 'usage-top-fill';
       return `<div class="usage-top-row">
                 <span class="usage-top-label" title="${escapeHtml(entry.key)}">${escapeHtml(entry.key)}</span>
-                <span class="usage-top-bar"><span class="usage-top-fill" style="width: ${width.toFixed(1)}%"></span></span>
-                <span class="usage-top-value">${formatUsageCount(entry.runs)}</span>
+                <span class="usage-top-bar"><span class="${className}" style="width: ${width.toFixed(1)}%"></span></span>
+                <span class="usage-top-value" title="${escapeHtml(valueTitle(entry.value))}">${escapeHtml(formatValue(entry.value))}</span>
               </div>`;
     })
     .join('');
-  return `<div class="usage-chart-head"><span class="usage-chart-title">Top ${escapeHtml(breakdownLabel)}</span></div>
+  return `<div class="usage-chart-head"><span class="usage-chart-title">${escapeHtml(title)}</span></div>
           <div class="usage-tops">${rows}</div>`;
 }
 
-function renderUsageReuse(view: UsageView): string {
-  const reuse = view.reuse ?? { translated: 0, reused: 0, fallback: 0 };
-  const total = reuse.translated + reuse.reused + reuse.fallback;
-  const reusePctText = view.reusePercent === undefined ? '—' : `${Math.round(view.reusePercent)}%`;
-  const pct = (value: number) => (total > 0 ? (value / total) * 100 : 0);
-  const strip = total > 0
-    ? `<div class="usage-reuse-strip">
-              <span class="usage-reuse-seg reused" style="width: ${pct(reuse.reused).toFixed(1)}%"></span>
-              <span class="usage-reuse-seg translated" style="width: ${pct(reuse.translated).toFixed(1)}%"></span>
-              <span class="usage-reuse-seg fallback" style="width: ${pct(reuse.fallback).toFixed(1)}%"></span>
-            </div>`
-    : '<div class="usage-reuse-strip empty"></div>';
-  return `<div class="usage-chart-head"><span class="usage-chart-title">Cache reuse</span><span class="usage-chart-total">${reusePctText} reused</span></div>
-          ${strip}
-          <div class="usage-reuse-legend">
-            <span class="usage-legend-item"><span class="usage-legend-swatch reused"></span>${formatUsageCount(reuse.reused)} reused</span>
-            <span class="usage-legend-item"><span class="usage-legend-swatch translated"></span>${formatUsageCount(reuse.translated)} new</span>
-            <span class="usage-legend-item"><span class="usage-legend-swatch fallback"></span>${formatUsageCount(reuse.fallback)} fallback</span>
-          </div>`;
+function renderUsageTokenRanking(view: UsageView): string {
+  return renderUsageMetricRanking(
+    'Tokens ranking',
+    view.topModelsByTokens ?? [],
+    (value) => formatUsageTokens(value),
+    (value) => `${formatUsageCount(Math.round(value))} tokens`,
+    'No token data.',
+  );
+}
+
+function renderUsageSpendRanking(view: UsageView): string {
+  return renderUsageMetricRanking(
+    'Spend ranking',
+    view.topModelsByCost ?? [],
+    (value) => formatUsageCost(value, view.costCurrency),
+    (value) => formatUsageCost(value, view.costCurrency),
+    'No cost data.',
+    'spend',
+  );
 }
 
 function renderUsageRecentTable(view: UsageView): string {
   const rows = (view.recentRuns ?? [])
     .map((run) => {
-      const blocks = run.status === 'success'
-        ? `${run.translatedBlocks ?? 0} new / ${run.reusedBlocks ?? 0} reused`
-        : '—';
+      const reportedTokens = run.tokensInput !== undefined || run.tokensOutput !== undefined
+        ? (run.tokensInput ?? 0) + (run.tokensOutput ?? 0)
+        : undefined;
       const tokenTotal = run.tokensSource === 'reported'
-        ? run.tokensTotal ?? ((run.tokensInput ?? 0) + (run.tokensOutput ?? 0))
+        ? reportedTokens ?? run.tokensTotal
         : run.tokensInput;
-      const tokenLabel = typeof tokenTotal === 'number'
-        ? `${formatUsageTokens(tokenTotal)} ${run.tokensSource === 'reported' ? 'tokens' : 'est. input'}`
-        : '—';
-      const costLabel = run.costAmount === undefined
-        ? 'Cost unavailable'
-        : formatUsageCost(run.costAmount, run.costCurrency);
-      const statusLabel = run.status === 'success' ? 'Success' : 'Failed';
+      const tokenLabel = typeof tokenTotal === 'number' ? formatUsageTokens(tokenTotal) : '—';
+      const tokenTitle = typeof tokenTotal === 'number'
+        ? `${formatUsageCount(Math.round(tokenTotal))} ${run.tokensSource === 'estimated' ? 'estimated input tokens' : 'tokens'}`
+        : 'Token usage unavailable';
+      const costLabel = run.costAmount === undefined ? '—' : formatUsageCost(run.costAmount, run.costCurrency);
+      const costTitle = run.costAmount === undefined ? 'Cost unavailable' : costLabel;
+      const statusTitle = run.status === 'success' ? 'Success' : 'Failed';
+      const fileTitle = `${run.projectName} / ${run.sourceFileName}`;
+      const languageTitle = run.targetLanguage ?? 'Target language unavailable';
       return `<tr>
                 <td><span class="usage-cell-stack"><span>${escapeHtml(formatUsageTime(run.finishedAt ?? run.startedAt))}</span><span class="usage-cell-sub">${escapeHtml(formatUsageDuration(run.durationMs))}</span></span></td>
-                <td class="usage-file" title="${escapeHtml(`${run.projectName} / ${run.sourceFileName}`)}"><span class="usage-cell-stack"><span>${escapeHtml(run.sourceFileName)}</span><span class="usage-cell-sub">${escapeHtml(run.projectName)}</span></span></td>
-                <td>${escapeHtml(run.targetLanguage ?? '—')}</td>
-                <td class="usage-file" title="${escapeHtml(run.modelId ?? '')}">${escapeHtml(run.modelId ?? '—')}</td>
-                <td>${escapeHtml(blocks)}</td>
-                <td><span class="usage-cell-stack"><span>${escapeHtml(tokenLabel)}</span><span class="usage-cell-sub">${escapeHtml(costLabel)}</span></span></td>
-                <td><span class="usage-status" data-status="${run.status}">${statusLabel}</span></td>
+                <td class="usage-file"><span class="usage-cell-stack"><span class="usage-truncate" title="${escapeHtml(fileTitle)}">${escapeHtml(run.sourceFileName)}</span><span class="usage-cell-sub">${escapeHtml(run.projectName)}</span></span></td>
+                <td title="${escapeHtml(languageTitle)}">${escapeHtml(formatUsageTargetLanguage(run.targetLanguage))}</td>
+                <td class="usage-model"><span class="usage-truncate" title="${escapeHtml(run.modelId ?? 'Model unavailable')}">${escapeHtml(run.modelId ?? '—')}</span></td>
+                <td><span class="usage-truncate" title="${escapeHtml(tokenTitle)}">${escapeHtml(tokenLabel)}</span></td>
+                <td><span class="usage-truncate" title="${escapeHtml(costTitle)}">${escapeHtml(costLabel)}</span></td>
+                <td><span class="usage-status-dot" data-status="${run.status}" title="${escapeHtml(statusTitle)}" aria-label="${escapeHtml(statusTitle)}"></span></td>
               </tr>`;
     })
     .join('');
   return `<div class="usage-table-wrap">
             <table class="usage-table">
-              <thead><tr><th>Time</th><th>File</th><th>Target</th><th>Model</th><th>Work</th><th>Usage</th><th>Status</th></tr></thead>
+              <thead><tr><th>Time</th><th>File</th><th>Target</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Status</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </div>`;
@@ -509,9 +530,8 @@ function renderUsageRecentTable(view: UsageView): string {
  */
 export function renderUsageSection(view: UsageView): string {
   if (!view || view.totalRuns === 0) {
-    return '<div class="usage-empty">No translations in this range yet. Translate a Markdown file, or widen the range, to see files, models, token estimates, and cache reuse here.</div>';
+    return '<div class="usage-empty">No translations in this range yet. Translate a Markdown file, or widen the range, to see files, models, token estimates, and cost here.</div>';
   }
-  const reuseText = view.reusePercent === undefined ? '—' : `${Math.round(view.reusePercent)}%`;
   const tokenTotal = view.hasReportedTokens
     ? view.reportedTotalTokens || (view.reportedInputTokens + view.reportedOutputTokens)
     : view.estimatedInputTokens;
@@ -525,13 +545,12 @@ export function renderUsageSection(view: UsageView): string {
             <div class="usage-card"><div class="usage-value">${formatUsageCount(view.totalRuns)}</div><div class="usage-caption">Runs · ${formatUsageCount(view.successRuns)} ok / ${formatUsageCount(view.failedRuns)} failed</div></div>
             <div class="usage-card"><div class="usage-value">${escapeHtml(formatUsageTokens(tokenTotal))}</div><div class="usage-caption">${escapeHtml(tokenCaption)}</div></div>
             <div class="usage-card"><div class="usage-value">${escapeHtml(costText)}</div><div class="usage-caption">${escapeHtml(costCaption)}</div></div>
-            <div class="usage-card"><div class="usage-value">${escapeHtml(reuseText)}</div><div class="usage-caption">Cache reuse · ${formatUsageCount(view.reusedBlocks)} reused / ${formatUsageCount(view.translatedBlocks)} new</div></div>
           </div>`;
   return `${cards}
           <div class="usage-charts">
             <div class="usage-chart usage-chart-bars">${renderUsageBars(view)}</div>
-            <div class="usage-chart">${renderUsageTops(view)}</div>
-            <div class="usage-chart">${renderUsageReuse(view)}</div>
+            <div class="usage-chart">${renderUsageTokenRanking(view)}</div>
+            <div class="usage-chart">${renderUsageSpendRanking(view)}</div>
           </div>
           ${renderUsageRecentTable(view)}`;
 }
@@ -1188,6 +1207,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       min-width: 0;
     }
     #usage-body {
+      display: grid;
+      gap: 14px;
       min-width: 0;
     }
     .usage-cards {
@@ -1226,7 +1247,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-table {
       width: 100%;
-      min-width: 700px;
+      min-width: 760px;
       border-collapse: collapse;
       table-layout: fixed;
       font-size: 12px;
@@ -1237,6 +1258,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       padding: 6px 10px;
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
+      vertical-align: middle;
     }
     .usage-table th {
       color: var(--muted);
@@ -1245,20 +1267,31 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-table th:nth-child(1),
     .usage-table td:nth-child(1) { width: 16%; }
     .usage-table th:nth-child(2),
-    .usage-table td:nth-child(2) { width: 16%; }
+    .usage-table td:nth-child(2) { width: 20%; }
     .usage-table th:nth-child(3),
     .usage-table td:nth-child(3) { width: 8%; }
     .usage-table th:nth-child(4),
-    .usage-table td:nth-child(4) { width: 22%; }
+    .usage-table td:nth-child(4) { width: 24%; }
     .usage-table th:nth-child(5),
-    .usage-table td:nth-child(5) { width: 14%; }
+    .usage-table td:nth-child(5) { width: 10%; }
     .usage-table th:nth-child(6),
-    .usage-table td:nth-child(6) { width: 14%; }
+    .usage-table td:nth-child(6) { width: 12%; }
     .usage-table th:nth-child(7),
     .usage-table td:nth-child(7) { width: 10%; }
-    .usage-table .usage-file {
+    .usage-table th:nth-child(7),
+    .usage-table td:nth-child(7) { text-align: center; }
+    .usage-table .usage-file,
+    .usage-table .usage-model {
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .usage-truncate {
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .usage-cell-stack {
       display: grid;
@@ -1275,30 +1308,28 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--muted);
       font-size: 11px;
     }
-    .usage-status {
+    .usage-status-dot {
       display: inline-block;
-      padding: 1px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      border: 1px solid var(--border);
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      vertical-align: middle;
     }
-    .usage-status[data-status="success"] { color: var(--vscode-testing-iconPassed, #3fb950); }
-    .usage-status[data-status="error"] { color: var(--danger); }
+    .usage-status-dot[data-status="success"] { background: var(--vscode-testing-iconPassed, #3fb950); }
+    .usage-status-dot[data-status="error"] { background: var(--danger); }
     .usage-empty {
       color: var(--muted);
       padding: 12px 0;
     }
     .usage-controls {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       gap: 12px;
-      align-items: end;
       min-width: 0;
     }
-    .usage-control-group {
-      display: grid;
+    .usage-tabs-wrap {
       min-width: 0;
-      gap: 6px;
     }
     .usage-control-label {
       color: var(--muted);
@@ -1309,41 +1340,48 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-seg {
       display: inline-flex;
-      width: 100%;
+      width: auto;
+      align-items: center;
+      gap: 2px;
       border: 1px solid var(--border);
       border-radius: 6px;
-      overflow: hidden;
+      padding: 3px;
+      background: var(--input);
     }
     .usage-seg-btn {
       appearance: none;
-      flex: 1 1 0;
+      flex: 0 0 auto;
       min-width: 0;
-      min-height: 30px;
+      min-height: 26px;
       border: 0;
-      border-right: 1px solid var(--border);
-      background: var(--input);
-      color: var(--fg);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
       font: inherit;
-      padding: 4px 8px;
+      padding: 4px 12px;
       cursor: pointer;
       white-space: nowrap;
     }
-    .usage-seg-btn:last-child { border-right: 0; }
     .usage-seg-btn.active {
-      background: var(--button);
-      color: var(--button-fg);
+      background: var(--panel);
+      color: var(--fg);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
     }
-    .usage-groupby {
+    .usage-range-control {
+      display: grid;
+      gap: 4px;
+      min-width: 96px;
+      margin-left: auto;
       color: var(--muted);
     }
-    .usage-groupby select {
+    .usage-range-select {
       font: inherit;
       color: var(--fg);
       background: var(--input);
       border: 1px solid var(--border);
       border-radius: 6px;
       min-height: 30px;
-      padding: 4px 8px;
+      padding: 4px 28px 4px 8px;
     }
     .usage-charts {
       display: grid;
@@ -1425,6 +1463,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-top-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .usage-top-bar { background: var(--input); border-radius: 3px; height: 10px; overflow: hidden; }
     .usage-top-fill { display: block; height: 100%; background: var(--vscode-charts-blue, #4e95d9); }
+    .usage-top-fill.spend { background: var(--vscode-charts-green, #4caf50); }
     .usage-top-value { color: var(--muted); text-align: right; }
     .usage-reuse-strip {
       display: flex;
@@ -1449,7 +1488,19 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-legend-swatch.translated { background: var(--vscode-charts-blue, #4e95d9); }
     .usage-legend-swatch.fallback { background: var(--vscode-charts-red, #e51400); }
     @media (max-width: 760px) {
-      .usage-controls { grid-template-columns: 1fr; }
+      .usage-controls {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .usage-seg {
+        width: 100%;
+      }
+      .usage-seg-btn {
+        flex: 1 1 0;
+      }
+      .usage-range-control {
+        margin-left: 0;
+      }
       .usage-charts { grid-template-columns: 1fr; }
     }
   </style>
@@ -1564,6 +1615,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
           </div>
         </section>
 
+        <h2>Usage</h2>
+        <section class="usage-section">
+          ${renderUsageControls(state.usage.query)}
+          <div id="usage-body">${renderUsageSection(state.usage)}</div>
+        </section>
+
         <h2>Output</h2>
         <section class="card">
           <div class="row top-align">
@@ -1592,12 +1649,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
               <button class="secondary" id="optimize-storage" type="button">Optimize</button>
             </div>
           </div>
-        </section>
-
-        <h2>Usage</h2>
-        <section class="usage-section">
-          ${renderUsageControls(state.usage.query)}
-          <div id="usage-body">${renderUsageSection(state.usage)}</div>
         </section>
 
         <h2 class="danger-title">Danger Zone</h2>
@@ -2292,8 +2343,6 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     const requestUsage = () => vscode.postMessage({
       type: 'usageQuery',
       range: usageQuery.range,
-      groupBy: usageQuery.groupBy,
-      scope: usageQuery.scope,
       breakdown: usageQuery.breakdown,
     });
     if (usageControls) {
@@ -2308,6 +2357,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         if (group) {
           group.querySelectorAll('.usage-seg-btn').forEach((sibling) => {
             sibling.classList.toggle('active', sibling === button);
+            sibling.setAttribute('aria-selected', sibling === button ? 'true' : 'false');
           });
         }
         requestUsage();

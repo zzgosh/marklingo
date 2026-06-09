@@ -6,6 +6,12 @@ export type UsageBreakdownEntry = {
   files: number;
 };
 
+export type UsageMetricEntry = {
+  key: string;
+  value: number;
+  runs: number;
+};
+
 export type RecentRun = {
   eventId: string;
   startedAt: string;
@@ -215,7 +221,7 @@ export function aggregateUsage(
 export type UsageRange = "7d" | "30d" | "90d" | "all";
 export type UsageGroupBy = "day" | "week" | "month";
 export type UsageScope = "currentProject" | "allProjects";
-export type UsageBreakdown = "provider" | "model" | "project" | "targetLanguage";
+export type UsageBreakdown = "provider" | "model" | "project";
 
 export type UsageQuery = {
   range: UsageRange;
@@ -246,6 +252,8 @@ export type UsageView = UsageSummary & {
   /** Ordered stacking keys: the top dimension values plus "Other" when truncated. */
   dimensionKeys: string[];
   tops: UsageBreakdownEntry[];
+  topModelsByTokens: UsageMetricEntry[];
+  topModelsByCost: UsageMetricEntry[];
   reuse: { translated: number; reused: number; fallback: number };
 };
 
@@ -258,6 +266,7 @@ const DAY_MS = 86_400_000;
 const MAX_BUCKETS = 120;
 const TOP_STACK_KEYS = 6;
 const TOP_LIST_ENTRIES = 8;
+const TOP_MODEL_RANKING_ENTRIES = 5;
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function rangeDays(range: UsageRange): number | undefined {
@@ -274,7 +283,6 @@ function breakdownKeyOf(event: UsageEventV1, breakdown: UsageBreakdown): string 
     case "provider": return event.providerType ?? "Unknown";
     case "model": return event.modelId ?? "Unknown";
     case "project": return event.projectName ?? "Unknown";
-    case "targetLanguage": return event.targetLanguage ?? "Unknown";
   }
 }
 
@@ -345,6 +353,28 @@ function bucketKeyOf(ms: number, groupBy: UsageGroupBy): string {
   if (groupBy === "month") return monthKey(ms);
   if (groupBy === "week") return isoDate(alignWeekUtc(ms));
   return isoDate(ms);
+}
+
+function spanDays(events: UsageEventV1[], now: Date): number {
+  let min = Infinity;
+  let max = now.getTime();
+  for (const event of events) {
+    const t = Date.parse(runTimestamp(event));
+    if (Number.isNaN(t)) continue;
+    min = Math.min(min, t);
+    max = Math.max(max, t);
+  }
+  if (min === Infinity) return 0;
+  return Math.max(1, Math.ceil((alignDayUtc(max) - alignDayUtc(min)) / DAY_MS) + 1);
+}
+
+function groupByForRange(range: UsageRange, events: UsageEventV1[], now: Date): UsageGroupBy {
+  if (range === "7d" || range === "30d") return "day";
+  if (range === "90d") return "week";
+  const days = spanDays(events, now);
+  if (days <= 30) return "day";
+  if (days <= 90) return "week";
+  return "month";
 }
 
 function bucketSpan(
@@ -429,6 +459,33 @@ function buildBuckets(
   });
 }
 
+function usageTokenTotal(event: UsageEventV1): number {
+  const input = typeof event.tokens?.input === "number" ? event.tokens.input : undefined;
+  const output = typeof event.tokens?.output === "number" ? event.tokens.output : undefined;
+  if (input !== undefined || output !== undefined) return (input ?? 0) + (output ?? 0);
+  return typeof event.tokens?.total === "number" ? event.tokens.total : 0;
+}
+
+function computeTopModelMetric(
+  events: UsageEventV1[],
+  valueOf: (event: UsageEventV1) => number,
+): UsageMetricEntry[] {
+  const acc = new Map<string, { value: number; runs: number }>();
+  for (const event of events) {
+    const key = event.modelId ?? "Unknown";
+    const value = valueOf(event);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const entry = acc.get(key) ?? { value: 0, runs: 0 };
+    entry.value += value;
+    entry.runs += 1;
+    acc.set(key, entry);
+  }
+  return [...acc.entries()]
+    .map(([key, entry]) => ({ key, value: entry.value, runs: entry.runs }))
+    .sort((a, b) => b.value - a.value || b.runs - a.runs || a.key.localeCompare(b.key))
+    .slice(0, TOP_MODEL_RANKING_ENTRIES);
+}
+
 /**
  * Aggregate events into a query-driven view: summary cards, time buckets stacked by the selected
  * breakdown, a top-dimension list, and cache-reuse totals. Pure; `now` and `currentProjectId` are
@@ -436,22 +493,32 @@ function buildBuckets(
  */
 export function aggregateUsageView(
   events: UsageEventV1[],
-  query: UsageQuery,
+  rawQuery: UsageQuery,
   context: AggregateUsageViewContext = {},
 ): UsageView {
   const now = context.now ?? new Date();
+  const query: UsageQuery = {
+    range: rawQuery.range,
+    groupBy: groupByForRange(rawQuery.range, events, now),
+    scope: "allProjects",
+    breakdown: rawQuery.breakdown,
+  };
   const filtered = filterEvents(events, query, now, context.currentProjectId);
   const summary = aggregateUsage(filtered, { recentLimit: 25 });
   const breakdownEntries = computeBreakdown(filtered, query.breakdown);
   const topKeys = breakdownEntries.slice(0, TOP_STACK_KEYS).map((entry) => entry.key);
   const dimensionKeys = breakdownEntries.length > TOP_STACK_KEYS ? [...topKeys, "Other"] : topKeys;
   const buckets = buildBuckets(filtered, query, now, dimensionKeys);
+  const topModelsByTokens = computeTopModelMetric(filtered, usageTokenTotal);
+  const topModelsByCost = computeTopModelMetric(filtered, (event) => event.cost?.amount ?? 0);
   return {
     ...summary,
     query,
     buckets,
     dimensionKeys,
     tops: breakdownEntries.slice(0, TOP_LIST_ENTRIES),
+    topModelsByTokens,
+    topModelsByCost,
     reuse: {
       translated: summary.translatedBlocks,
       reused: summary.reusedBlocks,
@@ -461,9 +528,7 @@ export function aggregateUsageView(
 }
 
 const USAGE_RANGE_VALUES: UsageRange[] = ["7d", "30d", "90d", "all"];
-const USAGE_GROUPBY_VALUES: UsageGroupBy[] = ["day", "week", "month"];
-const USAGE_SCOPE_VALUES: UsageScope[] = ["currentProject", "allProjects"];
-const USAGE_BREAKDOWN_VALUES: UsageBreakdown[] = ["provider", "model", "project", "targetLanguage"];
+const USAGE_BREAKDOWN_VALUES: UsageBreakdown[] = ["provider", "model", "project"];
 
 /** Coerce an untrusted message payload into a valid UsageQuery, falling back to defaults per field. */
 export function coerceUsageQuery(raw: unknown): UsageQuery {
@@ -472,8 +537,8 @@ export function coerceUsageQuery(raw: unknown): UsageQuery {
     typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
   return {
     range: pick(source.range, USAGE_RANGE_VALUES, DEFAULT_USAGE_QUERY.range),
-    groupBy: pick(source.groupBy, USAGE_GROUPBY_VALUES, DEFAULT_USAGE_QUERY.groupBy),
-    scope: pick(source.scope, USAGE_SCOPE_VALUES, DEFAULT_USAGE_QUERY.scope),
+    groupBy: DEFAULT_USAGE_QUERY.groupBy,
+    scope: "allProjects",
     breakdown: pick(source.breakdown, USAGE_BREAKDOWN_VALUES, DEFAULT_USAGE_QUERY.breakdown),
   };
 }
