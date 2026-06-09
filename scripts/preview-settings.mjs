@@ -203,6 +203,7 @@ function buildUsagePreviewView(baseUsage, rangeValue, breakdownValue) {
   const buckets = buildUsagePreviewBuckets(range, dimensionKeys);
   const tops = buildUsagePreviewTops(dimensionKeys, buckets);
   const totalRuns = buckets.reduce((sum, bucket) => sum + bucket.totalRuns, 0);
+  const tokenTotal = buckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
   const failedRuns = Math.max(1, Math.round(totalRuns * 0.07));
   return {
     ...baseUsage,
@@ -211,6 +212,7 @@ function buildUsagePreviewView(baseUsage, rangeValue, breakdownValue) {
     failedRuns,
     filesTranslated: Math.max(1, Math.round(totalRuns * 0.45)),
     projectsTouched: baseUsage.projectsTouched,
+    tokenTotal,
     estimatedInputTokens: Math.round(totalRuns * 4200),
     reportedInputTokens: Math.round(totalRuns * 3800),
     reportedOutputTokens: Math.round(totalRuns * 760),
@@ -343,6 +345,8 @@ function buildState(url) {
   const currentPromptState = getPromptState(verifiedAdapterMode, modelId, targetLanguage, chatPromptInstructions);
   const openRouterPromptState = getPromptState(openRouterVerifiedAdapterMode, openRouterModelId, targetLanguage, chatPromptInstructions);
   const openAiCompatiblePromptState = getPromptState(openAiCompatibleVerifiedAdapterMode, openAiCompatibleModelId, targetLanguage, chatPromptInstructions);
+  const initialUsageBuckets = buildUsagePreviewBuckets('7d', ['google/gemini-3.1-flash-lite', 'hy-mt2']);
+  const initialUsageTokenTotal = initialUsageBuckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
   return {
     shortcutLabel: 'Option + Command + T',
     shortcutStatus: 'Default shortcut for Markdown editors.',
@@ -401,6 +405,7 @@ function buildState(url) {
           reusedBlocks: 0,
           fallbackBlocks: 0,
           reusePercent: undefined,
+          tokenTotal: 0,
           estimatedInputTokens: 0,
           hasReportedTokens: false,
           reportedInputTokens: 0,
@@ -432,6 +437,7 @@ function buildState(url) {
           reusedBlocks: 1340,
           fallbackBlocks: 7,
           reusePercent: (1340 / (1340 + 512)) * 100,
+          tokenTotal: initialUsageTokenTotal,
           estimatedInputTokens: 184000,
           hasReportedTokens: true,
           reportedInputTokens: 166200,
@@ -460,7 +466,7 @@ function buildState(url) {
           ],
           query: { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
           dimensionKeys: ['google/gemini-3.1-flash-lite', 'hy-mt2'],
-          buckets: buildUsagePreviewBuckets('7d', ['google/gemini-3.1-flash-lite', 'hy-mt2']),
+          buckets: initialUsageBuckets,
           tops: [
             { key: 'google/gemini-3.1-flash-lite', runs: 24, files: 10 },
             { key: 'hy-mt2', runs: 12, files: 6 },

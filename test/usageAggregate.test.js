@@ -192,6 +192,7 @@ test('aggregateUsageView exposes tops and reuse totals', () => {
   const view = aggregateUsageView(events, { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
   assert.equal(view.tops[0].key, 'm1');
   assert.equal(view.tops[0].runs, 2);
+  assert.equal(view.tokenTotal, 1425);
   assert.equal(view.topModelsByTokens[0].key, 'm2');
   assert.equal(view.topModelsByTokens[0].value, 1000);
   assert.equal(view.topModelsByCost[0].key, 'm1');

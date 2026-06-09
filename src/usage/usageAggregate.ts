@@ -250,6 +250,7 @@ export type UsageBucket = {
 
 export type UsageView = UsageSummary & {
   query: UsageQuery;
+  tokenTotal: number;
   buckets: UsageBucket[];
   /** Ordered stacking keys: the top dimension values plus "Other" when truncated. */
   dimensionKeys: string[];
@@ -547,6 +548,7 @@ export function aggregateUsageView(
   };
   const filtered = filterEvents(events, query, now, context.currentProjectId);
   const summary = aggregateUsage(filtered, { recentLimit: 25 });
+  const tokenTotal = filtered.reduce((sum, event) => sum + usageTokenTotal(event), 0);
   const breakdownEntries = computeBreakdown(filtered, query.breakdown);
   const topKeys = breakdownEntries.slice(0, TOP_STACK_KEYS).map((entry) => entry.key);
   const dimensionKeys = breakdownEntries.length > TOP_STACK_KEYS ? [...topKeys, "Other"] : topKeys;
@@ -560,6 +562,7 @@ export function aggregateUsageView(
   return {
     ...summary,
     query,
+    tokenTotal,
     buckets,
     dimensionKeys,
     tops: breakdownEntries.slice(0, TOP_LIST_ENTRIES),

@@ -58,6 +58,7 @@ function getState(overrides = {}) {
       reusedBlocks: 0,
       fallbackBlocks: 0,
       reusePercent: undefined,
+      tokenTotal: 0,
       estimatedInputTokens: 0,
       hasReportedTokens: false,
       reportedInputTokens: 0,
@@ -389,6 +390,7 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
         reusedBlocks: 60,
         fallbackBlocks: 0,
         reusePercent: 75,
+        tokenTotal: 9000,
         estimatedInputTokens: 12000,
         hasReportedTokens: true,
         reportedInputTokens: 10000,
@@ -481,7 +483,7 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /usage-status-dot" data-status="error" title="Failed"/);
   assert.match(html, />ZH-CN<\/td>/);
   assert.match(html, />EN<\/td>/);
-  assert.match(html, /12\.4K/);
+  assert.match(html, /<div class="usage-value">9\.0K<\/div><div class="usage-caption">Tokens<\/div>/);
   assert.match(html, /title="9,000 tokens">9\.0K/);
   assert.match(html, /title="Reported cost: \$0\.0030">\$0\.0030/);
   assert.match(html, /title="Calculated from preset pricing: \$0\.0012">\$0\.0012/);

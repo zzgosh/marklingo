@@ -405,9 +405,12 @@ function renderUsageBars(view: UsageView): string {
   if (buckets.length === 0) {
     return `${chartHead(0)}<div class="usage-empty">No token data in this range.</div>`;
   }
-  const totalTokens = buckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
-  if (totalTokens <= 0) {
-    return `${chartHead(0)}<div class="usage-empty">No token data in this range.</div>`;
+  const bucketTokenTotal = buckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
+  const displayTokenTotal = typeof view.tokenTotal === 'number' && Number.isFinite(view.tokenTotal)
+    ? view.tokenTotal
+    : bucketTokenTotal;
+  if (bucketTokenTotal <= 0) {
+    return `${chartHead(displayTokenTotal)}<div class="usage-empty">No token data in this range.</div>`;
   }
   const maxTotal = Math.max(1, ...buckets.map((bucket) => bucket.totalTokens));
   const count = buckets.length;
@@ -440,7 +443,7 @@ function renderUsageBars(view: UsageView): string {
   const legend = dimensionKeys
     .map((key, index) => `<span class="usage-legend-item"><span class="usage-legend-swatch ${usageSegmentClass(index, key)}"></span>${escapeHtml(key)}</span>`)
     .join('');
-  return `${chartHead(totalTokens)}
+  return `${chartHead(displayTokenTotal)}
           <div class="usage-bars-wrap">
             <svg class="usage-bars" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${rects.join('')}</svg>
             <div class="usage-axis">${axisLabels}</div>
@@ -554,9 +557,11 @@ export function renderUsageSection(view: UsageView): string {
   if (!view || view.totalRuns === 0) {
     return '<div class="usage-empty">No translations in this range yet. Translate a Markdown file, or widen the range, to see files, models, token estimates, and cost here.</div>';
   }
-  const tokenTotal = view.hasReportedTokens
-    ? view.reportedTotalTokens || (view.reportedInputTokens + view.reportedOutputTokens)
-    : view.estimatedInputTokens;
+  const tokenTotal = typeof view.tokenTotal === 'number' && Number.isFinite(view.tokenTotal)
+    ? view.tokenTotal
+    : view.hasReportedTokens
+      ? view.reportedTotalTokens || (view.reportedInputTokens + view.reportedOutputTokens)
+      : view.estimatedInputTokens;
   const tokenCaption = 'Tokens';
   const costText = formatUsageCost(view.hasEstimatedCost ? view.estimatedCost : undefined, view.costCurrency);
   const costCaption = 'Estimated cost';
