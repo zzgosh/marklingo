@@ -10,6 +10,7 @@ export type UsageMetricEntry = {
   key: string;
   value: number;
   runs: number;
+  source?: string;
 };
 
 export type RecentRun = {
@@ -469,19 +470,27 @@ function usageTokenTotal(event: UsageEventV1): number {
 function computeTopModelMetric(
   events: UsageEventV1[],
   valueOf: (event: UsageEventV1) => number,
+  sourceOf?: (event: UsageEventV1) => string | undefined,
 ): UsageMetricEntry[] {
-  const acc = new Map<string, { value: number; runs: number }>();
+  const acc = new Map<string, { value: number; runs: number; sources: Set<string> }>();
   for (const event of events) {
     const key = event.modelId ?? "Unknown";
     const value = valueOf(event);
     if (!Number.isFinite(value) || value <= 0) continue;
-    const entry = acc.get(key) ?? { value: 0, runs: 0 };
+    const entry = acc.get(key) ?? { value: 0, runs: 0, sources: new Set<string>() };
     entry.value += value;
     entry.runs += 1;
+    const source = sourceOf?.(event);
+    if (source) entry.sources.add(source);
     acc.set(key, entry);
   }
   return [...acc.entries()]
-    .map(([key, entry]) => ({ key, value: entry.value, runs: entry.runs }))
+    .map(([key, entry]) => ({
+      key,
+      value: entry.value,
+      runs: entry.runs,
+      source: entry.sources.size === 1 ? [...entry.sources][0] : entry.sources.size > 1 ? "mixed" : undefined,
+    }))
     .sort((a, b) => b.value - a.value || b.runs - a.runs || a.key.localeCompare(b.key))
     .slice(0, TOP_MODEL_RANKING_ENTRIES);
 }
@@ -510,7 +519,11 @@ export function aggregateUsageView(
   const dimensionKeys = breakdownEntries.length > TOP_STACK_KEYS ? [...topKeys, "Other"] : topKeys;
   const buckets = buildBuckets(filtered, query, now, dimensionKeys);
   const topModelsByTokens = computeTopModelMetric(filtered, usageTokenTotal);
-  const topModelsByCost = computeTopModelMetric(filtered, (event) => event.cost?.amount ?? 0);
+  const topModelsByCost = computeTopModelMetric(
+    filtered,
+    (event) => event.cost?.amount ?? 0,
+    (event) => event.cost?.source,
+  );
   return {
     ...summary,
     query,

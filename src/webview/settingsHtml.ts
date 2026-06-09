@@ -319,11 +319,18 @@ function formatUsageTokens(value: number): string {
   return `${value}`;
 }
 
-function formatUsageCost(value: number | undefined, currency: string | undefined): string {
+function formatUsageCost(value: number | undefined, currency: string | undefined, source?: string): string {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
   const amount = value.toFixed(4);
-  if (!currency || currency === 'USD' || currency === 'credits') return `$${amount}`;
-  return `${amount} ${currency}`;
+  const prefix = source === 'estimated' ? '≈' : '';
+  if (!currency || currency === 'USD' || currency === 'credits') return `${prefix}$${amount}`;
+  return `${prefix}${amount} ${currency}`;
+}
+
+function formatUsageCostTitle(label: string, source?: string): string {
+  if (source === 'estimated') return `Estimated cost: ${label}`;
+  if (source === 'reported') return `Reported cost: ${label}`;
+  return label;
 }
 
 function formatUsageDuration(ms?: number): string {
@@ -373,7 +380,7 @@ function renderUsageRangeSelect(active: string): string {
   const options = USAGE_RANGE_OPTIONS
     .map((option) => `<option value="${option.value}"${option.value === active ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
     .join('');
-  return `<select class="usage-range-select" data-usage-control="range">${options}</select>`;
+  return `<span class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="Usage range">${options}</select></span>`;
 }
 
 function renderUsageControls(query: UsageView['query']): string {
@@ -382,7 +389,6 @@ function renderUsageControls(query: UsageView['query']): string {
               ${renderUsageSegmentControl('breakdown', USAGE_BREAKDOWN_OPTIONS, query.breakdown)}
             </div>
             <label class="usage-range-control">
-              <span class="usage-control-label">Range</span>
               ${renderUsageRangeSelect(query.range)}
             </label>
           </div>`;
@@ -441,23 +447,24 @@ function renderUsageBars(view: UsageView): string {
 function renderUsageMetricRanking(
   title: string,
   entries: UsageView['topModelsByTokens'],
-  formatValue: (value: number) => string,
-  valueTitle: (value: number) => string,
+  formatValue: (entry: UsageView['topModelsByTokens'][number]) => string,
+  valueTitle: (entry: UsageView['topModelsByTokens'][number]) => string,
   emptyText: string,
-  fillClass = '',
+  colorKeys: string[] = [],
 ): string {
   if (entries.length === 0) {
     return `<div class="usage-chart-head"><span class="usage-chart-title">${escapeHtml(title)}</span></div><div class="usage-empty">${escapeHtml(emptyText)}</div>`;
   }
   const maxValue = Math.max(1, ...entries.map((entry) => entry.value));
   const rows = entries
-    .map((entry) => {
+    .map((entry, index) => {
       const width = (entry.value / maxValue) * 100;
-      const className = fillClass ? `usage-top-fill ${fillClass}` : 'usage-top-fill';
+      const colorIndex = colorKeys.indexOf(entry.key);
+      const className = `usage-top-fill ${usageSegmentClass(colorIndex >= 0 ? colorIndex : index, entry.key)}`;
       return `<div class="usage-top-row">
                 <span class="usage-top-label" title="${escapeHtml(entry.key)}">${escapeHtml(entry.key)}</span>
                 <span class="usage-top-bar"><span class="${className}" style="width: ${width.toFixed(1)}%"></span></span>
-                <span class="usage-top-value" title="${escapeHtml(valueTitle(entry.value))}">${escapeHtml(formatValue(entry.value))}</span>
+                <span class="usage-top-value" title="${escapeHtml(valueTitle(entry))}">${escapeHtml(formatValue(entry))}</span>
               </div>`;
     })
     .join('');
@@ -465,13 +472,19 @@ function renderUsageMetricRanking(
           <div class="usage-tops">${rows}</div>`;
 }
 
+function getUsageModelColorKeys(view: UsageView): string[] {
+  if (view.query.breakdown === 'model' && view.dimensionKeys.length > 0) return view.dimensionKeys;
+  return (view.models ?? []).map((entry) => entry.key);
+}
+
 function renderUsageTokenRanking(view: UsageView): string {
   return renderUsageMetricRanking(
     'Tokens ranking',
     view.topModelsByTokens ?? [],
-    (value) => formatUsageTokens(value),
-    (value) => `${formatUsageCount(Math.round(value))} tokens`,
+    (entry) => formatUsageTokens(entry.value),
+    (entry) => `${formatUsageCount(Math.round(entry.value))} tokens`,
     'No token data.',
+    getUsageModelColorKeys(view),
   );
 }
 
@@ -479,10 +492,10 @@ function renderUsageSpendRanking(view: UsageView): string {
   return renderUsageMetricRanking(
     'Spend ranking',
     view.topModelsByCost ?? [],
-    (value) => formatUsageCost(value, view.costCurrency),
-    (value) => formatUsageCost(value, view.costCurrency),
+    (entry) => formatUsageCost(entry.value, view.costCurrency, entry.source),
+    (entry) => formatUsageCostTitle(formatUsageCost(entry.value, view.costCurrency, entry.source), entry.source),
     'No cost data.',
-    'spend',
+    getUsageModelColorKeys(view),
   );
 }
 
@@ -499,8 +512,8 @@ function renderUsageRecentTable(view: UsageView): string {
       const tokenTitle = typeof tokenTotal === 'number'
         ? `${formatUsageCount(Math.round(tokenTotal))} ${run.tokensSource === 'estimated' ? 'estimated input tokens' : 'tokens'}`
         : 'Token usage unavailable';
-      const costLabel = run.costAmount === undefined ? '—' : formatUsageCost(run.costAmount, run.costCurrency);
-      const costTitle = run.costAmount === undefined ? 'Cost unavailable' : costLabel;
+      const costLabel = run.costAmount === undefined ? '—' : formatUsageCost(run.costAmount, run.costCurrency, run.costSource);
+      const costTitle = run.costAmount === undefined ? 'Cost unavailable' : formatUsageCostTitle(costLabel, run.costSource);
       const statusTitle = run.status === 'success' ? 'Success' : 'Failed';
       const fileTitle = `${run.projectName} / ${run.sourceFileName}`;
       const languageTitle = run.targetLanguage ?? 'Target language unavailable';
@@ -1368,11 +1381,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
     }
     .usage-range-control {
-      display: grid;
-      gap: 4px;
+      display: block;
       min-width: 96px;
       margin-left: auto;
       color: var(--muted);
+    }
+    .usage-range-wrap {
+      min-width: 96px;
     }
     .usage-range-select {
       font: inherit;
@@ -1381,7 +1396,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       border: 1px solid var(--border);
       border-radius: 6px;
       min-height: 30px;
-      padding: 4px 28px 4px 8px;
+      padding-top: 4px;
+      padding-bottom: 4px;
     }
     .usage-charts {
       display: grid;
@@ -1462,8 +1478,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-top-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .usage-top-bar { background: var(--input); border-radius: 3px; height: 10px; overflow: hidden; }
-    .usage-top-fill { display: block; height: 100%; background: var(--vscode-charts-blue, #4e95d9); }
-    .usage-top-fill.spend { background: var(--vscode-charts-green, #4caf50); }
+    .usage-top-fill { display: block; height: 100%; min-width: 3px; background: var(--vscode-charts-blue, #4e95d9); }
+    .usage-top-fill.usage-seg-c0 { background: var(--vscode-charts-blue, #4e95d9); }
+    .usage-top-fill.usage-seg-c1 { background: var(--vscode-charts-green, #4caf50); }
+    .usage-top-fill.usage-seg-c2 { background: var(--vscode-charts-orange, #e08a00); }
+    .usage-top-fill.usage-seg-c3 { background: var(--vscode-charts-purple, #b180d7); }
+    .usage-top-fill.usage-seg-c4 { background: var(--vscode-charts-red, #e51400); }
+    .usage-top-fill.usage-seg-c5 { background: var(--vscode-charts-yellow, #cca700); }
+    .usage-top-fill.usage-seg-other { background: var(--muted); }
     .usage-top-value { color: var(--muted); text-align: right; }
     .usage-reuse-strip {
       display: flex;
@@ -1502,6 +1524,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         margin-left: 0;
       }
       .usage-charts { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+      .usage-table {
+        min-width: 640px;
+      }
+      .usage-table th:nth-child(3),
+      .usage-table td:nth-child(3) {
+        display: none;
+      }
     }
   </style>
 </head>

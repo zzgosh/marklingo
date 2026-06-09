@@ -187,6 +187,7 @@ test('aggregateUsageView exposes tops and reuse totals', () => {
   assert.equal(view.topModelsByTokens[0].value, 1000);
   assert.equal(view.topModelsByCost[0].key, 'm1');
   assert.equal(Number(view.topModelsByCost[0].value.toFixed(3)), 0.005);
+  assert.equal(view.topModelsByCost[0].source, 'reported');
   assert.deepEqual(view.reuse, { translated: 16, reused: 45, fallback: 0 });
 });
 

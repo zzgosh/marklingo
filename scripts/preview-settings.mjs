@@ -39,7 +39,7 @@ const settingsHtmlUrl = pathToFileURL(path.join(root, 'out/webview/settingsHtml.
 const promptsUrl = pathToFileURL(path.join(root, 'out/translation/prompts.js')).href;
 const translationModelPromptsUrl = pathToFileURL(path.join(root, 'out/translation/translationModelPrompts.js')).href;
 const providerPresetsUrl = pathToFileURL(path.join(root, 'out/services/providerPresets.js')).href;
-const { createSettingsHtmlNonce, renderSettingsHtml } = await import(`${settingsHtmlUrl}?t=${Date.now()}`);
+const { createSettingsHtmlNonce, renderSettingsHtml, renderUsageSection } = await import(`${settingsHtmlUrl}?t=${Date.now()}`);
 const { resolveSystemPrompt } = await import(`${promptsUrl}?t=${Date.now()}`);
 const { getTranslationModelPromptPreview } = await import(`${translationModelPromptsUrl}?t=${Date.now()}`);
 const {
@@ -53,6 +53,15 @@ const providerDefaultBaseUrls = Object.fromEntries(PROVIDER_PRESETS.map((preset)
   preset.id,
   preset.defaultBaseUrl,
 ]));
+
+const usagePreviewRanges = ['7d', '30d', '90d', 'all'];
+const usagePreviewBreakdowns = ['provider', 'model', 'project'];
+const usagePreviewMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const usagePreviewDayMs = 86_400_000;
+
+function serializeForScript(value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
 
 function getPreviewThemeCss(nonce) {
   return `<style nonce="${nonce}">
@@ -103,15 +112,133 @@ function getPromptState(adapterMode, promptModelId, targetLanguage, chatPromptIn
   };
 }
 
-function getPreviewBridgeScript(nonce, url) {
+function coerceUsagePreviewRange(value) {
+  return usagePreviewRanges.includes(value) ? value : '30d';
+}
+
+function coerceUsagePreviewBreakdown(value) {
+  return usagePreviewBreakdowns.includes(value) ? value : 'model';
+}
+
+function getUsagePreviewGroupBy(range) {
+  if (range === '90d') return 'week';
+  if (range === 'all') return 'month';
+  return 'day';
+}
+
+function getUsagePreviewDimensionKeys(breakdown) {
+  if (breakdown === 'provider') return ['openrouter', 'openaiCompatible'];
+  if (breakdown === 'project') return ['marklingo', 'docs-site', 'api-docs'];
+  return ['google/gemini-3.1-flash-lite', 'hy-mt2'];
+}
+
+function formatUsagePreviewDayLabel(date) {
+  return `${usagePreviewMonths[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}
+
+function buildUsagePreviewBucketDate(range, index, count) {
+  const base = Date.UTC(2026, 5, 8);
+  if (range === '90d') return new Date(base - (count - 1 - index) * 7 * usagePreviewDayMs);
+  if (range === 'all') return new Date(Date.UTC(2026, 5 - (count - 1 - index), 1));
+  return new Date(base - (count - 1 - index) * usagePreviewDayMs);
+}
+
+function buildUsagePreviewBuckets(range, dimensionKeys) {
+  const count = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 13 : 6;
+  return Array.from({ length: count }, (_, index) => {
+    const date = buildUsagePreviewBucketDate(range, index, count);
+    const segments = dimensionKeys.map((key, dimensionIndex) => {
+      const wave = Math.abs(Math.sin((index + 1) * (dimensionIndex + 1) * 0.73));
+      const ceiling = dimensionIndex === 0 ? 6 : dimensionIndex === 1 ? 4 : 3;
+      const runs = Math.round(wave * ceiling) + (dimensionIndex === 0 && index % 4 === 0 ? 1 : 0);
+      return { key, runs };
+    });
+    let totalRuns = segments.reduce((sum, segment) => sum + segment.runs, 0);
+    if (totalRuns === 0 && segments.length > 0) {
+      segments[0].runs = 1;
+      totalRuns = 1;
+    }
+    const key = range === 'all'
+      ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+      : date.toISOString().slice(0, 10);
+    const label = range === 'all'
+      ? `${usagePreviewMonths[date.getUTCMonth()]}`
+      : formatUsagePreviewDayLabel(date);
+    return { key, label, totalRuns, segments };
+  });
+}
+
+function buildUsagePreviewTops(dimensionKeys, buckets) {
+  return dimensionKeys
+    .map((key) => {
+      const runs = buckets.reduce((sum, bucket) => {
+        const segment = bucket.segments.find((item) => item.key === key);
+        return sum + (segment?.runs ?? 0);
+      }, 0);
+      return { key, runs, files: Math.max(1, Math.ceil(runs / 3)) };
+    })
+    .filter((entry) => entry.runs > 0)
+    .sort((a, b) => b.runs - a.runs)
+    .slice(0, 5);
+}
+
+function buildUsagePreviewView(baseUsage, rangeValue, breakdownValue) {
+  const range = coerceUsagePreviewRange(rangeValue);
+  const breakdown = coerceUsagePreviewBreakdown(breakdownValue);
+  const query = { range, groupBy: getUsagePreviewGroupBy(range), scope: 'allProjects', breakdown };
+  if (baseUsage.totalRuns === 0) {
+    return { ...baseUsage, query };
+  }
+
+  const dimensionKeys = getUsagePreviewDimensionKeys(breakdown);
+  const buckets = buildUsagePreviewBuckets(range, dimensionKeys);
+  const tops = buildUsagePreviewTops(dimensionKeys, buckets);
+  const totalRuns = buckets.reduce((sum, bucket) => sum + bucket.totalRuns, 0);
+  const failedRuns = Math.max(1, Math.round(totalRuns * 0.07));
+  return {
+    ...baseUsage,
+    totalRuns,
+    successRuns: Math.max(0, totalRuns - failedRuns),
+    failedRuns,
+    filesTranslated: Math.max(1, Math.round(totalRuns * 0.45)),
+    projectsTouched: breakdown === 'project' ? Math.min(3, dimensionKeys.length) : baseUsage.projectsTouched,
+    estimatedInputTokens: Math.round(totalRuns * 4200),
+    reportedInputTokens: Math.round(totalRuns * 3800),
+    reportedOutputTokens: Math.round(totalRuns * 760),
+    reportedTotalTokens: Math.round(totalRuns * 4560),
+    estimatedCost: Number((totalRuns * 0.00195).toFixed(5)),
+    query,
+    dimensionKeys,
+    buckets,
+    tops,
+  };
+}
+
+function buildUsagePreviewResponses(baseUsage) {
+  const responses = {};
+  usagePreviewRanges.forEach((range) => {
+    usagePreviewBreakdowns.forEach((breakdown) => {
+      const view = buildUsagePreviewView(baseUsage, range, breakdown);
+      responses[`${range}:${breakdown}`] = {
+        query: view.query,
+        html: renderUsageSection(view),
+      };
+    });
+  });
+  return responses;
+}
+
+function getPreviewBridgeScript(nonce, url, usage) {
   const usesCustomLanguage = url.searchParams.get('custom') === '1';
   const targetLanguage = usesCustomLanguage ? 'Brazilian Portuguese' : '简体中文';
   const chatPromptInstructions = resolveSystemPrompt('', targetLanguage);
   const adapterMode = url.search.includes('capability=translationModel') ? 'translationModel' : 'chatJson';
   const promptModelId = url.searchParams.get('openaiModel') ?? url.searchParams.get('model') ?? defaultModelId;
   const promptState = getPromptState(adapterMode, promptModelId, targetLanguage, chatPromptInstructions);
+  const usagePreviewResponses = buildUsagePreviewResponses(usage);
   return `<script nonce="${nonce}">
     window.__marklingoPreviewMessages = [];
+    const usagePreviewResponses = ${serializeForScript(usagePreviewResponses)};
     window.acquireVsCodeApi = () => ({
       postMessage(message) {
         window.__marklingoPreviewMessages.push(message);
@@ -120,6 +247,15 @@ function getPreviewBridgeScript(nonce, url) {
         const reply = (payload) => window.setTimeout(() => window.postMessage(payload, window.location.origin), 140);
         if (message.type === 'updateSetting') {
           reply({ type: 'saved', key: message.key, value: message.value, saveId: message.saveId });
+          return;
+        }
+        if (message.type === 'usageQuery') {
+          const range = ${serializeForScript(usagePreviewRanges)}.includes(message.range) ? message.range : '30d';
+          const breakdown = ${serializeForScript(usagePreviewBreakdowns)}.includes(message.breakdown) ? message.breakdown : 'model';
+          const usageResponse = usagePreviewResponses[range + ':' + breakdown] || usagePreviewResponses['30d:model'];
+          if (usageResponse) {
+            reply({ type: 'usageSection', html: usageResponse.html, query: usageResponse.query });
+          }
           return;
         }
         if (message.type === 'verifyProvider') {
@@ -342,8 +478,7 @@ function buildState(url) {
             { key: 'hy-mt2', value: 44880, runs: 12 },
           ],
           topModelsByCost: [
-            { key: 'google/gemini-3.1-flash-lite', value: 0.0712, runs: 24 },
-            { key: 'hy-mt2', value: 0.0122, runs: 12 },
+            { key: 'google/gemini-3.1-flash-lite', value: 0.0712, runs: 24, source: 'reported' },
           ],
           reuse: { translated: 512, reused: 1340, fallback: 7 },
         },
@@ -364,12 +499,13 @@ const server = http.createServer((request, response) => {
   }
 
   const nonce = createSettingsHtmlNonce();
+  const state = buildState(requestUrl);
   const html = renderSettingsHtml({
-    beforeMainScript: getPreviewBridgeScript(nonce, requestUrl),
+    beforeMainScript: getPreviewBridgeScript(nonce, requestUrl, state.usage),
     cspSource: "'self'",
     extraHead: getPreviewThemeCss(nonce),
     nonce,
-    state: buildState(requestUrl),
+    state,
   });
   response.writeHead(200, {
     'Cache-Control': 'no-store',

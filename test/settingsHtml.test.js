@@ -367,6 +367,7 @@ test('renders an empty Usage section when there is no usage history', () => {
   assert.ok(!html.includes('class="usage-table"'));
   // The persistent control shell renders even with no history.
   assert.match(html, /data-usage-control="range"/);
+  assert.match(html, /class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="Usage range"/);
   assert.match(html, /data-usage-control="breakdown"/);
   assert.ok(!html.includes('data-usage-control="scope"'));
   assert.ok(!html.includes('data-usage-control="groupBy"'));
@@ -425,6 +426,23 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
             costSource: 'reported',
           },
           {
+            eventId: 'e3',
+            startedAt: '2026-06-08T09:30:00.000Z',
+            finishedAt: '2026-06-08T09:30:03.000Z',
+            status: 'success',
+            projectName: 'api-docs',
+            sourceFileName: 'draft.md',
+            targetLanguage: 'German',
+            providerType: 'openaiCompatible',
+            modelId: 'openai-compatible/model',
+            durationMs: 3000,
+            tokensInput: 1500,
+            tokensSource: 'estimated',
+            costAmount: 0.0012,
+            costCurrency: 'USD',
+            costSource: 'estimated',
+          },
+          {
             eventId: 'e2',
             startedAt: '2026-06-08T09:00:00.000Z',
             finishedAt: '2026-06-08T09:00:02.000Z',
@@ -445,7 +463,7 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
         ],
         tops: [{ key: 'google/gemini-3.1-flash-lite', runs: 5, files: 3 }],
         topModelsByTokens: [{ key: 'google/gemini-3.1-flash-lite', value: 9000, runs: 1 }],
-        topModelsByCost: [{ key: 'google/gemini-3.1-flash-lite', value: 0.003, runs: 1 }],
+        topModelsByCost: [{ key: 'google/gemini-3.1-flash-lite', value: 0.003, runs: 1, source: 'reported' }],
         reuse: { translated: 20, reused: 60, fallback: 0 },
       },
     }),
@@ -464,9 +482,12 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, />en<\/td>/);
   assert.match(html, /12\.4K/);
   assert.match(html, /title="9,000 tokens">9\.0K/);
-  assert.match(html, /title="\$0\.0030">\$0\.0030/);
+  assert.match(html, /title="Reported cost: \$0\.0030">\$0\.0030/);
+  assert.match(html, /title="Estimated cost: ≈\$0\.0012">≈\$0\.0012/);
   assert.match(html, /title="Cost unavailable">—/);
   assert.match(html, /data-usage-control="range"/);
+  assert.match(html, /class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="Usage range"/);
+  assert.ok(!html.includes('class="usage-control-label">Range</span>'));
   assert.match(html, /<option value="30d" selected>30D<\/option>/);
   assert.match(html, /class="usage-seg-btn active" data-usage-control="breakdown" data-value="model"/);
   assert.match(html, /class="usage-bars"/);
@@ -474,6 +495,7 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /Tokens ranking/);
   assert.match(html, /Spend ranking/);
   assert.match(html, /class="usage-top-row"/);
+  assert.match(html, /class="usage-top-fill usage-seg-c0"/);
   assert.match(html, /<th>Tokens<\/th><th>Cost<\/th><th>Status<\/th>/);
   assert.ok(!html.includes('<th>Work</th>'));
   assert.ok(!html.includes('Cache reuse'));
