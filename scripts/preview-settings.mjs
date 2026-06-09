@@ -54,10 +54,11 @@ const providerDefaultBaseUrls = Object.fromEntries(PROVIDER_PRESETS.map((preset)
   preset.defaultBaseUrl,
 ]));
 
-const usagePreviewRanges = ['7d', '30d', '90d', 'all'];
-const usagePreviewBreakdowns = ['provider', 'model', 'project'];
+const usagePreviewRanges = ['1d', '7d', '30d', '365d', 'all'];
+const usagePreviewBreakdowns = ['provider', 'model'];
 const usagePreviewMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const usagePreviewDayMs = 86_400_000;
+const usagePreviewHourMs = 3_600_000;
 
 function serializeForScript(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -113,7 +114,7 @@ function getPromptState(adapterMode, promptModelId, targetLanguage, chatPromptIn
 }
 
 function coerceUsagePreviewRange(value) {
-  return usagePreviewRanges.includes(value) ? value : '30d';
+  return usagePreviewRanges.includes(value) ? value : '7d';
 }
 
 function coerceUsagePreviewBreakdown(value) {
@@ -121,14 +122,14 @@ function coerceUsagePreviewBreakdown(value) {
 }
 
 function getUsagePreviewGroupBy(range) {
-  if (range === '90d') return 'week';
+  if (range === '1d') return 'hour';
+  if (range === '365d') return 'week';
   if (range === 'all') return 'month';
   return 'day';
 }
 
 function getUsagePreviewDimensionKeys(breakdown) {
   if (breakdown === 'provider') return ['openrouter', 'openaiCompatible'];
-  if (breakdown === 'project') return ['marklingo', 'docs-site', 'api-docs'];
   return ['google/gemini-3.1-flash-lite', 'hy-mt2'];
 }
 
@@ -138,33 +139,41 @@ function formatUsagePreviewDayLabel(date) {
 
 function buildUsagePreviewBucketDate(range, index, count) {
   const base = Date.UTC(2026, 5, 8);
-  if (range === '90d') return new Date(base - (count - 1 - index) * 7 * usagePreviewDayMs);
+  if (range === '1d') return new Date(base - (count - 1 - index) * usagePreviewHourMs);
+  if (range === '365d') return new Date(base - (count - 1 - index) * 7 * usagePreviewDayMs);
   if (range === 'all') return new Date(Date.UTC(2026, 5 - (count - 1 - index), 1));
   return new Date(base - (count - 1 - index) * usagePreviewDayMs);
 }
 
 function buildUsagePreviewBuckets(range, dimensionKeys) {
-  const count = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 13 : 6;
+  const count = range === '1d' ? 24 : range === '7d' ? 7 : range === '30d' ? 30 : range === '365d' ? 53 : 6;
   return Array.from({ length: count }, (_, index) => {
     const date = buildUsagePreviewBucketDate(range, index, count);
     const segments = dimensionKeys.map((key, dimensionIndex) => {
       const wave = Math.abs(Math.sin((index + 1) * (dimensionIndex + 1) * 0.73));
       const ceiling = dimensionIndex === 0 ? 6 : dimensionIndex === 1 ? 4 : 3;
       const runs = Math.round(wave * ceiling) + (dimensionIndex === 0 && index % 4 === 0 ? 1 : 0);
-      return { key, runs };
+      const tokens = runs * (dimensionIndex === 0 ? 6400 : 4200) + Math.round(wave * 900);
+      return { key, runs, tokens };
     });
     let totalRuns = segments.reduce((sum, segment) => sum + segment.runs, 0);
     if (totalRuns === 0 && segments.length > 0) {
       segments[0].runs = 1;
+      segments[0].tokens = 6400;
       totalRuns = 1;
     }
+    const totalTokens = segments.reduce((sum, segment) => sum + segment.tokens, 0);
     const key = range === 'all'
       ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+      : range === '1d'
+        ? date.toISOString().slice(0, 13)
       : date.toISOString().slice(0, 10);
     const label = range === 'all'
       ? `${usagePreviewMonths[date.getUTCMonth()]}`
+      : range === '1d'
+        ? `${String(date.getUTCHours()).padStart(2, '0')}:00`
       : formatUsagePreviewDayLabel(date);
-    return { key, label, totalRuns, segments };
+    return { key, label, totalRuns, totalTokens, segments };
   });
 }
 
@@ -201,7 +210,7 @@ function buildUsagePreviewView(baseUsage, rangeValue, breakdownValue) {
     successRuns: Math.max(0, totalRuns - failedRuns),
     failedRuns,
     filesTranslated: Math.max(1, Math.round(totalRuns * 0.45)),
-    projectsTouched: breakdown === 'project' ? Math.min(3, dimensionKeys.length) : baseUsage.projectsTouched,
+    projectsTouched: baseUsage.projectsTouched,
     estimatedInputTokens: Math.round(totalRuns * 4200),
     reportedInputTokens: Math.round(totalRuns * 3800),
     reportedOutputTokens: Math.round(totalRuns * 760),
@@ -250,9 +259,9 @@ function getPreviewBridgeScript(nonce, url, usage) {
           return;
         }
         if (message.type === 'usageQuery') {
-          const range = ${serializeForScript(usagePreviewRanges)}.includes(message.range) ? message.range : '30d';
+          const range = ${serializeForScript(usagePreviewRanges)}.includes(message.range) ? message.range : '7d';
           const breakdown = ${serializeForScript(usagePreviewBreakdowns)}.includes(message.breakdown) ? message.breakdown : 'model';
-          const usageResponse = usagePreviewResponses[range + ':' + breakdown] || usagePreviewResponses['30d:model'];
+          const usageResponse = usagePreviewResponses[range + ':' + breakdown] || usagePreviewResponses['7d:model'];
           if (usageResponse) {
             reply({ type: 'usageSection', html: usageResponse.html, query: usageResponse.query });
           }
@@ -405,7 +414,7 @@ function buildState(url) {
           models: [],
           targetLanguages: [],
           recentRuns: [],
-          query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+          query: { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
           buckets: [],
           dimensionKeys: [],
           tops: [],
@@ -449,26 +458,9 @@ function buildState(url) {
             { eventId: 'r2', startedAt: '2026-06-08T09:40:00.000Z', finishedAt: '2026-06-08T09:40:06.500Z', status: 'success', projectName: 'marklingo', sourceFileName: 'AGENTS.md', targetLanguage: '简体中文', providerType: 'openrouter', modelId: 'google/gemini-3.1-flash-lite', translatedBlocks: 4, reusedBlocks: 58, fallbackBlocks: 0, durationMs: 6500, tokensInput: 9000, tokensOutput: 1200, tokensTotal: 10200, cachedProviderTokens: 2200, tokensSource: 'reported', costAmount: 0.0031, costCurrency: 'USD', costSource: 'reported' },
             { eventId: 'r3', startedAt: '2026-06-07T22:10:00.000Z', finishedAt: '2026-06-07T22:10:02.100Z', status: 'error', projectName: 'docs-site', sourceFileName: 'guide.md', targetLanguage: 'English', providerType: 'openaiCompatible', modelId: 'hy-mt2', durationMs: 2100, tokensSource: 'unavailable' },
           ],
-          query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+          query: { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
           dimensionKeys: ['google/gemini-3.1-flash-lite', 'hy-mt2'],
-          buckets: (() => {
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const base = Date.UTC(2026, 5, 8);
-            return Array.from({ length: 14 }, (_, i) => {
-              const d = new Date(base - (13 - i) * 86400000);
-              const a = Math.round(Math.abs(Math.sin(i + 1)) * 6);
-              const b = Math.round(Math.abs(Math.cos(i + 1)) * 4);
-              return {
-                key: d.toISOString().slice(0, 10),
-                label: `${months[d.getUTCMonth()]} ${d.getUTCDate()}`,
-                totalRuns: a + b,
-                segments: [
-                  { key: 'google/gemini-3.1-flash-lite', runs: a },
-                  { key: 'hy-mt2', runs: b },
-                ],
-              };
-            });
-          })(),
+          buckets: buildUsagePreviewBuckets('7d', ['google/gemini-3.1-flash-lite', 'hy-mt2']),
           tops: [
             { key: 'google/gemini-3.1-flash-lite', runs: 24, files: 10 },
             { key: 'hy-mt2', runs: 12, files: 6 },

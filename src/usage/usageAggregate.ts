@@ -219,10 +219,10 @@ export function aggregateUsage(
   return summary;
 }
 
-export type UsageRange = "7d" | "30d" | "90d" | "all";
-export type UsageGroupBy = "day" | "week" | "month";
+export type UsageRange = "1d" | "7d" | "30d" | "365d" | "all";
+export type UsageGroupBy = "hour" | "day" | "week" | "month";
 export type UsageScope = "currentProject" | "allProjects";
-export type UsageBreakdown = "provider" | "model" | "project";
+export type UsageBreakdown = "provider" | "model";
 
 export type UsageQuery = {
   range: UsageRange;
@@ -232,18 +232,19 @@ export type UsageQuery = {
 };
 
 export const DEFAULT_USAGE_QUERY: UsageQuery = {
-  range: "30d",
+  range: "7d",
   groupBy: "day",
   scope: "allProjects",
   breakdown: "model",
 };
 
-export type UsageBucketSegment = { key: string; runs: number };
+export type UsageBucketSegment = { key: string; runs: number; tokens: number };
 
 export type UsageBucket = {
   key: string;
   label: string;
   totalRuns: number;
+  totalTokens: number;
   segments: UsageBucketSegment[];
 };
 
@@ -264,6 +265,7 @@ export type AggregateUsageViewContext = {
 };
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 const MAX_BUCKETS = 120;
 const TOP_STACK_KEYS = 6;
 const TOP_LIST_ENTRIES = 8;
@@ -272,9 +274,10 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 
 function rangeDays(range: UsageRange): number | undefined {
   switch (range) {
+    case "1d": return 1;
     case "7d": return 7;
     case "30d": return 30;
-    case "90d": return 90;
+    case "365d": return 365;
     default: return undefined;
   }
 }
@@ -283,7 +286,6 @@ function breakdownKeyOf(event: UsageEventV1, breakdown: UsageBreakdown): string 
   switch (breakdown) {
     case "provider": return event.providerType ?? "Unknown";
     case "model": return event.modelId ?? "Unknown";
-    case "project": return event.projectName ?? "Unknown";
   }
 }
 
@@ -321,6 +323,18 @@ function computeBreakdown(events: UsageEventV1[], breakdown: UsageBreakdown): Us
   return toBreakdownEntries(acc);
 }
 
+function usageTokenTotal(event: UsageEventV1): number {
+  const input = typeof event.tokens?.input === "number" ? event.tokens.input : undefined;
+  const output = typeof event.tokens?.output === "number" ? event.tokens.output : undefined;
+  if (input !== undefined || output !== undefined) return (input ?? 0) + (output ?? 0);
+  return typeof event.tokens?.total === "number" ? event.tokens.total : 0;
+}
+
+function alignHourUtc(ms: number): number {
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours());
+}
+
 function alignDayUtc(ms: number): number {
   const d = new Date(ms);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -336,8 +350,17 @@ function isoDate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+function hourKey(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 13);
+}
+
 function monthKey(ms: number): string {
   return new Date(ms).toISOString().slice(0, 7);
+}
+
+function hourLabel(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:00`;
 }
 
 function dayLabel(ms: number): string {
@@ -353,6 +376,7 @@ function monthLabel(ms: number): string {
 function bucketKeyOf(ms: number, groupBy: UsageGroupBy): string {
   if (groupBy === "month") return monthKey(ms);
   if (groupBy === "week") return isoDate(alignWeekUtc(ms));
+  if (groupBy === "hour") return hourKey(ms);
   return isoDate(ms);
 }
 
@@ -370,8 +394,9 @@ function spanDays(events: UsageEventV1[], now: Date): number {
 }
 
 function groupByForRange(range: UsageRange, events: UsageEventV1[], now: Date): UsageGroupBy {
+  if (range === "1d") return "hour";
   if (range === "7d" || range === "30d") return "day";
-  if (range === "90d") return "week";
+  if (range === "365d") return "week";
   const days = spanDays(events, now);
   if (days <= 30) return "day";
   if (days <= 90) return "week";
@@ -386,6 +411,7 @@ function bucketSpan(
   const days = rangeDays(query.range);
   const endMs = now.getTime();
   if (days !== undefined) {
+    if (query.range === "1d") return { startMs: endMs - 23 * HOUR_MS, endMs };
     return { startMs: endMs - (days - 1) * DAY_MS, endMs };
   }
   let min = Infinity;
@@ -402,7 +428,14 @@ function generateBucketScaffold(
   groupBy: UsageGroupBy,
 ): Array<{ key: string; label: string }> {
   const out: Array<{ key: string; label: string }> = [];
-  if (groupBy === "month") {
+  if (groupBy === "hour") {
+    let cur = alignHourUtc(span.startMs);
+    const end = alignHourUtc(span.endMs);
+    while (cur <= end) {
+      out.push({ key: hourKey(cur), label: hourLabel(cur) });
+      cur += HOUR_MS;
+    }
+  } else if (groupBy === "month") {
     const startDate = new Date(span.startMs);
     const endDate = new Date(span.endMs);
     let cur = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1);
@@ -441,30 +474,30 @@ function buildBuckets(
   const scaffold = generateBucketScaffold(span, query.groupBy);
   const dimSet = new Set(dimensionKeys);
   const hasOther = dimSet.has("Other");
-  const counts = new Map<string, Map<string, number>>();
+  const counts = new Map<string, Map<string, { runs: number; tokens: number }>>();
   for (const event of events) {
     const t = Date.parse(runTimestamp(event));
     if (Number.isNaN(t)) continue;
     const bucketKey = bucketKeyOf(t, query.groupBy);
     let dim = breakdownKeyOf(event, query.breakdown);
     if (!dimSet.has(dim)) dim = hasOther ? "Other" : dim;
-    const bucket = counts.get(bucketKey) ?? new Map<string, number>();
-    bucket.set(dim, (bucket.get(dim) ?? 0) + 1);
+    const bucket = counts.get(bucketKey) ?? new Map<string, { runs: number; tokens: number }>();
+    const current = bucket.get(dim) ?? { runs: 0, tokens: 0 };
+    current.runs += 1;
+    current.tokens += usageTokenTotal(event);
+    bucket.set(dim, current);
     counts.set(bucketKey, bucket);
   }
   return scaffold.map(({ key, label }) => {
     const bucket = counts.get(key);
-    const segments = dimensionKeys.map((dimKey) => ({ key: dimKey, runs: bucket?.get(dimKey) ?? 0 }));
+    const segments = dimensionKeys.map((dimKey) => {
+      const segment = bucket?.get(dimKey);
+      return { key: dimKey, runs: segment?.runs ?? 0, tokens: segment?.tokens ?? 0 };
+    });
     const totalRuns = segments.reduce((sum, segment) => sum + segment.runs, 0);
-    return { key, label, totalRuns, segments };
+    const totalTokens = segments.reduce((sum, segment) => sum + segment.tokens, 0);
+    return { key, label, totalRuns, totalTokens, segments };
   });
-}
-
-function usageTokenTotal(event: UsageEventV1): number {
-  const input = typeof event.tokens?.input === "number" ? event.tokens.input : undefined;
-  const output = typeof event.tokens?.output === "number" ? event.tokens.output : undefined;
-  if (input !== undefined || output !== undefined) return (input ?? 0) + (output ?? 0);
-  return typeof event.tokens?.total === "number" ? event.tokens.total : 0;
 }
 
 function computeTopModelMetric(
@@ -540,8 +573,8 @@ export function aggregateUsageView(
   };
 }
 
-const USAGE_RANGE_VALUES: UsageRange[] = ["7d", "30d", "90d", "all"];
-const USAGE_BREAKDOWN_VALUES: UsageBreakdown[] = ["provider", "model", "project"];
+const USAGE_RANGE_VALUES: UsageRange[] = ["1d", "7d", "30d", "365d", "all"];
+const USAGE_BREAKDOWN_VALUES: UsageBreakdown[] = ["provider", "model"];
 
 /** Coerce an untrusted message payload into a valid UsageQuery, falling back to defaults per field. */
 export function coerceUsageQuery(raw: unknown): UsageQuery {

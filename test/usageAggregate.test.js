@@ -138,12 +138,20 @@ test('aggregateUsageView derives group by from range', () => {
     event({ finishedAt: '2026-05-15T10:00:00.000Z' }),
     event({ finishedAt: '2026-01-01T10:00:00.000Z' }),
   ];
+  const oneDay = aggregateUsageView(events, { range: '1d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(oneDay.query.groupBy, 'hour');
+  assert.equal(oneDay.buckets.length, 24);
+
+  const seven = aggregateUsageView(events, { range: '7d', groupBy: 'week', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(seven.query.groupBy, 'day');
+  assert.equal(seven.buckets.length, 7);
+
   const thirty = aggregateUsageView(events, { range: '30d', groupBy: 'week', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
   assert.equal(thirty.query.groupBy, 'day');
   assert.equal(thirty.buckets.length, 30);
 
-  const ninety = aggregateUsageView(events, { range: '90d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
-  assert.equal(ninety.query.groupBy, 'week');
+  const year = aggregateUsageView(events, { range: '365d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
+  assert.equal(year.query.groupBy, 'week');
 
   const all = aggregateUsageView(events, { range: 'all', groupBy: 'day', scope: 'allProjects', breakdown: 'model' }, { now: VIEW_NOW });
   assert.equal(all.query.groupBy, 'month');
@@ -160,6 +168,7 @@ test('aggregateUsageView builds continuous day buckets with stacked segments', (
   const last = view.buckets[view.buckets.length - 1];
   assert.equal(last.key, '2026-06-08');
   assert.equal(last.totalRuns, 2);
+  assert.equal(last.totalTokens, 2000);
   assert.deepEqual([...view.dimensionKeys].sort(), ['m1', 'm2']);
   assert.equal(last.segments.length, view.dimensionKeys.length);
 });
@@ -197,11 +206,15 @@ test('coerceUsageQuery keeps exposed values and fixes hidden controls', () => {
     { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'provider' },
   );
   assert.deepEqual(
-    coerceUsageQuery({ range: 'bogus', breakdown: 'targetLanguage' }),
-    { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+    coerceUsageQuery({ range: '1d', breakdown: 'model' }),
+    { range: '1d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+  );
+  assert.deepEqual(
+    coerceUsageQuery({ range: 'bogus', breakdown: 'project' }),
+    { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
   );
   assert.deepEqual(
     coerceUsageQuery(null),
-    { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+    { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
   );
 });

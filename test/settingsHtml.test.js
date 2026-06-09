@@ -71,7 +71,7 @@ function getState(overrides = {}) {
       models: [],
       targetLanguages: [],
       recentRuns: [],
-      query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+      query: { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
       buckets: [],
       dimensionKeys: [],
       tops: [],
@@ -456,10 +456,10 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
             tokensSource: 'unavailable',
           },
         ],
-        query: { range: '30d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
+        query: { range: '7d', groupBy: 'day', scope: 'allProjects', breakdown: 'model' },
         dimensionKeys: ['google/gemini-3.1-flash-lite'],
         buckets: [
-          { key: '2026-06-08', label: 'Jun 8', totalRuns: 5, segments: [{ key: 'google/gemini-3.1-flash-lite', runs: 5 }] },
+          { key: '2026-06-08', label: 'Jun 8', totalRuns: 5, totalTokens: 9000, segments: [{ key: 'google/gemini-3.1-flash-lite', runs: 5, tokens: 9000 }] },
         ],
         tops: [{ key: 'google/gemini-3.1-flash-lite', runs: 5, files: 3 }],
         topModelsByTokens: [{ key: 'google/gemini-3.1-flash-lite', value: 9000, runs: 1 }],
@@ -470,16 +470,17 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   });
 
   assert.match(html, /<h2>Usage<\/h2>/);
-  assert.match(html, /Files translated/);
-  assert.match(html, /10\.0K input \/ 2\.4K output/);
+  assert.match(html, /Translated files/);
+  assert.match(html, /Translation tasks/);
+  assert.match(html, /Tokens/);
   assert.match(html, /\$0\.0048/);
   assert.match(html, /Estimated cost/);
   assert.match(html, /class="usage-table"/);
   assert.match(html, /README\.md/);
   assert.match(html, /usage-status-dot" data-status="success" title="Success"/);
   assert.match(html, /usage-status-dot" data-status="error" title="Failed"/);
-  assert.match(html, />zh-CN<\/td>/);
-  assert.match(html, />en<\/td>/);
+  assert.match(html, />ZH-CN<\/td>/);
+  assert.match(html, />EN<\/td>/);
   assert.match(html, /12\.4K/);
   assert.match(html, /title="9,000 tokens">9\.0K/);
   assert.match(html, /title="Reported cost: \$0\.0030">\$0\.0030/);
@@ -488,12 +489,16 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /data-usage-control="range"/);
   assert.match(html, /class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="Usage range"/);
   assert.ok(!html.includes('class="usage-control-label">Range</span>'));
-  assert.match(html, /<option value="30d" selected>30D<\/option>/);
+  assert.match(html, /<option value="7d" selected>Past 1 week<\/option>/);
   assert.match(html, /class="usage-seg-btn active" data-usage-control="breakdown" data-value="model"/);
+  assert.ok(!html.includes('data-value="project"'));
   assert.match(html, /class="usage-bars"/);
   assert.match(html, /<rect class="usage-seg-c0"/);
-  assert.match(html, /Tokens ranking/);
-  assert.match(html, /Spend ranking/);
+  assert.match(html, /Tokens by model/);
+  assert.match(html, /Models ranked by token usage/);
+  assert.match(html, /data-ranking-mode="cost"/);
+  assert.match(html, /Models ranked by cost/);
+  assert.ok(!html.includes('Spend ranking'));
   assert.match(html, /class="usage-top-row"/);
   assert.match(html, /class="usage-top-fill usage-seg-c0"/);
   assert.match(html, /\.usage-charts \{\s*display: grid;\s*grid-template-columns: 1fr;/);

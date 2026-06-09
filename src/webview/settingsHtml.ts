@@ -273,37 +273,36 @@ export function formatBytes(bytes: number): string {
 }
 
 const USAGE_RANGE_OPTIONS = [
-  { value: '7d', label: '7D' },
-  { value: '30d', label: '30D' },
-  { value: '90d', label: '90D' },
-  { value: 'all', label: 'All' },
+  { value: '1d', label: 'Past 1 day' },
+  { value: '7d', label: 'Past 1 week' },
+  { value: '30d', label: 'Past 1 month' },
+  { value: '365d', label: 'Past 1 year' },
+  { value: 'all', label: 'All time' },
 ];
 const USAGE_BREAKDOWN_OPTIONS = [
   { value: 'provider', label: 'Provider' },
   { value: 'model', label: 'Model' },
-  { value: 'project', label: 'Project' },
 ];
 const USAGE_BREAKDOWN_LABELS: Record<string, string> = {
   provider: 'provider',
   model: 'model',
-  project: 'project',
 };
 const USAGE_LANGUAGE_LABELS: Record<string, string> = {
-  '简体中文': 'zh-CN',
-  '繁體中文': 'zh-TW',
-  'English': 'en',
-  '日本語': 'ja',
-  'Japanese': 'ja',
-  '한국어': 'ko',
-  'Korean': 'ko',
-  'Français': 'fr',
-  'French': 'fr',
-  'Deutsch': 'de',
-  'German': 'de',
-  'Español': 'es',
-  'Spanish': 'es',
-  'Português': 'pt',
-  'Portuguese': 'pt',
+  '简体中文': 'ZH-CN',
+  '繁體中文': 'ZH-TW',
+  'English': 'EN',
+  '日本語': 'JA',
+  'Japanese': 'JA',
+  '한국어': 'KO',
+  'Korean': 'KO',
+  'Français': 'FR',
+  'French': 'FR',
+  'Deutsch': 'DE',
+  'German': 'DE',
+  'Español': 'ES',
+  'Spanish': 'ES',
+  'Português': 'PT',
+  'Portuguese': 'PT',
 };
 
 function formatUsageCount(value: number): string {
@@ -345,7 +344,7 @@ function formatUsageTime(iso?: string): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 }
 
 function formatUsageTargetLanguage(value?: string): string {
@@ -353,7 +352,7 @@ function formatUsageTargetLanguage(value?: string): string {
   if (!label) return '—';
   const known = USAGE_LANGUAGE_LABELS[label];
   if (known) return known;
-  if (/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/i.test(label)) return label;
+  if (/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/i.test(label)) return label.toUpperCase();
   const words = label.match(/[\p{L}\p{N}]+/gu) ?? [];
   if (words.length >= 2) return words.map((word) => word[0]).join('').slice(0, 6).toUpperCase();
   return label.length <= 8 ? label : `${label.slice(0, 7)}...`;
@@ -400,10 +399,17 @@ function usageSegmentClass(index: number, key: string): string {
 function renderUsageBars(view: UsageView): string {
   const buckets = view.buckets ?? [];
   const dimensionKeys = view.dimensionKeys ?? [];
+  const breakdownLabel = USAGE_BREAKDOWN_LABELS[view.query.breakdown] ?? view.query.breakdown;
+  const chartHead = (totalTokens: number) =>
+    `<div class="usage-chart-head"><span class="usage-chart-title">Tokens by ${escapeHtml(breakdownLabel)}</span><span class="usage-chart-total">${escapeHtml(formatUsageTokens(totalTokens))} tokens</span></div>`;
   if (buckets.length === 0) {
-    return '<div class="usage-empty">No runs in this range.</div>';
+    return `${chartHead(0)}<div class="usage-empty">No token data in this range.</div>`;
   }
-  const maxTotal = Math.max(1, ...buckets.map((bucket) => bucket.totalRuns));
+  const totalTokens = buckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
+  if (totalTokens <= 0) {
+    return `${chartHead(0)}<div class="usage-empty">No token data in this range.</div>`;
+  }
+  const maxTotal = Math.max(1, ...buckets.map((bucket) => bucket.totalTokens));
   const count = buckets.length;
   const slotWidth = 100 / count;
   const barWidth = slotWidth * 0.7;
@@ -412,12 +418,13 @@ function renderUsageBars(view: UsageView): string {
   buckets.forEach((bucket, bucketIndex) => {
     let yTop = 100;
     bucket.segments.forEach((segment) => {
-      if (segment.runs <= 0) return;
-      const height = (segment.runs / maxTotal) * 100;
+      if (segment.tokens <= 0) return;
+      const height = (segment.tokens / maxTotal) * 100;
       yTop -= height;
       const dimIndex = dimensionKeys.indexOf(segment.key);
       const x = bucketIndex * slotWidth + barOffset;
-      rects.push(`<rect class="${usageSegmentClass(dimIndex, segment.key)}" x="${x.toFixed(2)}" y="${yTop.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}"><title>${escapeHtml(bucket.label)}: ${escapeHtml(segment.key)} ${segment.runs}</title></rect>`);
+      const title = `${bucket.label}: ${segment.key} ${formatUsageTokens(segment.tokens)} tokens (${formatUsageCount(segment.runs)} ${segment.runs === 1 ? 'run' : 'runs'})`;
+      rects.push(`<rect class="${usageSegmentClass(dimIndex, segment.key)}" x="${x.toFixed(2)}" y="${yTop.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}"><title>${escapeHtml(title)}</title></rect>`);
     });
   });
   const labelStep = view.query.groupBy === 'day' && (view.query.range === '30d' || count > 14)
@@ -433,9 +440,7 @@ function renderUsageBars(view: UsageView): string {
   const legend = dimensionKeys
     .map((key, index) => `<span class="usage-legend-item"><span class="usage-legend-swatch ${usageSegmentClass(index, key)}"></span>${escapeHtml(key)}</span>`)
     .join('');
-  const totalRuns = buckets.reduce((sum, bucket) => sum + bucket.totalRuns, 0);
-  const breakdownLabel = USAGE_BREAKDOWN_LABELS[view.query.breakdown] ?? view.query.breakdown;
-  return `<div class="usage-chart-head"><span class="usage-chart-title">Runs by ${escapeHtml(breakdownLabel)}</span><span class="usage-chart-total">${formatUsageCount(totalRuns)} runs</span></div>
+  return `${chartHead(totalTokens)}
           <div class="usage-bars-wrap">
             <svg class="usage-bars" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${rects.join('')}</svg>
             <div class="usage-axis">${axisLabels}</div>
@@ -443,8 +448,7 @@ function renderUsageBars(view: UsageView): string {
           <div class="usage-legend">${legend}</div>`;
 }
 
-function renderUsageMetricRanking(
-  title: string,
+function renderUsageMetricRows(
   entries: UsageView['topModelsByTokens'],
   formatValue: (entry: UsageView['topModelsByTokens'][number]) => string,
   valueTitle: (entry: UsageView['topModelsByTokens'][number]) => string,
@@ -452,7 +456,7 @@ function renderUsageMetricRanking(
   colorKeys: string[] = [],
 ): string {
   if (entries.length === 0) {
-    return `<div class="usage-chart-head"><span class="usage-chart-title">${escapeHtml(title)}</span></div><div class="usage-empty">${escapeHtml(emptyText)}</div>`;
+    return `<div class="usage-empty">${escapeHtml(emptyText)}</div>`;
   }
   const maxValue = Math.max(1, ...entries.map((entry) => entry.value));
   const rows = entries
@@ -467,8 +471,7 @@ function renderUsageMetricRanking(
               </div>`;
     })
     .join('');
-  return `<div class="usage-chart-head"><span class="usage-chart-title">${escapeHtml(title)}</span></div>
-          <div class="usage-tops">${rows}</div>`;
+  return `<div class="usage-tops">${rows}</div>`;
 }
 
 function getUsageModelColorKeys(view: UsageView): string[] {
@@ -476,26 +479,33 @@ function getUsageModelColorKeys(view: UsageView): string[] {
   return (view.models ?? []).map((entry) => entry.key);
 }
 
-function renderUsageTokenRanking(view: UsageView): string {
-  return renderUsageMetricRanking(
-    'Tokens ranking',
+function renderUsageModelRanking(view: UsageView): string {
+  const colorKeys = getUsageModelColorKeys(view);
+  const tokenRows = renderUsageMetricRows(
     view.topModelsByTokens ?? [],
     (entry) => formatUsageTokens(entry.value),
     (entry) => `${formatUsageCount(Math.round(entry.value))} tokens`,
     'No token data.',
-    getUsageModelColorKeys(view),
+    colorKeys,
   );
-}
-
-function renderUsageSpendRanking(view: UsageView): string {
-  return renderUsageMetricRanking(
-    'Spend ranking',
+  const costRows = renderUsageMetricRows(
     view.topModelsByCost ?? [],
     (entry) => formatUsageCost(entry.value, view.costCurrency),
     (entry) => formatUsageCostTitle(formatUsageCost(entry.value, view.costCurrency), entry.source),
     'No cost data.',
-    getUsageModelColorKeys(view),
+    colorKeys,
   );
+  return `<div class="usage-ranking" data-ranking-active="tokens">
+            <div class="usage-chart-head usage-ranking-head">
+              <span class="usage-chart-title" data-ranking-title>Models ranked by token usage</span>
+              <div class="usage-seg usage-ranking-toggle" role="tablist" aria-label="Model ranking metric">
+                <button type="button" class="usage-seg-btn active" data-ranking-mode="tokens" data-ranking-title="Models ranked by token usage" role="tab" aria-selected="true">Tokens</button>
+                <button type="button" class="usage-seg-btn" data-ranking-mode="cost" data-ranking-title="Models ranked by cost" role="tab" aria-selected="false">Cost</button>
+              </div>
+            </div>
+            <div class="usage-ranking-panel" data-ranking-panel="tokens">${tokenRows}</div>
+            <div class="usage-ranking-panel" data-ranking-panel="cost" hidden>${costRows}</div>
+          </div>`;
 }
 
 function renderUsageRecentTable(view: UsageView): string {
@@ -547,22 +557,20 @@ export function renderUsageSection(view: UsageView): string {
   const tokenTotal = view.hasReportedTokens
     ? view.reportedTotalTokens || (view.reportedInputTokens + view.reportedOutputTokens)
     : view.estimatedInputTokens;
-  const tokenCaption = view.hasReportedTokens
-    ? `${formatUsageTokens(view.reportedInputTokens)} input / ${formatUsageTokens(view.reportedOutputTokens)} output`
-    : 'Input tokens · estimated';
+  const tokenCaption = 'Tokens';
   const costText = formatUsageCost(view.hasEstimatedCost ? view.estimatedCost : undefined, view.costCurrency);
   const costCaption = 'Estimated cost';
+  const taskTitle = `${formatUsageCount(view.successRuns)} successful / ${formatUsageCount(view.failedRuns)} failed`;
   const cards = `<div class="usage-cards">
-            <div class="usage-card"><div class="usage-value">${formatUsageCount(view.filesTranslated)}</div><div class="usage-caption">Files translated</div></div>
-            <div class="usage-card"><div class="usage-value">${formatUsageCount(view.totalRuns)}</div><div class="usage-caption">Runs · ${formatUsageCount(view.successRuns)} ok / ${formatUsageCount(view.failedRuns)} failed</div></div>
             <div class="usage-card"><div class="usage-value">${escapeHtml(formatUsageTokens(tokenTotal))}</div><div class="usage-caption">${escapeHtml(tokenCaption)}</div></div>
             <div class="usage-card"><div class="usage-value">${escapeHtml(costText)}</div><div class="usage-caption">${escapeHtml(costCaption)}</div></div>
+            <div class="usage-card" title="${escapeHtml(taskTitle)}"><div class="usage-value">${formatUsageCount(view.successRuns)}</div><div class="usage-caption">Translation tasks</div></div>
+            <div class="usage-card"><div class="usage-value">${formatUsageCount(view.filesTranslated)}</div><div class="usage-caption">Translated files</div></div>
           </div>`;
   return `${cards}
           <div class="usage-charts">
             <div class="usage-chart usage-chart-bars">${renderUsageBars(view)}</div>
-            <div class="usage-chart">${renderUsageTokenRanking(view)}</div>
-            <div class="usage-chart">${renderUsageSpendRanking(view)}</div>
+            <div class="usage-chart">${renderUsageModelRanking(view)}</div>
           </div>
           ${renderUsageRecentTable(view)}`;
 }
@@ -1277,19 +1285,19 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       font-weight: 600;
     }
     .usage-table th:nth-child(1),
-    .usage-table td:nth-child(1) { width: 16%; }
+    .usage-table td:nth-child(1) { width: 17%; }
     .usage-table th:nth-child(2),
-    .usage-table td:nth-child(2) { width: 20%; }
+    .usage-table td:nth-child(2) { width: 21%; }
     .usage-table th:nth-child(3),
     .usage-table td:nth-child(3) { width: 8%; }
     .usage-table th:nth-child(4),
-    .usage-table td:nth-child(4) { width: 24%; }
+    .usage-table td:nth-child(4) { width: 26%; }
     .usage-table th:nth-child(5),
     .usage-table td:nth-child(5) { width: 10%; }
     .usage-table th:nth-child(6),
-    .usage-table td:nth-child(6) { width: 12%; }
+    .usage-table td:nth-child(6) { width: 11%; }
     .usage-table th:nth-child(7),
-    .usage-table td:nth-child(7) { width: 10%; }
+    .usage-table td:nth-child(7) { width: 7%; }
     .usage-table th:nth-child(7),
     .usage-table td:nth-child(7) { text-align: center; }
     .usage-table .usage-file,
@@ -1415,12 +1423,24 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-chart-head {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: center;
       gap: 8px;
       margin-bottom: 8px;
     }
     .usage-chart-title { font-weight: 600; font-size: 12px; }
     .usage-chart-total { color: var(--muted); font-size: 11px; }
+    .usage-ranking-toggle {
+      flex: 0 0 auto;
+    }
+    .usage-ranking-toggle .usage-seg-btn {
+      min-height: 24px;
+      min-width: 0;
+      padding: 3px 10px;
+      font-size: 11px;
+    }
+    .usage-ranking-panel[hidden] {
+      display: none;
+    }
     .usage-bars-wrap {
       position: relative;
       overflow: hidden;
@@ -1521,6 +1541,16 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       }
       .usage-range-control {
         margin-left: 0;
+      }
+      .usage-ranking-head {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .usage-ranking-toggle {
+        width: 100%;
+      }
+      .usage-ranking-toggle .usage-seg-btn {
+        flex: 1 1 0;
       }
       .usage-charts { grid-template-columns: 1fr; }
     }
@@ -2399,6 +2429,26 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         if (!control) return;
         usageQuery[control] = select.value;
         requestUsage();
+      });
+    }
+    if (usageBody) {
+      usageBody.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-ranking-mode]');
+        if (!button || !usageBody.contains(button)) return;
+        const ranking = button.closest('.usage-ranking');
+        if (!ranking) return;
+        const mode = button.getAttribute('data-ranking-mode');
+        const title = button.getAttribute('data-ranking-title') || '';
+        ranking.querySelectorAll('[data-ranking-mode]').forEach((sibling) => {
+          const selected = sibling === button;
+          sibling.classList.toggle('active', selected);
+          sibling.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+        ranking.querySelectorAll('[data-ranking-panel]').forEach((panel) => {
+          panel.hidden = panel.getAttribute('data-ranking-panel') !== mode;
+        });
+        const titleNode = ranking.querySelector('[data-ranking-title]');
+        if (titleNode && title) titleNode.textContent = title;
       });
     }
 
