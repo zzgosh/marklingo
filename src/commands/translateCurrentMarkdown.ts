@@ -54,7 +54,11 @@ import {
   type TranslationMetaDebug,
   type TranslationProviderUsageDebug,
 } from '../translation/cache.js';
-import { TRANSLATION_PROGRESS_MESSAGES, getBatchTranslationProgressMessage } from './progressMessages.js';
+import {
+  TRANSLATION_PROGRESS_MESSAGES,
+  getBatchTranslationProgressMessage,
+  getTranslationRequestProgressMessage,
+} from './progressMessages.js';
 import { buildUsageEventFromDebug, shouldRecordUsageEvent } from '../usage/usageEvent.js';
 import { appendUsageEvent } from '../usage/usageLedger.js';
 
@@ -394,6 +398,10 @@ type TranslationModelValidationResult = {
   maxTokens?: number;
   providerUsage?: TranslationProviderUsageDebug;
 };
+
+const PROMPTING_PROGRESS_INCREMENT = 10;
+const REQUESTS_PROGRESS_INCREMENT = 80;
+const WRITING_PROGRESS_INCREMENT = 10;
 
 function hasMarkdownFileExtension(uri: vscode.Uri): boolean {
   const ext = path.extname(uri.fsPath).toLowerCase();
@@ -806,7 +814,10 @@ async function translateMarkdownDocument(
           placeholdersById.set(seg.id, modelProtectedResult);
         }
 
-        progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.preparing });
+        progress.report({
+          message: TRANSLATION_PROGRESS_MESSAGES.prompting,
+          increment: PROMPTING_PROGRESS_INCREMENT,
+        });
         const modelContextLength = await getOpenRouterModelContextLength(settings);
         const translationModelBlockLimit = Math.min(maxBlocksPerRequest, translationModelMaxBlocksPerRequest);
         const buildPrompt = (blocks: TranslationRequestBlock[]) =>
@@ -852,8 +863,14 @@ async function translateMarkdownDocument(
         );
 
         if (plan.chunks.length === 0) {
-          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.cached });
+          progress.report({
+            message: TRANSLATION_PROGRESS_MESSAGES.cached,
+            increment: REQUESTS_PROGRESS_INCREMENT,
+          });
         }
+        const requestProgressIncrement = plan.chunks.length > 0
+          ? REQUESTS_PROGRESS_INCREMENT / plan.chunks.length
+          : 0;
 
         const requestTranslatedBlocks = async (
           blocks: TranslationRequestBlock[],
@@ -917,7 +934,7 @@ async function translateMarkdownDocument(
 
         const requestChatJsonChunk = async (plannedChunk: typeof plan.chunks[number], chunkIndex: number) => {
           throwIfCancellationRequested(options.cancellationToken);
-          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.translating });
+          progress.report({ message: getTranslationRequestProgressMessage(chunkIndex, plan.chunks.length) });
           const requestStartedAt = Date.now();
           const requestDebug = debug.plan?.chunks[chunkIndex];
           const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
@@ -950,6 +967,7 @@ async function translateMarkdownDocument(
             `Request ${chunkIndex + 1}/${plan.chunks.length} finished in ${requestDurationMs}ms ` +
               `(${plannedChunk.blocks.length} blocks, ~${plannedChunk.estimatedPromptTokens} estimated prompt tokens).`,
           );
+          progress.report({ increment: requestProgressIncrement });
         };
 
         const requestTranslationModelBlocks = async (
@@ -957,7 +975,6 @@ async function translateMarkdownDocument(
           label: string,
         ): Promise<TranslationModelValidationResult> => {
           throwIfCancellationRequested(options.cancellationToken);
-          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.translating });
           const requestIndex = ++actualRequestCount;
           const requestStartedAt = Date.now();
           const abortSignal = createAbortSignalFromCancellationToken(options.cancellationToken);
@@ -1066,6 +1083,7 @@ async function translateMarkdownDocument(
             const requestDebug = debug.plan?.chunks[chunkIndex];
             const chunkStartedAt = Date.now();
             try {
+              progress.report({ message: getTranslationRequestProgressMessage(chunkIndex, plan.chunks.length) });
               const validated = await requestTranslationModelBlocks(plannedChunk.blocks, `chunk ${chunkIndex + 1}/${plan.chunks.length}`);
               for (const [blockId, value] of Object.entries(validated.values)) {
                 translatedValuesById.set(blockId, value);
@@ -1079,6 +1097,7 @@ async function translateMarkdownDocument(
                 requestDebug.durationMs = Date.now() - chunkStartedAt;
                 requestDebug.status = 'success';
               }
+              progress.report({ increment: requestProgressIncrement });
             } catch (error) {
               if (requestDebug) {
                 requestDebug.durationMs = Date.now() - chunkStartedAt;
@@ -1132,7 +1151,6 @@ async function translateMarkdownDocument(
           );
         }
         debug.warnings = warnings;
-        progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.writing });
 
         const parts: string[] = [];
         let cursor = 0;
@@ -1175,22 +1193,30 @@ async function translateMarkdownDocument(
         return { markdown: out, meta };
       };
 
-    const { markdown: translatedMarkdown, meta: nextMeta } = options.progress
-      ? await translateWithProgress(options.progress)
+    const translateAndWriteWithProgress = async (progress: TranslationProgress) => {
+      const result = await translateWithProgress(progress);
+      progress.report({
+        message: TRANSLATION_PROGRESS_MESSAGES.writing,
+        increment: WRITING_PROGRESS_INCREMENT,
+      });
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(currentTranslatedUri.fsPath)));
+      await Promise.all([
+        vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(result.markdown, 'utf8')),
+        saveTranslationMeta(currentMetaUri, result.meta),
+      ]);
+      return result;
+    };
+
+    const { meta: nextMeta } = options.progress
+      ? await translateAndWriteWithProgress(options.progress)
       : await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: 'MarkLingo: Translating Markdown',
           cancellable: false,
         },
-        translateWithProgress,
+        translateAndWriteWithProgress,
       );
-
-    await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(currentTranslatedUri.fsPath)));
-    await Promise.all([
-      vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(translatedMarkdown, 'utf8')),
-      saveTranslationMeta(currentMetaUri, nextMeta),
-    ]);
     await recordUsageEvent(context, doc.uri, debug, {
       batchRunId: options.batchRunId,
       outputUri: currentTranslatedUri,
@@ -1453,7 +1479,10 @@ async function translateMarkdownFilesBatch(
           }
 
           const fileProgress: TranslationProgress = {
-            report: () => progress.report({ message: fileLabel }),
+            report: (item) => {
+              const stage = item.message ? ` - ${item.message}` : '';
+              progress.report({ message: `${fileLabel}${stage}` });
+            },
           };
           const result = await translateMarkdownDocument(context, doc, runtime!, {
             mode: options.mode ?? 'auto',

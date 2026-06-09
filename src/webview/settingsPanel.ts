@@ -275,20 +275,33 @@ async function hasStoredProviderApiKey(
   return false;
 }
 
-async function readUsageView(context: vscode.ExtensionContext, projectUri?: vscode.Uri) {
+async function readUsageView(
+  context: vscode.ExtensionContext,
+  projectUri?: vscode.Uri,
+  query = DEFAULT_USAGE_QUERY,
+) {
   const currentProjectId = projectUri ? getProjectId(projectUri) : undefined;
   try {
     const events = await readUsageEvents(context, { scope: 'allProjects' });
-    return aggregateUsageView(events, DEFAULT_USAGE_QUERY, { now: new Date(), currentProjectId });
+    return aggregateUsageView(events, query, { now: new Date(), currentProjectId });
   } catch (error) {
     console.warn('[marklingo] failed to read usage events:', error instanceof Error ? error.message : String(error));
-    return aggregateUsageView([], DEFAULT_USAGE_QUERY, { now: new Date(), currentProjectId });
+    return aggregateUsageView([], query, { now: new Date(), currentProjectId });
   }
 }
 
-async function readSettingsState(context: vscode.ExtensionContext, projectUri?: vscode.Uri): Promise<SettingsState> {
+type ReadSettingsStateOptions = {
+  includeUsage?: boolean;
+};
+
+async function readSettingsState(
+  context: vscode.ExtensionContext,
+  projectUri?: vscode.Uri,
+  options: ReadSettingsStateOptions = {},
+): Promise<SettingsState> {
   const cfg = vscode.workspace.getConfiguration('marklingo');
-  const shortcutState = await getShortcutState(context);
+  const shortcutStatePromise = getShortcutState(context);
+  const storageStatsPromise = readPrivateStorageStats(context);
   const targetLanguage = cfg.get<string>('translation.targetLanguage', '简体中文');
   const targetLanguageCustom = cfg.get<string>('translation.targetLanguageCustom', '');
   const resolvedTargetLanguage =
@@ -353,6 +366,8 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
   const modelId = currentProviderState.modelId;
   const currentProviderBaseUrl = currentProviderState.baseUrl;
   const verifiedAdapterMode = currentProviderState.verifiedAdapterMode;
+  const shortcutState = await shortcutStatePromise;
+  const storageStats = await storageStatsPromise;
   return {
     ...shortcutState,
     providerType: provider.providerType,
@@ -394,8 +409,8 @@ async function readSettingsState(context: vscode.ExtensionContext, projectUri?: 
     customPrompt: cfg.get<string>('translation.customPrompt', ''),
     storageRoot: getProjectsStorageRoot(context).fsPath,
     currentProjectPath: getCurrentProjectDirectoryPath(projectUri),
-    storageStats: await readPrivateStorageStats(context),
-    usage: await readUsageView(context, projectUri),
+    storageStats,
+    usage: options.includeUsage ? await readUsageView(context, projectUri) : undefined,
   };
 }
 
@@ -688,6 +703,12 @@ async function refreshPanel(context: vscode.ExtensionContext, panel: vscode.Webv
   panel.webview.html = getHtml(panel.webview, await readSettingsState(context, currentPanelProjectUri));
 }
 
+function sameProjectContext(a: vscode.Uri | undefined, b: vscode.Uri | undefined): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return getProjectId(a) === getProjectId(b);
+}
+
 async function disposePanel(panel: vscode.WebviewPanel): Promise<void> {
   let disposable: vscode.Disposable | undefined;
   const disposed = new Promise<void>((resolve) => {
@@ -809,9 +830,12 @@ function watchUserKeybindings(context: vscode.ExtensionContext, panel: vscode.We
 export async function openSettingsPanel(context: vscode.ExtensionContext): Promise<void> {
   const projectUri = getCurrentProjectUri();
   if (currentPanel) {
+    const previousProjectUri = currentPanelProjectUri;
     if (projectUri) currentPanelProjectUri = projectUri;
     currentPanel.reveal(vscode.ViewColumn.Active);
-    await refreshPanel(context, currentPanel);
+    if (!sameProjectContext(previousProjectUri, currentPanelProjectUri)) {
+      await refreshPanel(context, currentPanel);
+    }
     return;
   }
 
@@ -847,9 +871,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
       }
       if (message?.type === 'usageQuery') {
         const query = coerceUsageQuery(message);
-        const events = await readUsageEvents(context, { scope: 'allProjects' });
-        const currentProjectId = currentPanelProjectUri ? getProjectId(currentPanelProjectUri) : undefined;
-        const view = aggregateUsageView(events, query, { now: new Date(), currentProjectId });
+        const view = await readUsageView(context, currentPanelProjectUri, query);
         await panel.webview.postMessage({ type: 'usageSection', html: renderUsageSection(view), query });
         return;
       }

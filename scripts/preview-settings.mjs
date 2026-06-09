@@ -246,7 +246,11 @@ function getPreviewBridgeScript(nonce, url, usage) {
   const adapterMode = url.search.includes('capability=translationModel') ? 'translationModel' : 'chatJson';
   const promptModelId = url.searchParams.get('openaiModel') ?? url.searchParams.get('model') ?? defaultModelId;
   const promptState = getPromptState(adapterMode, promptModelId, targetLanguage, chatPromptInstructions);
-  const usagePreviewResponses = buildUsagePreviewResponses(usage);
+  const usageDelay = Number.parseInt(url.searchParams.get('usageDelay') ?? '140', 10);
+  const replyDelay = Number.isFinite(usageDelay) && usageDelay >= 0 ? usageDelay : 140;
+  const usageBaseUrl = new URL(url.toString());
+  usageBaseUrl.searchParams.delete('usage');
+  const usagePreviewResponses = buildUsagePreviewResponses(usage ?? buildState(usageBaseUrl).usage);
   return `<script nonce="${nonce}">
     window.__marklingoPreviewMessages = [];
     const usagePreviewResponses = ${serializeForScript(usagePreviewResponses)};
@@ -255,7 +259,7 @@ function getPreviewBridgeScript(nonce, url, usage) {
         window.__marklingoPreviewMessages.push(message);
         console.info('[MarkLingo Settings preview]', message);
         if (!message || typeof message.type !== 'string') return;
-        const reply = (payload) => window.setTimeout(() => window.postMessage(payload, window.location.origin), 140);
+        const reply = (payload) => window.setTimeout(() => window.postMessage(payload, window.location.origin), ${replyDelay});
         if (message.type === 'updateSetting') {
           reply({ type: 'saved', key: message.key, value: message.value, saveId: message.saveId });
           return;
@@ -394,7 +398,9 @@ function buildState(url) {
       evictedCacheCount: 3,
       cachePayloadBytes: url.searchParams.get('storage') === 'full' ? 250 * 1024 * 1024 : 38 * 1024 * 1024,
     },
-    usage: url.searchParams.get('usage') === 'empty'
+    usage: url.searchParams.get('usage') === 'loading'
+      ? undefined
+      : url.searchParams.get('usage') === 'empty'
       ? {
           totalRuns: 0,
           successRuns: 0,

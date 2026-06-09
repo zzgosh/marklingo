@@ -9,7 +9,7 @@ import {
   type ModelTag,
   type ProviderType,
 } from '../services/providerPresets.js';
-import type { UsageView } from '../usage/usageAggregate.js';
+import type { UsageQuery, UsageView } from '../usage/usageAggregate.js';
 
 export const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 
@@ -81,7 +81,7 @@ export type SettingsState = {
     evictedCacheCount: number;
     cachePayloadBytes: number;
   };
-  usage: UsageView;
+  usage?: UsageView;
 };
 
 export type RenderSettingsHtmlOptions = {
@@ -116,6 +116,13 @@ function scriptJson(value: unknown): string {
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');
 }
+
+const DEFAULT_USAGE_QUERY_CLIENT: UsageQuery = {
+  range: '7d',
+  groupBy: 'day',
+  scope: 'allProjects',
+  breakdown: 'model',
+};
 
 function renderOptions(selected: string): string {
   return TARGET_LANGUAGE_OPTIONS.map((option) => {
@@ -392,6 +399,28 @@ function renderUsageControls(query: UsageView['query']): string {
           </div>`;
 }
 
+function renderUsageSkeleton(): string {
+  const cards = Array.from({ length: 4 }, () =>
+    '<div class="usage-skeleton-card"><span class="usage-skeleton-line usage-skeleton-value"></span><span class="usage-skeleton-line usage-skeleton-caption"></span></div>',
+  ).join('');
+  const rankingRows = Array.from({ length: 5 }, (_, index) =>
+    `<div class="usage-skeleton-ranking-row">
+      <span class="usage-skeleton-line" style="width: ${76 - index * 7}%"></span>
+      <span class="usage-skeleton-line"></span>
+      <span class="usage-skeleton-line"></span>
+    </div>`,
+  ).join('');
+  const tableRows = Array.from({ length: 5 }, () =>
+    '<div class="usage-skeleton-table-row"><span></span><span></span><span></span><span></span></div>',
+  ).join('');
+  return `<div class="usage-skeleton" aria-label="Loading usage insights">
+            <div class="usage-skeleton-cards">${cards}</div>
+            <div class="usage-skeleton-chart usage-skeleton-chart-wide"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="usage-skeleton-chart usage-skeleton-ranking">${rankingRows}</div>
+            <div class="usage-skeleton-table">${tableRows}</div>
+          </div>`;
+}
+
 function usageSegmentClass(index: number, key: string): string {
   return key === 'Other' ? 'usage-seg-other' : `usage-seg-c${index % 6}`;
 }
@@ -647,6 +676,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     ? currentProjectPath
     : 'Open a file or single workspace folder to select a current project.';
   const providerClientPresets = buildProviderClientPresets();
+  const usageQuery = state.usage?.query ?? DEFAULT_USAGE_QUERY_CLIENT;
+  const usageBody = state.usage ? renderUsageSection(state.usage) : renderUsageSkeleton();
+  const usageBusy = state.usage ? 'false' : 'true';
   const providerBaselines = Object.fromEntries(Object.entries(providerStates).map(([providerType, providerState]) => [
     providerType,
     {
@@ -1236,6 +1268,124 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       gap: 14px;
       min-width: 0;
     }
+    #usage-body.usage-loading[data-loading="true"] {
+      opacity: 0.86;
+    }
+    .usage-skeleton {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      min-width: 0;
+    }
+    .usage-skeleton-line,
+    .usage-skeleton-card,
+    .usage-skeleton-chart,
+    .usage-skeleton-table,
+    .usage-skeleton-table-row span {
+      position: relative;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--input) 70%, transparent);
+    }
+    .usage-skeleton-line::after,
+    .usage-skeleton-card::after,
+    .usage-skeleton-chart::after,
+    .usage-skeleton-table::after,
+    .usage-skeleton-table-row span::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 10%, transparent), transparent);
+      animation: usage-skeleton-shimmer 1.35s ease-in-out infinite;
+    }
+    @keyframes usage-skeleton-shimmer {
+      100% { transform: translateX(100%); }
+    }
+    .usage-skeleton-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      min-width: 0;
+    }
+    .usage-skeleton-card {
+      min-height: 74px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 13px 14px;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
+    .usage-skeleton-card .usage-skeleton-line {
+      display: block;
+      border-radius: 3px;
+    }
+    .usage-skeleton-value {
+      width: 58%;
+      height: 22px;
+    }
+    .usage-skeleton-caption {
+      width: 42%;
+      height: 12px;
+      margin-top: 8px;
+    }
+    .usage-skeleton-chart {
+      min-height: 178px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
+    .usage-skeleton-chart-wide {
+      display: flex;
+      align-items: end;
+      gap: 7px;
+      padding: 42px 14px 22px;
+    }
+    .usage-skeleton-chart-wide span {
+      flex: 1 1 0;
+      min-height: 22px;
+      background: color-mix(in srgb, var(--input) 78%, transparent);
+    }
+    .usage-skeleton-chart-wide span:nth-child(1) { height: 34%; }
+    .usage-skeleton-chart-wide span:nth-child(2) { height: 62%; }
+    .usage-skeleton-chart-wide span:nth-child(3) { height: 46%; }
+    .usage-skeleton-chart-wide span:nth-child(4) { height: 78%; }
+    .usage-skeleton-chart-wide span:nth-child(5) { height: 51%; }
+    .usage-skeleton-chart-wide span:nth-child(6) { height: 68%; }
+    .usage-skeleton-chart-wide span:nth-child(7) { height: 42%; }
+    .usage-skeleton-ranking {
+      display: grid;
+      gap: 8px;
+      padding: 44px 14px 14px;
+    }
+    .usage-skeleton-ranking-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) 7ch;
+      gap: 8px;
+      align-items: center;
+    }
+    .usage-skeleton-ranking-row .usage-skeleton-line {
+      height: 10px;
+      border-radius: 0;
+    }
+    .usage-skeleton-ranking-row .usage-skeleton-line:first-child {
+      border-radius: 3px;
+    }
+    .usage-skeleton-table {
+      display: grid;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      gap: 12px;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
+    .usage-skeleton-table-row {
+      display: grid;
+      grid-template-columns: 14% 25% 25% 18%;
+      gap: 10px;
+    }
+    .usage-skeleton-table-row span {
+      height: 14px;
+      border-radius: 3px;
+    }
     .usage-cards {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1290,13 +1440,13 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       font-weight: 600;
     }
     .usage-table th:nth-child(1),
-    .usage-table td:nth-child(1) { width: 17%; }
+    .usage-table td:nth-child(1) { width: 14%; }
     .usage-table th:nth-child(2),
-    .usage-table td:nth-child(2) { width: 21%; }
+    .usage-table td:nth-child(2) { width: 25%; }
     .usage-table th:nth-child(3),
     .usage-table td:nth-child(3) { width: 8%; }
     .usage-table th:nth-child(4),
-    .usage-table td:nth-child(4) { width: 26%; }
+    .usage-table td:nth-child(4) { width: 25%; }
     .usage-table th:nth-child(5),
     .usage-table td:nth-child(5) { width: 10%; }
     .usage-table th:nth-child(6),
@@ -1495,7 +1645,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-tops { display: flex; flex-direction: column; gap: 6px; }
     .usage-top-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(72px, 34%) max-content;
+      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) 7ch;
       gap: 8px;
       align-items: center;
       font-size: 12px;
@@ -1510,7 +1660,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-top-fill.usage-seg-c4 { background: var(--vscode-charts-red, #e51400); }
     .usage-top-fill.usage-seg-c5 { background: var(--vscode-charts-yellow, #cca700); }
     .usage-top-fill.usage-seg-other { background: var(--muted); }
-    .usage-top-value { color: var(--muted); text-align: right; }
+    .usage-top-value { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
     .usage-reuse-strip {
       display: flex;
       height: 14px;
@@ -1682,8 +1832,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 
         <h2>Usage</h2>
         <section class="usage-section">
-          ${renderUsageControls(state.usage.query)}
-          <div id="usage-body">${renderUsageSection(state.usage)}</div>
+          ${renderUsageControls(usageQuery)}
+          <div id="usage-body" aria-busy="${usageBusy}" data-loading="${usageBusy}">${usageBody}</div>
         </section>
 
         <h2>Output</h2>
@@ -2402,14 +2552,24 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     document.getElementById('reveal-storage').addEventListener('click', () => vscode.postMessage({ type: 'revealStorage' }));
     document.getElementById('optimize-storage').addEventListener('click', () => vscode.postMessage({ type: 'optimizeStorage' }));
 
-    const usageQuery = ${JSON.stringify(state.usage.query)};
+    const usageQuery = ${scriptJson(usageQuery)};
     const usageBody = document.getElementById('usage-body');
     const usageControls = document.querySelector('.usage-controls');
-    const requestUsage = () => vscode.postMessage({
-      type: 'usageQuery',
-      range: usageQuery.range,
-      breakdown: usageQuery.breakdown,
-    });
+    const setUsageBusy = (busy) => {
+      if (!usageBody) return;
+      usageBody.setAttribute('aria-busy', busy ? 'true' : 'false');
+      usageBody.dataset.loading = busy ? 'true' : 'false';
+      usageBody.classList.toggle('usage-loading', busy);
+    };
+    const requestUsage = () => {
+      setUsageBusy(true);
+      vscode.postMessage({
+        type: 'usageQuery',
+        range: usageQuery.range,
+        breakdown: usageQuery.breakdown,
+      });
+    };
+    if (usageBody?.dataset.loading === 'true') requestUsage();
     if (usageControls) {
       usageControls.addEventListener('click', (event) => {
         const button = event.target.closest('.usage-seg-btn');
@@ -2461,7 +2621,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       const msg = event.data;
       if (!msg || typeof msg.type !== 'string') return;
       if (msg.type === 'usageSection') {
-        if (usageBody && typeof msg.html === 'string') usageBody.innerHTML = msg.html;
+        if (msg.query && typeof msg.query === 'object') {
+          if (typeof msg.query.range === 'string') usageQuery.range = msg.query.range;
+          if (typeof msg.query.breakdown === 'string') usageQuery.breakdown = msg.query.breakdown;
+        }
+        if (usageBody && typeof msg.html === 'string') {
+          usageBody.innerHTML = msg.html;
+          setUsageBusy(false);
+        }
         return;
       }
       if (msg.type === 'saved') {

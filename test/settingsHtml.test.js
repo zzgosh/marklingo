@@ -375,6 +375,20 @@ test('renders an empty Usage section when there is no usage history', () => {
   assert.ok(!html.includes('data-value="targetLanguage"'));
 });
 
+test('renders a Usage skeleton when usage is deferred', () => {
+  const html = renderSettingsHtml({ cspSource: "'self'", nonce: 'test-nonce', state: getState({ usage: undefined }) });
+
+  assert.match(html, /<h2>Usage<\/h2>/);
+  assert.match(html, /id="usage-body" aria-busy="true" data-loading="true"/);
+  assert.match(html, /class="usage-skeleton"/);
+  assert.match(html, /@keyframes usage-skeleton-shimmer/);
+  assert.match(html, /requestUsage\(\);/);
+  assert.match(html, /"range":"7d"/);
+  assert.match(html, /"breakdown":"model"/);
+  assert.ok(!html.includes('No translations in this range yet'));
+  assert.ok(!html.includes('class="usage-table"'));
+});
+
 test('renders Usage summary cards and recent runs when usage exists', () => {
   const html = renderSettingsHtml({
     cspSource: "'self'",
@@ -504,7 +518,11 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /class="usage-top-row"/);
   assert.match(html, /class="usage-top-fill usage-seg-c0"/);
   assert.match(html, /\.usage-charts \{\s*display: grid;\s*grid-template-columns: 1fr;/);
+  assert.match(html, /\.usage-top-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) minmax\(112px, 36%\) 7ch;/);
+  assert.match(html, /\.usage-top-value \{ color: var\(--muted\); text-align: right; font-variant-numeric: tabular-nums; \}/);
   assert.match(html, /\.usage-top-bar \{ background: var\(--input\); border-radius: 0;/);
+  assert.match(html, /\.usage-table th:nth-child\(1\),\s*\.usage-table td:nth-child\(1\) \{ width: 14%; \}/);
+  assert.match(html, /\.usage-table th:nth-child\(2\),\s*\.usage-table td:nth-child\(2\) \{ width: 25%; \}/);
   assert.match(html, /<th>Tokens<\/th><th>Cost<\/th><th>Status<\/th>/);
   assert.ok(!html.includes('<th>Work</th>'));
   assert.ok(!html.includes('Cache reuse'));
