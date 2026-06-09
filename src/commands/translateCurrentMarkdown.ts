@@ -55,7 +55,7 @@ import {
   type TranslationProviderUsageDebug,
 } from '../translation/cache.js';
 import { TRANSLATION_PROGRESS_MESSAGES, getBatchTranslationProgressMessage } from './progressMessages.js';
-import { buildUsageEventFromDebug } from '../usage/usageEvent.js';
+import { buildUsageEventFromDebug, shouldRecordUsageEvent } from '../usage/usageEvent.js';
 import { appendUsageEvent } from '../usage/usageLedger.js';
 
 const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
@@ -250,6 +250,7 @@ async function recordUsageEvent(
   options: { batchRunId?: string; outputUri?: vscode.Uri },
 ): Promise<void> {
   try {
+    if (!shouldRecordUsageEvent(debug)) return;
     const event = buildUsageEventFromDebug(debug, {
       eventId: randomUUID(),
       batchRunId: options.batchRunId ?? debug.runId,

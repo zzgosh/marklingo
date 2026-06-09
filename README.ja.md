@@ -128,7 +128,7 @@ Provider または Model ID を変更して `Save and Verify` をクリックし
 
 ### Usage Insights
 
-Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、実行回数、provider/model/project の内訳、最近の実行、token 使用量、利用可能な場合の USD 推定コストを表示します。OpenRouter のコストは provider が報告したリクエストコストを使い、組み込みの direct provider は provider が報告した input/output tokens と MarkLingo に同梱された Gateway 価格表で推定します。カスタムおよびローカルの OpenAI-compatible エンドポイントでは `Cost unavailable` と表示される場合があります。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
+Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、実行回数、provider/model/project の内訳、最近の実行、token 使用量、利用可能な場合の USD 推定コストを表示します。成功したキャッシュのみの rerun は既存の翻訳から出力を再構築するだけで provider を呼び出さないため、Usage runs には含めません。OpenRouter のコストは provider が報告したリクエストコストを使い、組み込みの direct provider は provider が報告した input/output tokens と MarkLingo に同梱された Gateway 価格表で推定します。カスタムおよびローカルの OpenAI-compatible エンドポイントでは `Cost unavailable` と表示される場合があります。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
 
 ## 出力ファイル
 

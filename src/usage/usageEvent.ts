@@ -19,8 +19,9 @@ export type UsageCost = {
 };
 
 /**
- * One append-only usage event per source-file translation attempt. Privacy boundary: only hashes,
- * counts, labels, and timestamps. Never API keys, prompts, raw paths, or full source/output text.
+ * One append-only usage event per source-file translation attempt that reaches provider work or
+ * fails before completing. Privacy boundary: only hashes, counts, labels, and timestamps. Never API
+ * keys, prompts, raw paths, or full source/output text.
  */
 export type UsageEventV1 = {
   schemaVersion: 1;
@@ -126,6 +127,12 @@ function buildUsageCost(debug: TranslationMetaDebug): UsageCost | undefined {
     currency: estimate.currency,
     source: "estimated",
   };
+}
+
+export function shouldRecordUsageEvent(debug: TranslationMetaDebug): boolean {
+  if (debug.status !== "success") return true;
+  const requestCount = debug.plan?.actualRequestCount ?? debug.plan?.chunkCount;
+  return !(debug.document.blocksToTranslate === 0 && requestCount === 0);
 }
 
 /**

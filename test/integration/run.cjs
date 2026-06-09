@@ -785,6 +785,19 @@ async function testReusesCachedTranslations(context) {
   assert.equal(context.server.state.chatRequests.length, 1);
   assert.equal(context.server.state.chatRequests[0].blocks.length, 1);
   assert.match(context.server.state.chatRequests[0].blocks[0].markdown, /Second paragraph/);
+
+  const eventsAfterIncrementalRun = findUsageEventsByFile(context.seeded.globalStorageUri, 'cache.md');
+  assert.equal(eventsAfterIncrementalRun.length, 2, 'expected usage events only for runs that called the provider');
+
+  context.server.state.chatRequests = [];
+  await translate(source);
+
+  assert.equal(context.server.state.chatRequests.length, 0, 'expected unchanged cached translations to avoid provider calls');
+  assert.equal(
+    findUsageEventsByFile(context.seeded.globalStorageUri, 'cache.md').length,
+    eventsAfterIncrementalRun.length,
+    'expected cache-only runs not to create usage events',
+  );
 }
 
 async function testCompactsPrivateCacheIntoTrackingStubs(context) {

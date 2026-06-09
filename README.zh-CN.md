@@ -128,7 +128,7 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 
 ### Usage Insights
 
-Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、运行次数、provider/model/project 分组、最近运行记录、token 使用量，以及可用时的 USD 预估成本。OpenRouter 成本来自 provider 报告的本次请求成本；内置 direct provider 使用 provider 报告的 input/output tokens 和 MarkLingo 随包附带的 Gateway 价格表估算。自定义和本地 OpenAI-compatible 端点可能显示 `Cost unavailable`。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
+Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、运行次数、provider/model/project 分组、最近运行记录、token 使用量，以及可用时的 USD 预估成本。成功的纯缓存 rerun 只会用已有翻译重建输出，不会调用 provider，因此不会计入 Usage runs。OpenRouter 成本来自 provider 报告的本次请求成本；内置 direct provider 使用 provider 报告的 input/output tokens 和 MarkLingo 随包附带的 Gateway 价格表估算。自定义和本地 OpenAI-compatible 端点可能显示 `Cost unavailable`。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
 
 ## 输出文件
 

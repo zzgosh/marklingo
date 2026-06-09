@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildUsageEventFromDebug } from '../out/usage/usageEvent.js';
+import { buildUsageEventFromDebug, shouldRecordUsageEvent } from '../out/usage/usageEvent.js';
 
 function baseDebug(overrides = {}) {
   return {
@@ -175,6 +175,43 @@ test('leaves local/custom provider cost unavailable without pricing', () => {
     },
   }), ctx);
   assert.equal(event.cost, undefined);
+});
+
+test('skips successful cache-only runs with no provider requests', () => {
+  const debug = baseDebug({
+    document: {
+      ...baseDebug().document,
+      blocksToTranslate: 0,
+      cacheHits: 48,
+    },
+    plan: {
+      ...baseDebug().plan,
+      chunkCount: 0,
+      actualRequestCount: 0,
+      chunks: [],
+    },
+    result: { outputHash: 'out', translatedBlocks: 0, reusedBlocks: 48, fallbackBlocks: 0, warningCount: 0 },
+  });
+  assert.equal(shouldRecordUsageEvent(debug), false);
+});
+
+test('keeps failed attempts in usage even when no provider request completed', () => {
+  const debug = baseDebug({
+    status: 'error',
+    document: {
+      ...baseDebug().document,
+      blocksToTranslate: 0,
+      cacheHits: 48,
+    },
+    plan: {
+      ...baseDebug().plan,
+      chunkCount: 0,
+      actualRequestCount: 0,
+      chunks: [],
+    },
+    result: undefined,
+  });
+  assert.equal(shouldRecordUsageEvent(debug), true);
 });
 
 test('does not leak the provider base URL into the serialized event', () => {

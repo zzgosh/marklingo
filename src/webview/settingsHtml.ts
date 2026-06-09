@@ -319,16 +319,15 @@ function formatUsageTokens(value: number): string {
   return `${value}`;
 }
 
-function formatUsageCost(value: number | undefined, currency: string | undefined, source?: string): string {
+function formatUsageCost(value: number | undefined, currency: string | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
   const amount = value.toFixed(4);
-  const prefix = source === 'estimated' ? '≈' : '';
-  if (!currency || currency === 'USD' || currency === 'credits') return `${prefix}$${amount}`;
-  return `${prefix}${amount} ${currency}`;
+  if (!currency || currency === 'USD' || currency === 'credits') return `$${amount}`;
+  return `${amount} ${currency}`;
 }
 
 function formatUsageCostTitle(label: string, source?: string): string {
-  if (source === 'estimated') return `Estimated cost: ${label}`;
+  if (source === 'estimated') return `Calculated from preset pricing: ${label}`;
   if (source === 'reported') return `Reported cost: ${label}`;
   return label;
 }
@@ -492,8 +491,8 @@ function renderUsageSpendRanking(view: UsageView): string {
   return renderUsageMetricRanking(
     'Spend ranking',
     view.topModelsByCost ?? [],
-    (entry) => formatUsageCost(entry.value, view.costCurrency, entry.source),
-    (entry) => formatUsageCostTitle(formatUsageCost(entry.value, view.costCurrency, entry.source), entry.source),
+    (entry) => formatUsageCost(entry.value, view.costCurrency),
+    (entry) => formatUsageCostTitle(formatUsageCost(entry.value, view.costCurrency), entry.source),
     'No cost data.',
     getUsageModelColorKeys(view),
   );
@@ -512,7 +511,7 @@ function renderUsageRecentTable(view: UsageView): string {
       const tokenTitle = typeof tokenTotal === 'number'
         ? `${formatUsageCount(Math.round(tokenTotal))} ${run.tokensSource === 'estimated' ? 'estimated input tokens' : 'tokens'}`
         : 'Token usage unavailable';
-      const costLabel = run.costAmount === undefined ? '—' : formatUsageCost(run.costAmount, run.costCurrency, run.costSource);
+      const costLabel = run.costAmount === undefined ? '—' : formatUsageCost(run.costAmount, run.costCurrency);
       const costTitle = run.costAmount === undefined ? 'Cost unavailable' : formatUsageCostTitle(costLabel, run.costSource);
       const statusTitle = run.status === 'success' ? 'Success' : 'Failed';
       const fileTitle = `${run.projectName} / ${run.sourceFileName}`;
@@ -1401,7 +1400,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-charts {
       display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      grid-template-columns: 1fr;
       gap: 12px;
       min-width: 0;
     }
@@ -1477,7 +1476,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       font-size: 12px;
     }
     .usage-top-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .usage-top-bar { background: var(--input); border-radius: 3px; height: 10px; overflow: hidden; }
+    .usage-top-bar { background: var(--input); border-radius: 0; height: 10px; overflow: hidden; }
     .usage-top-fill { display: block; height: 100%; min-width: 3px; background: var(--vscode-charts-blue, #4e95d9); }
     .usage-top-fill.usage-seg-c0 { background: var(--vscode-charts-blue, #4e95d9); }
     .usage-top-fill.usage-seg-c1 { background: var(--vscode-charts-green, #4caf50); }

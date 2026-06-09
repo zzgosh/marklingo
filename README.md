@@ -126,7 +126,7 @@ The settings page saves Provider credentials through `Save and Verify`. Other dr
 
 ### Usage Insights
 
-Settings includes a local Usage section for translation history. It shows files translated, runs, provider/model/project breakdowns, recent runs, token usage, and estimated USD cost when available. OpenRouter cost uses the provider-reported request cost, while built-in direct providers use provider-reported input/output tokens and MarkLingo's bundled Gateway pricing table. Custom and local OpenAI-compatible endpoints may show `Cost unavailable`. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
+Settings includes a local Usage section for translation history. It shows files translated, runs, provider/model/project breakdowns, recent runs, token usage, and estimated USD cost when available. Successful cache-only reruns that rebuild output from existing translations are not counted as Usage runs because they do not call the provider. OpenRouter cost uses the provider-reported request cost, while built-in direct providers use provider-reported input/output tokens and MarkLingo's bundled Gateway pricing table. Custom and local OpenAI-compatible endpoints may show `Cost unavailable`. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
 
 ## Output Files
 

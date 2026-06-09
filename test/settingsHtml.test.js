@@ -483,7 +483,7 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /12\.4K/);
   assert.match(html, /title="9,000 tokens">9\.0K/);
   assert.match(html, /title="Reported cost: \$0\.0030">\$0\.0030/);
-  assert.match(html, /title="Estimated cost: ≈\$0\.0012">≈\$0\.0012/);
+  assert.match(html, /title="Calculated from preset pricing: \$0\.0012">\$0\.0012/);
   assert.match(html, /title="Cost unavailable">—/);
   assert.match(html, /data-usage-control="range"/);
   assert.match(html, /class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="Usage range"/);
@@ -496,6 +496,8 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /Spend ranking/);
   assert.match(html, /class="usage-top-row"/);
   assert.match(html, /class="usage-top-fill usage-seg-c0"/);
+  assert.match(html, /\.usage-charts \{\s*display: grid;\s*grid-template-columns: 1fr;/);
+  assert.match(html, /\.usage-top-bar \{ background: var\(--input\); border-radius: 0;/);
   assert.match(html, /<th>Tokens<\/th><th>Cost<\/th><th>Status<\/th>/);
   assert.ok(!html.includes('<th>Work</th>'));
   assert.ok(!html.includes('Cache reuse'));
