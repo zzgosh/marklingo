@@ -523,7 +523,7 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.match(html, /class="usage-top-row"/);
   assert.match(html, /class="usage-top-fill usage-seg-c0"/);
   assert.match(html, /\.usage-charts \{\s*display: grid;\s*grid-template-columns: 1fr;/);
-  assert.match(html, /\.usage-top-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) minmax\(112px, 36%\) minmax\(7ch, max-content\);/);
+  assert.match(html, /\.usage-top-row \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) minmax\(112px, 36%\) 11ch;/);
   assert.match(html, /\.usage-top-value \{\s*color: var\(--muted\);\s*text-align: right;\s*font-variant-numeric: tabular-nums;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*white-space: nowrap;\s*\}/);
   assert.match(html, /\.usage-top-bar \{ background: var\(--input\); border-radius: 0;/);
   assert.match(html, /\.usage-table th:nth-child\(1\),\s*\.usage-table td:nth-child\(1\) \{ width: 14%; \}/);

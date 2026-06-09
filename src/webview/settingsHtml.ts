@@ -1358,7 +1358,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     }
     .usage-skeleton-ranking-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) minmax(7ch, max-content);
+      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) 11ch;
       gap: 8px;
       align-items: center;
     }
@@ -1645,7 +1645,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .usage-tops { display: flex; flex-direction: column; gap: 6px; }
     .usage-top-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) minmax(7ch, max-content);
+      grid-template-columns: minmax(0, 1fr) minmax(112px, 36%) 11ch;
       gap: 8px;
       align-items: center;
       font-size: 12px;
