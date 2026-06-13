@@ -399,10 +399,6 @@ type TranslationModelValidationResult = {
   providerUsage?: TranslationProviderUsageDebug;
 };
 
-const PROMPTING_PROGRESS_INCREMENT = 10;
-const REQUESTS_PROGRESS_INCREMENT = 80;
-const WRITING_PROGRESS_INCREMENT = 10;
-
 function hasMarkdownFileExtension(uri: vscode.Uri): boolean {
   const ext = path.extname(uri.fsPath).toLowerCase();
   return ext === '.md' || ext === '.markdown';
@@ -814,10 +810,7 @@ async function translateMarkdownDocument(
           placeholdersById.set(seg.id, modelProtectedResult);
         }
 
-        progress.report({
-          message: TRANSLATION_PROGRESS_MESSAGES.prompting,
-          increment: PROMPTING_PROGRESS_INCREMENT,
-        });
+        progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.prompting });
         const modelContextLength = await getOpenRouterModelContextLength(settings);
         const translationModelBlockLimit = Math.min(maxBlocksPerRequest, translationModelMaxBlocksPerRequest);
         const buildPrompt = (blocks: TranslationRequestBlock[]) =>
@@ -863,14 +856,8 @@ async function translateMarkdownDocument(
         );
 
         if (plan.chunks.length === 0) {
-          progress.report({
-            message: TRANSLATION_PROGRESS_MESSAGES.cached,
-            increment: REQUESTS_PROGRESS_INCREMENT,
-          });
+          progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.cached });
         }
-        const requestProgressIncrement = plan.chunks.length > 0
-          ? REQUESTS_PROGRESS_INCREMENT / plan.chunks.length
-          : 0;
 
         const requestTranslatedBlocks = async (
           blocks: TranslationRequestBlock[],
@@ -967,7 +954,6 @@ async function translateMarkdownDocument(
             `Request ${chunkIndex + 1}/${plan.chunks.length} finished in ${requestDurationMs}ms ` +
               `(${plannedChunk.blocks.length} blocks, ~${plannedChunk.estimatedPromptTokens} estimated prompt tokens).`,
           );
-          progress.report({ increment: requestProgressIncrement });
         };
 
         const requestTranslationModelBlocks = async (
@@ -1097,7 +1083,6 @@ async function translateMarkdownDocument(
                 requestDebug.durationMs = Date.now() - chunkStartedAt;
                 requestDebug.status = 'success';
               }
-              progress.report({ increment: requestProgressIncrement });
             } catch (error) {
               if (requestDebug) {
                 requestDebug.durationMs = Date.now() - chunkStartedAt;
@@ -1195,10 +1180,7 @@ async function translateMarkdownDocument(
 
     const translateAndWriteWithProgress = async (progress: TranslationProgress) => {
       const result = await translateWithProgress(progress);
-      progress.report({
-        message: TRANSLATION_PROGRESS_MESSAGES.writing,
-        increment: WRITING_PROGRESS_INCREMENT,
-      });
+      progress.report({ message: TRANSLATION_PROGRESS_MESSAGES.writing });
       await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(currentTranslatedUri.fsPath)));
       await Promise.all([
         vscode.workspace.fs.writeFile(currentTranslatedUri, Buffer.from(result.markdown, 'utf8')),
