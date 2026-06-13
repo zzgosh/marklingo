@@ -116,6 +116,8 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /id="modelIdSelectWrap">/);
   assert.match(html, /<option value="google\/gemini-3\.1-flash-lite" selected>google\/gemini-3\.1-flash-lite<\/option>/);
   assert.match(html, /<option value="deepseek\/deepseek-v4-flash">deepseek\/deepseek-v4-flash<\/option>/);
+  assert.match(html, /<option value="xiaomi\/mimo-v2\.5">xiaomi\/mimo-v2\.5<\/option>/);
+  assert.ok(!html.includes('xiaomi/mimo-v2-flash'));
   assert.match(html, /<option value="">Custom\.\.\.<\/option>/);
   assert.match(html, /id="model-tags"><span class="model-tag model-tag-quality">Quality<\/span><span class="model-tag model-tag-fast"><svg class="model-tag-icon"[\s\S]*?<\/svg>Fast<\/span><\/div>/);
   assert.match(html, /\.model-tag-icon \{\s+width: 11px;/);

@@ -264,7 +264,7 @@ export function resolveConfiguredModelId(cfg: vscode.WorkspaceConfiguration, pro
   const providerModelId = hasExplicitStringConfiguration(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
     ? readStringSetting(cfg, OPENROUTER_PROVIDER_MODEL_ID_SETTING)
     : '';
-  return providerModelId || legacyModelId || DEFAULT_OPENROUTER_MODEL_ID;
+  return coerceProviderModelId(providerType, providerModelId || legacyModelId || DEFAULT_OPENROUTER_MODEL_ID);
 }
 
 function readProviderBaseUrlForTranslation(cfg: vscode.WorkspaceConfiguration, providerType: ProviderType): string {

@@ -41,6 +41,7 @@ export type ProviderPreset = {
   reasoningControl: ProviderReasoningControl;
   baseUrlOptions?: ProviderBaseUrlOption[];
   modelOptions: ProviderModelOption[];
+  deprecatedModelReplacements?: Readonly<Record<string, string>>;
   baseUrlSetting?: string;
   modelIdSetting?: string;
 };
@@ -78,8 +79,11 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
       { label: 'Gemini 3.1 Flash Lite', modelId: DEFAULT_OPENROUTER_MODEL_ID, tags: ['quality', 'fast'] },
       { label: 'DeepSeek V4 Flash', modelId: 'deepseek/deepseek-v4-flash', tags: ['quality', 'fast'] },
       { label: 'GPT-5.4 Mini', modelId: 'openai/gpt-5.4-mini', tags: ['quality', 'fast'] },
-      { label: 'MiMo V2 Flash', modelId: 'xiaomi/mimo-v2-flash', tags: ['quality', 'fast'] },
+      { label: 'MiMo V2.5', modelId: 'xiaomi/mimo-v2.5', tags: ['quality', 'slow'] },
     ],
+    deprecatedModelReplacements: {
+      'xiaomi/mimo-v2-flash': 'xiaomi/mimo-v2.5',
+    },
   },
   {
     id: 'openai',
@@ -161,17 +165,19 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     label: 'Xiaomi MiMo',
     description: 'Xiaomi MiMo OpenAI-compatible API.',
     defaultBaseUrl: 'https://api.xiaomimimo.com/v1',
-    defaultModelId: 'mimo-v2-flash',
+    defaultModelId: 'mimo-v2.5',
     authMode: 'bearer',
     baseUrlEditable: false,
     modelIdEditable: false,
     reasoningControl: 'thinkingDisabled',
     modelIdSetting: 'providers.xiaomiMimo.modelId',
     modelOptions: [
-      { label: 'MiMo V2 Flash', modelId: 'mimo-v2-flash', gatewayModelId: 'xiaomi/mimo-v2-flash', tags: ['quality', 'fast'] },
       { label: 'MiMo V2.5', modelId: 'mimo-v2.5', gatewayModelId: 'xiaomi/mimo-v2.5', tags: ['quality', 'slow'] },
       { label: 'MiMo V2.5 Pro', modelId: 'mimo-v2.5-pro', gatewayModelId: 'xiaomi/mimo-v2.5-pro', tags: ['quality', 'slow'] },
     ],
+    deprecatedModelReplacements: {
+      'mimo-v2-flash': 'mimo-v2.5',
+    },
   },
   {
     id: 'openaiCompatible',
@@ -209,8 +215,14 @@ export function getProviderDefaultModelId(providerType: ProviderType): string {
   return getProviderPreset(providerType).defaultModelId;
 }
 
-export function getProviderGatewayModelId(providerType: ProviderType, modelId: string): string | undefined {
+export function normalizeDeprecatedProviderModelId(providerType: ProviderType, modelId: string): string {
   const trimmed = modelId.trim();
+  if (!trimmed) return '';
+  return getProviderPreset(providerType).deprecatedModelReplacements?.[trimmed] ?? trimmed;
+}
+
+export function getProviderGatewayModelId(providerType: ProviderType, modelId: string): string | undefined {
+  const trimmed = normalizeDeprecatedProviderModelId(providerType, modelId);
   if (!trimmed || providerType === 'openrouter' || providerType === 'openaiCompatible') return undefined;
   return getProviderPreset(providerType).modelOptions.find((option) => option.modelId === trimmed)?.gatewayModelId;
 }
@@ -262,13 +274,14 @@ export function providerSupportsEditableModelId(providerType: ProviderType): boo
 
 export function providerAcceptsModelId(providerType: ProviderType, modelId: string): boolean {
   const preset = getProviderPreset(providerType);
-  if (preset.modelIdEditable) return modelId.trim().length > 0 || preset.defaultModelId.length === 0;
-  return preset.modelOptions.some((option) => option.modelId === modelId.trim());
+  const normalized = normalizeDeprecatedProviderModelId(providerType, modelId);
+  if (preset.modelIdEditable) return normalized.length > 0 || preset.defaultModelId.length === 0;
+  return preset.modelOptions.some((option) => option.modelId === normalized);
 }
 
 export function coerceProviderModelId(providerType: ProviderType, modelId: string): string {
-  const trimmed = modelId.trim();
-  if (providerAcceptsModelId(providerType, trimmed)) return trimmed;
+  const normalized = normalizeDeprecatedProviderModelId(providerType, modelId);
+  if (providerAcceptsModelId(providerType, normalized)) return normalized;
   return getProviderDefaultModelId(providerType);
 }
 
@@ -339,7 +352,7 @@ export function getKnownLocalModelTags(modelId: string): ModelTag[] {
 }
 
 export function getProviderModelTags(providerType: ProviderType, baseUrl: string, modelId: string): ModelTag[] {
-  const trimmed = modelId.trim();
+  const trimmed = normalizeDeprecatedProviderModelId(providerType, modelId);
   const option = getProviderPreset(providerType).modelOptions.find((item) => item.modelId === trimmed);
   if (option?.tags) return uniqueModelTags(option.tags);
 

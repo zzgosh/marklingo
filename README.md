@@ -71,7 +71,7 @@ Fixed provider presets expose a curated set of model choices. OpenRouter and Cus
 | DeepSeek | `deepseek-v4-flash`, `deepseek-v4-pro` |
 | Moonshot | `kimi-k2.6`, `kimi-k2.5` |
 | GLM | `glm-4.7`, `glm-5`, `glm-5.1` |
-| Xiaomi MiMo | `mimo-v2-flash`, `mimo-v2.5`, `mimo-v2.5-pro` |
+| Xiaomi MiMo | `mimo-v2.5`, `mimo-v2.5-pro` |
 | Custom OpenAI Compatible | Endpoint-provided model alias; direct Model ID entry |
 
 - **Provider**

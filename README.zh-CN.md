@@ -71,7 +71,7 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
 | Moonshot | `kimi-k2.6`、`kimi-k2.5` |
 | GLM | `glm-4.7`、`glm-5`、`glm-5.1` |
-| Xiaomi MiMo | `mimo-v2-flash`、`mimo-v2.5`、`mimo-v2.5-pro` |
+| Xiaomi MiMo | `mimo-v2.5`、`mimo-v2.5-pro` |
 | Custom OpenAI Compatible | 端点暴露的模型 alias；支持直接输入 Model ID |
 
 - **Provider（提供方）**
