@@ -99,6 +99,18 @@ test('exposes curated model tags and conservative local model tags', () => {
     getProviderModelTags('openaiCompatible', 'http://127.0.0.1:8080/v1', 'hy-mt2-base'),
     ['local', 'slow'],
   );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'http://127.0.0.1:47321/v1', 'gpt-5.3-codex-spark'),
+    ['local', 'quality', 'fast'],
+  );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'http://127.0.0.1:47321/v1', 'GPT_5.3_Codex_Spark'),
+    ['local', 'quality', 'fast'],
+  );
+  assert.deepEqual(
+    getProviderModelTags('openaiCompatible', 'https://api.openai.com/v1', 'gpt-5.3-codex-spark'),
+    [],
+  );
   assert.equal(isLocalEndpoint('https://192.168.1.20/v1'), true);
   assert.equal(isLocalEndpoint('https://10.0.0.2/v1'), true);
   assert.equal(isLocalEndpoint('https://172.16.0.1/v1'), true);

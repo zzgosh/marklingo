@@ -61,6 +61,11 @@ export const KNOWN_LOCAL_MODEL_TAG_RULES: readonly KnownLocalModelTagRule[] = [
     flags: 'i',
     tags: ['local', 'slow'],
   },
+  {
+    pattern: 'gpt[-_ ]?5[._-]?3[-_ ]?codex[-_ ]?spark',
+    flags: 'i',
+    tags: ['quality', 'fast'],
+  },
 ] as const;
 
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
