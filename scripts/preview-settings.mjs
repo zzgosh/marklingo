@@ -368,7 +368,7 @@ function buildState(url) {
         title: 'Delete Current Project Translated Files',
         shortcutLabel: 'Option + Command + D',
         shortcutStatus: 'Default shortcut for current project cleanup.',
-        shortcutWarning: 'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+        shortcutWarning: 'macOS may use this for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
       },
     ],
     providerType,

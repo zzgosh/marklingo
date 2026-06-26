@@ -17,7 +17,7 @@ function getState(overrides = {}) {
         title: 'Delete Current Project Translated Files',
         shortcutLabel: 'Option + Command + D',
         shortcutStatus: 'Default shortcut for current project cleanup.',
-        shortcutWarning: 'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+        shortcutWarning: 'macOS may use this for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
       },
     ],
     providerType: 'openrouter',
@@ -112,7 +112,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /Delete Current Project Translated Files/);
   assert.match(html, />Edit<\/button>/);
   assert.match(html, /class="info-tip shortcut-info"/);
-  assert.match(html, /data-shortcut-info="deleteCurrentProjectTranslatedFiles"[\s\S]*On macOS, Option \+ Command \+ D may be handled by the Dock shortcut before VS Code receives it\./);
+  assert.match(html, /data-shortcut-info="deleteCurrentProjectTranslatedFiles"[\s\S]*macOS may use this for Dock\. Change it in System Settings &gt; Keyboard &gt; Keyboard Shortcuts\.\.\. &gt; Dock &gt; Turn Dock hiding on\/off\./);
   assert.match(html, /data-shortcut-warning="deleteCurrentProjectTranslatedFiles"><\/div>/);
   assert.match(html, /type: 'openKeyboardShortcuts', shortcutId:/);
   assert.match(html, /System Instructions/);

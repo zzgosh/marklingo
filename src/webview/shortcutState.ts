@@ -36,7 +36,7 @@ export const DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT: ShortcutDefinitio
   nonMacKey: NON_MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY,
   defaultStatus: 'Default shortcut for current project cleanup.',
   platformDefaultStatus: 'Platform-specific default shortcuts for current project cleanup.',
-  macSystemWarning: 'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+  macSystemWarning: 'macOS may use this for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
 };
 
 export const SHORTCUT_DEFINITIONS = [

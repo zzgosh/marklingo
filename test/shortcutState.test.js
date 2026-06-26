@@ -180,7 +180,7 @@ test('warns about the known macOS Dock shortcut for the cleanup default', () => 
   assert.equal(state.shortcutStatus, 'Default shortcut for current project cleanup.');
   assert.equal(
     state.shortcutWarning,
-    'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+    'macOS may use this for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
   );
 });
 

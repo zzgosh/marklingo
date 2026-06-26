@@ -39,7 +39,7 @@ Default shortcuts:
 | `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
 | `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
 
-On macOS, `Option + Command + D` may be handled by the Dock shortcut before VS Code receives it. Open MarkLingo Settings and use `Edit` in Keyboard Shortcuts if you need to assign a different keybinding.
+On macOS, `Option + Command + D` may conflict with Dock. Change the macOS shortcut in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off, or use `Edit` in MarkLingo Settings to assign a different VS Code keybinding.
 
 You can also start with `MarkLingo: Translate Current Markdown`. If no provider has been saved and verified yet, MarkLingo opens Settings first. Configure Provider, API key, Base URL when shown, and Model ID, click `Save and Verify`, then run the translation command again.
 

@@ -189,7 +189,7 @@ function getShortcutWarningText(warning: string): string {
 
 function getShortcutTooltipWarningText(warning: string): string {
   const text = getShortcutWarningText(warning);
-  return warning.includes('before VS Code receives it') ? text : '';
+  return warning.includes('System Settings > Keyboard > Keyboard Shortcuts') ? text : '';
 }
 
 function getShortcutInlineWarningText(warning: string): string {
@@ -1977,7 +1977,7 @@ ${renderShortcutRows(shortcuts)}
 
     function getShortcutTooltipWarningText(warning) {
       const text = getShortcutWarningText(warning);
-      return warning.includes('before VS Code receives it') ? text : '';
+      return warning.includes('System Settings > Keyboard > Keyboard Shortcuts') ? text : '';
     }
 
     function getShortcutInlineWarningText(warning) {
