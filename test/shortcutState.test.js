@@ -180,7 +180,7 @@ test('warns about the known macOS Dock shortcut for the cleanup default', () => 
   assert.equal(state.shortcutStatus, 'Default shortcut for current project cleanup.');
   assert.equal(
     state.shortcutWarning,
-    'macOS may use this for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
+    'If MarkLingo cannot use this shortcut, macOS may already use it for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
   );
 });
 
