@@ -212,6 +212,19 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('id="clear-data"'));
 });
 
+test('renders shortcut fallbacks when state omits shortcut details', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({ shortcuts: undefined }),
+  });
+
+  assert.match(html, /Translate Current Markdown/);
+  assert.match(html, /Delete Current Project Translated Files/);
+  assert.match(html, /Not assigned/);
+  assert.match(html, /No active shortcut\. Edit keyboard shortcuts to assign one\./);
+});
+
 test('keeps the saved OpenAI-compatible provider draft when OpenRouter is active', () => {
   const html = renderSettingsHtml({
     cspSource: "'self'",

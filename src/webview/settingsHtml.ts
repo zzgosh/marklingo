@@ -188,7 +188,7 @@ function getShortcutWarningText(warning: string): string {
 }
 
 function getShortcutStates(state: SettingsState): ShortcutState[] {
-  const byId = new Map(state.shortcuts.map((shortcut) => [shortcut.id, shortcut]));
+  const byId = new Map((state.shortcuts ?? []).map((shortcut) => [shortcut.id, shortcut]));
   return SHORTCUT_DEFINITIONS.map((definition) => byId.get(definition.id) ?? {
     id: definition.id,
     title: definition.title,

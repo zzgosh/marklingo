@@ -351,12 +351,26 @@ function buildState(url) {
   const openAiCompatiblePromptState = getPromptState(openAiCompatibleVerifiedAdapterMode, openAiCompatibleModelId, targetLanguage, chatPromptInstructions);
   const initialUsageBuckets = buildUsagePreviewBuckets('7d', ['google/gemini-3.1-flash-lite', 'hy-mt2']);
   const initialUsageTokenTotal = initialUsageBuckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
+  const shortcutWarning = url.searchParams.get('warning') === '1'
+    ? 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.'
+    : '';
   return {
-    shortcutLabel: 'Option + Command + T',
-    shortcutStatus: 'Default shortcut for Markdown editors.',
-    shortcutWarning: url.searchParams.get('warning') === '1'
-      ? 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.'
-      : '',
+    shortcuts: [
+      {
+        id: 'translateCurrentMarkdown',
+        title: 'Translate Current Markdown',
+        shortcutLabel: 'Option + Command + T',
+        shortcutStatus: shortcutWarning ? 'Potential user keybinding conflict: workbench.action.tasks.runTask' : 'Default shortcut for Markdown editors.',
+        shortcutWarning,
+      },
+      {
+        id: 'deleteCurrentProjectTranslatedFiles',
+        title: 'Delete Current Project Translated Files',
+        shortcutLabel: 'Option + Command + D',
+        shortcutStatus: 'Default shortcut for current project cleanup.',
+        shortcutWarning: 'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+      },
+    ],
     providerType,
     baseUrl,
     openRouterBaseUrl: defaultBaseUrl,
