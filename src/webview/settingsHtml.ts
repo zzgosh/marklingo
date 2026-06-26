@@ -1,4 +1,8 @@
 import {
+  SHORTCUT_DEFINITIONS,
+  type ShortcutState,
+} from './shortcutState.js';
+import {
   coerceProviderType,
   getProviderModelTags,
   getProviderPreset,
@@ -36,9 +40,7 @@ export type SettingsProviderState = {
 };
 
 export type SettingsState = {
-  shortcutLabel: string;
-  shortcutStatus: string;
-  shortcutWarning: string;
+  shortcuts: ShortcutState[];
   providerType: string;
   baseUrl: string;
   openRouterBaseUrl: string;
@@ -183,6 +185,36 @@ function getShortcutWarningText(warning: string): string {
     return 'No active shortcut. Edit keyboard shortcuts to assign one.';
   }
   return warning;
+}
+
+function getShortcutStates(state: SettingsState): ShortcutState[] {
+  const byId = new Map(state.shortcuts.map((shortcut) => [shortcut.id, shortcut]));
+  return SHORTCUT_DEFINITIONS.map((definition) => byId.get(definition.id) ?? {
+    id: definition.id,
+    title: definition.title,
+    shortcutLabel: 'Not assigned',
+    shortcutStatus: 'Open Keyboard Shortcuts to assign a shortcut.',
+    shortcutWarning: 'Open Keyboard Shortcuts to assign a new shortcut.',
+  });
+}
+
+function renderShortcutRows(shortcuts: ShortcutState[]): string {
+  return shortcuts.map((shortcut) => {
+    const warning = getShortcutWarningText(shortcut.shortcutWarning);
+    return `
+          <div class="row shortcut-row" data-shortcut-id="${escapeHtml(shortcut.id)}">
+            <div>
+              <div class="label">${escapeHtml(shortcut.title)}</div>
+            </div>
+            <div class="shortcut-stack">
+              <div class="shortcut-controls">
+                <span class="shortcut-pill" data-shortcut-label="${escapeHtml(shortcut.id)}">${escapeHtml(shortcut.shortcutLabel)}</span>
+                <button class="secondary open-keyboard-shortcuts" type="button" data-shortcut-id="${escapeHtml(shortcut.id)}">Edit</button>
+              </div>
+              <div class="shortcut-warning" data-shortcut-warning="${escapeHtml(shortcut.id)}">${escapeHtml(warning)}</div>
+            </div>
+          </div>`;
+  }).join('');
 }
 
 const API_KEY_MASK_VALUE = '•'.repeat(32);
@@ -651,7 +683,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       </span>`
     : '';
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' hidden';
-  const shortcutWarningText = getShortcutWarningText(state.shortcutWarning);
+  const shortcuts = getShortcutStates(state);
   const pluralize = (count: number, singular: string, plural: string): string =>
     `${count} ${count === 1 ? singular : plural}`;
   const storageStatsTextParts = [
@@ -1075,6 +1107,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       gap: 12px;
       min-width: 0;
     }
+    .shortcut-stack {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
     .shortcut-pill {
       display: inline-flex;
       align-items: center;
@@ -1096,6 +1133,14 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       color: var(--danger);
     }
     .section-warning:empty {
+      display: none;
+    }
+    .shortcut-warning {
+      color: var(--danger);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .shortcut-warning:empty {
       display: none;
     }
     .path-field {
@@ -1734,17 +1779,8 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       <div id="settings">
         <h2>Keyboard Shortcuts</h2>
         <section class="card">
-          <div class="row shortcut-row">
-            <div>
-              <div class="label">Translate Current Markdown</div>
-            </div>
-            <div class="shortcut-controls">
-              <span class="shortcut-pill" id="shortcut-label">${escapeHtml(state.shortcutLabel)}</span>
-              <button class="secondary" id="open-keyboard-shortcuts" type="button">Edit</button>
-            </div>
-          </div>
+${renderShortcutRows(shortcuts)}
         </section>
-        <div class="section-warning" id="shortcut-warning">${escapeHtml(shortcutWarningText)}</div>
 
         <h2>Provider</h2>
         <section class="card provider-card">
@@ -2555,7 +2591,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       }, 1600);
     });
 
-    document.getElementById('open-keyboard-shortcuts').addEventListener('click', () => vscode.postMessage({ type: 'openKeyboardShortcuts' }));
+    document.querySelectorAll('.open-keyboard-shortcuts').forEach((button) => {
+      button.addEventListener('click', () => {
+        vscode.postMessage({ type: 'openKeyboardShortcuts', shortcutId: button.getAttribute('data-shortcut-id') || '' });
+      });
+    });
     document.getElementById('reveal-storage').addEventListener('click', () => vscode.postMessage({ type: 'revealStorage' }));
     document.getElementById('optimize-storage').addEventListener('click', () => vscode.postMessage({ type: 'optimizeStorage' }));
 
@@ -2706,13 +2746,15 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
         return;
       }
       if (msg.type === 'shortcutState') {
-        const label = document.getElementById('shortcut-label');
-        const statusEl = document.getElementById('shortcut-status');
-        const warn = document.getElementById('shortcut-warning');
-        if (label) label.textContent = msg.shortcutLabel || '';
-        if (statusEl) statusEl.textContent = msg.shortcutStatus || '';
-        if (warn) {
-          warn.textContent = getShortcutWarningText(msg.shortcutWarning || '');
+        const shortcuts = Array.isArray(msg.shortcuts) ? msg.shortcuts : [];
+        for (const shortcut of shortcuts) {
+          if (!shortcut || typeof shortcut.id !== 'string') continue;
+          const label = document.querySelector('[data-shortcut-label="' + shortcut.id + '"]');
+          const warn = document.querySelector('[data-shortcut-warning="' + shortcut.id + '"]');
+          if (label) label.textContent = shortcut.shortcutLabel || '';
+          if (warn) {
+            warn.textContent = getShortcutWarningText(shortcut.shortcutWarning || '');
+          }
         }
         return;
       }

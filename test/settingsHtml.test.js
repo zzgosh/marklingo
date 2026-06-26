@@ -4,9 +4,22 @@ import { renderSettingsHtml } from '../out/webview/settingsHtml.js';
 
 function getState(overrides = {}) {
   return {
-    shortcutLabel: 'Option + Command + T',
-    shortcutStatus: 'Default shortcut for Markdown editors.',
-    shortcutWarning: '',
+    shortcuts: [
+      {
+        id: 'translateCurrentMarkdown',
+        title: 'Translate Current Markdown',
+        shortcutLabel: 'Option + Command + T',
+        shortcutStatus: 'Default shortcut for Markdown editors.',
+        shortcutWarning: '',
+      },
+      {
+        id: 'deleteCurrentProjectTranslatedFiles',
+        title: 'Delete Current Project Translated Files',
+        shortcutLabel: 'Option + Command + D',
+        shortcutStatus: 'Default shortcut for current project cleanup.',
+        shortcutWarning: 'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+      },
+    ],
     providerType: 'openrouter',
     baseUrl: 'https://openrouter.ai/api/v1',
     openRouterBaseUrl: 'https://openrouter.ai/api/v1',
@@ -96,7 +109,10 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /<title>MarkLingo Settings<\/title>/);
   assert.match(html, /<h2>Keyboard Shortcuts<\/h2>/);
   assert.match(html, /Translate Current Markdown/);
+  assert.match(html, /Delete Current Project Translated Files/);
   assert.match(html, />Edit<\/button>/);
+  assert.match(html, /On macOS, Option \+ Command \+ D may be handled by the Dock shortcut before VS Code receives it\./);
+  assert.match(html, /type: 'openKeyboardShortcuts', shortcutId:/);
   assert.match(html, /System Instructions/);
   assert.match(html, /<h2>Provider<\/h2>/);
   assert.match(html, /<section class="card provider-card">/);
@@ -322,7 +338,15 @@ test('escapes settings state before rendering into HTML', () => {
       baseUrl: '<img src=x onerror=alert(1)>',
       openAiCompatibleBaseUrl: '<img src=x onerror=alert(1)>',
       customPrompt: '<b>Keep names</b>',
-      shortcutWarning: '<script>alert(1)</script>',
+      shortcuts: [
+        {
+          id: 'translateCurrentMarkdown',
+          title: 'Translate Current Markdown',
+          shortcutLabel: 'Option + Command + T',
+          shortcutStatus: 'Default shortcut for Markdown editors.',
+          shortcutWarning: '<script>alert(1)</script>',
+        },
+      ],
       targetLanguage: 'Custom...',
       targetLanguageCustom: 'Brazilian Portuguese',
     }),

@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+  MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY,
   getDefaultTranslateKeybindingSearchQuery,
   getDefaultTranslateKeys,
+  getDefaultShortcutKeybindingSearchQuery,
+  getDefaultShortcutKeys,
   getShortcutStateFromKeybindings,
   MAC_TRANSLATE_KEY,
+  NON_MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY,
   NON_MAC_TRANSLATE_KEY,
 } from '../out/webview/shortcutState.js';
 
@@ -27,6 +32,31 @@ test('uses Windows/Linux default shortcut on local non-darwin extension hosts', 
   assert.equal(
     getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'linux' }),
     '@keybinding:ctrl+alt+t',
+  );
+});
+
+test('uses current project cleanup default shortcuts per platform', () => {
+  assert.deepEqual(
+    getDefaultShortcutKeys(DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT, { extensionHostPlatform: 'darwin' }),
+    [MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+  );
+  assert.equal(
+    getDefaultShortcutKeybindingSearchQuery(
+      DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+      { extensionHostPlatform: 'darwin' },
+    ),
+    '@keybinding:alt+cmd+d',
+  );
+  assert.deepEqual(
+    getDefaultShortcutKeys(DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT, { extensionHostPlatform: 'linux' }),
+    [NON_MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+  );
+  assert.equal(
+    getDefaultShortcutKeybindingSearchQuery(
+      DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+      { extensionHostPlatform: 'linux' },
+    ),
+    '@keybinding:ctrl+alt+d',
   );
 });
 
@@ -135,6 +165,38 @@ test('user-assigned translate shortcut takes precedence over removed defaults', 
   );
 
   assert.equal(state.shortcutLabel, 'Control + Shift + T');
+  assert.equal(state.shortcutStatus, 'Assigned in user keybindings.');
+  assert.equal(state.shortcutWarning, '');
+});
+
+test('warns about the known macOS Dock shortcut for the cleanup default', () => {
+  const state = getShortcutStateFromKeybindings(
+    [],
+    [MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+    DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+  );
+
+  assert.equal(state.shortcutLabel, 'Option + Command + D');
+  assert.equal(state.shortcutStatus, 'Default shortcut for current project cleanup.');
+  assert.equal(
+    state.shortcutWarning,
+    'On macOS, Option + Command + D may be handled by the Dock shortcut before VS Code receives it.',
+  );
+});
+
+test('does not show the macOS Dock warning after assigning a custom cleanup shortcut', () => {
+  const state = getShortcutStateFromKeybindings(
+    [
+      {
+        key: 'ctrl+shift+d',
+        command: 'marklingo.deleteCurrentProjectTranslatedFiles',
+      },
+    ],
+    [MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+    DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+  );
+
+  assert.equal(state.shortcutLabel, 'Control + Shift + D');
   assert.equal(state.shortcutStatus, 'Assigned in user keybindings.');
   assert.equal(state.shortcutWarning, '');
 });

@@ -91,6 +91,14 @@
         "win": "ctrl+alt+t",
         "linux": "ctrl+alt+t",
         "when": "editorTextFocus && (editorLangId == markdown || resourceExtname == .md || resourceExtname == .markdown)"
+      },
+      {
+        "command": "marklingo.deleteCurrentProjectTranslatedFiles",
+        "key": "ctrl+alt+d",
+        "mac": "alt+cmd+d",
+        "win": "ctrl+alt+d",
+        "linux": "ctrl+alt+d",
+        "when": "editorTextFocus && resourceScheme == file"
       }
     ],
     "menus": {

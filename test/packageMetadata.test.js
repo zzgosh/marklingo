@@ -36,6 +36,19 @@ test('translation keybinding is available for markdown file extensions', () => {
   );
 });
 
+test('current project translated file cleanup keybinding is available for file editors', () => {
+  const pkg = readPackageJson();
+  const binding = pkg.contributes.keybindings.find((item) => item.command === 'marklingo.deleteCurrentProjectTranslatedFiles');
+
+  assert.ok(binding, 'expected current project cleanup command keybinding');
+  assert.equal(binding.key, 'ctrl+alt+d');
+  assert.equal(binding.mac, 'alt+cmd+d');
+  assert.equal(binding.win, 'ctrl+alt+d');
+  assert.equal(binding.linux, 'ctrl+alt+d');
+  assert.match(binding.when, /editorTextFocus/);
+  assert.match(binding.when, /resourceScheme == file/);
+});
+
 test('registered command contributions include user-facing actions', () => {
   const pkg = readPackageJson();
   const commandIds = new Set(pkg.contributes.commands.map((item) => item.command));
