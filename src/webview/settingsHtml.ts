@@ -187,6 +187,16 @@ function getShortcutWarningText(warning: string): string {
   return warning;
 }
 
+function getShortcutTooltipWarningText(warning: string): string {
+  const text = getShortcutWarningText(warning);
+  return warning.includes('before VS Code receives it') ? text : '';
+}
+
+function getShortcutInlineWarningText(warning: string): string {
+  const tooltip = getShortcutTooltipWarningText(warning);
+  return tooltip ? '' : getShortcutWarningText(warning);
+}
+
 function getShortcutStates(state: SettingsState): ShortcutState[] {
   const byId = new Map((state.shortcuts ?? []).map((shortcut) => [shortcut.id, shortcut]));
   return SHORTCUT_DEFINITIONS.map((definition) => byId.get(definition.id) ?? {
@@ -200,7 +210,9 @@ function getShortcutStates(state: SettingsState): ShortcutState[] {
 
 function renderShortcutRows(shortcuts: ShortcutState[]): string {
   return shortcuts.map((shortcut) => {
-    const warning = getShortcutWarningText(shortcut.shortcutWarning);
+    const inlineWarning = getShortcutInlineWarningText(shortcut.shortcutWarning);
+    const tooltipWarning = getShortcutTooltipWarningText(shortcut.shortcutWarning);
+    const tooltipHidden = tooltipWarning ? '' : ' hidden';
     return `
           <div class="row shortcut-row" data-shortcut-id="${escapeHtml(shortcut.id)}">
             <div>
@@ -208,10 +220,13 @@ function renderShortcutRows(shortcuts: ShortcutState[]): string {
             </div>
             <div class="shortcut-stack">
               <div class="shortcut-controls">
-                <span class="shortcut-pill" data-shortcut-label="${escapeHtml(shortcut.id)}">${escapeHtml(shortcut.shortcutLabel)}</span>
+                <span class="shortcut-key-group">
+                  <span class="shortcut-pill" data-shortcut-label="${escapeHtml(shortcut.id)}">${escapeHtml(shortcut.shortcutLabel)}</span>
+                  <span class="info-tip shortcut-info" data-shortcut-info="${escapeHtml(shortcut.id)}" tabindex="0" aria-label="About this shortcut"${tooltipHidden}><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(tooltipWarning)}</span></span>
+                </span>
                 <button class="secondary open-keyboard-shortcuts" type="button" data-shortcut-id="${escapeHtml(shortcut.id)}">Edit</button>
               </div>
-              <div class="shortcut-warning" data-shortcut-warning="${escapeHtml(shortcut.id)}">${escapeHtml(warning)}</div>
+              <div class="shortcut-warning" data-shortcut-warning="${escapeHtml(shortcut.id)}">${escapeHtml(inlineWarning)}</div>
             </div>
           </div>`;
   }).join('');
@@ -1112,10 +1127,16 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       gap: 6px;
       min-width: 0;
     }
-    .shortcut-pill {
+    .shortcut-key-group {
       display: inline-flex;
       align-items: center;
       justify-self: start;
+      gap: 8px;
+      min-width: 0;
+    }
+    .shortcut-pill {
+      display: inline-flex;
+      align-items: center;
       min-height: 26px;
       max-width: 100%;
       padding: 3px 10px;
@@ -1245,6 +1266,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
       display: block;
       width: 14px;
       height: 14px;
+    }
+    .shortcut-info {
+      margin-left: 0;
     }
     .info-tip .tooltip {
       position: absolute;
@@ -1949,6 +1973,16 @@ ${renderShortcutRows(shortcuts)}
         return 'No active shortcut. Edit keyboard shortcuts to assign one.';
       }
       return warning;
+    }
+
+    function getShortcutTooltipWarningText(warning) {
+      const text = getShortcutWarningText(warning);
+      return warning.includes('before VS Code receives it') ? text : '';
+    }
+
+    function getShortcutInlineWarningText(warning) {
+      const tooltip = getShortcutTooltipWarningText(warning);
+      return tooltip ? '' : getShortcutWarningText(warning);
     }
 
     const textByKey = new Map();
@@ -2751,9 +2785,16 @@ ${renderShortcutRows(shortcuts)}
           if (!shortcut || typeof shortcut.id !== 'string') continue;
           const label = document.querySelector('[data-shortcut-label="' + shortcut.id + '"]');
           const warn = document.querySelector('[data-shortcut-warning="' + shortcut.id + '"]');
+          const info = document.querySelector('[data-shortcut-info="' + shortcut.id + '"]');
+          const tooltip = info ? info.querySelector('.tooltip') : null;
+          const tooltipWarning = getShortcutTooltipWarningText(shortcut.shortcutWarning || '');
           if (label) label.textContent = shortcut.shortcutLabel || '';
           if (warn) {
-            warn.textContent = getShortcutWarningText(shortcut.shortcutWarning || '');
+            warn.textContent = getShortcutInlineWarningText(shortcut.shortcutWarning || '');
+          }
+          if (info && tooltip) {
+            tooltip.textContent = tooltipWarning;
+            info.hidden = !tooltipWarning;
           }
         }
         return;

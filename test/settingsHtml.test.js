@@ -111,7 +111,9 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /Translate Current Markdown/);
   assert.match(html, /Delete Current Project Translated Files/);
   assert.match(html, />Edit<\/button>/);
-  assert.match(html, /On macOS, Option \+ Command \+ D may be handled by the Dock shortcut before VS Code receives it\./);
+  assert.match(html, /class="info-tip shortcut-info"/);
+  assert.match(html, /data-shortcut-info="deleteCurrentProjectTranslatedFiles"[\s\S]*On macOS, Option \+ Command \+ D may be handled by the Dock shortcut before VS Code receives it\./);
+  assert.match(html, /data-shortcut-warning="deleteCurrentProjectTranslatedFiles"><\/div>/);
   assert.match(html, /type: 'openKeyboardShortcuts', shortcutId:/);
   assert.match(html, /System Instructions/);
   assert.match(html, /<h2>Provider<\/h2>/);
