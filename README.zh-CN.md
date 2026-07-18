@@ -34,8 +34,12 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 
 默认快捷键：
 
-- macOS：`Option + Command + T`
-- Windows/Linux：`Control + Alt + T`
+| 命令 | macOS | Windows/Linux |
+| --- | --- | --- |
+| `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
+| `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
+
+如果 MarkLingo 在 macOS 上无法使用 `Option + Command + D`，该快捷键可能已被 Dock 占用。可前往“系统设置 > 键盘 > 键盘快捷键... > Dock > 打开或关闭 Dock 隐藏”进行更改，或在 MarkLingo Settings 中点击 `Edit`，为该命令分配其他 VS Code 快捷键。
 
 也可以直接从 `MarkLingo: Translate Current Markdown` 开始。如果还没有保存并验证过 Provider，MarkLingo 会先打开 Settings。配置 Provider、API key、显示时的 Base URL 和 Model ID，点击 `Save and Verify`，然后再次运行翻译命令。
 
@@ -177,7 +181,7 @@ MarkLingo 是一个本地 VS Code 扩展，但翻译需要将文档内容发送�
 - 已跟踪的项目翻译输出
 - 项目翻译元数据/缓存，包括 Usage Insights 事件
 
-当你只想清理当前项目中由扩展跟踪的翻译文件时，使用 `MarkLingo: Delete Current Project Translated Files`。这个项目范围的命令会有意删除已跟踪的输出，即使它们在生成后被编辑过。
+当你只想清理当前项目中由扩展跟踪的翻译文件时，使用 `MarkLingo: Delete Current Project Translated Files` 或其快捷键。MarkLingo 会先要求确认，并有意删除已跟踪的输出，即使它们在生成后被编辑过；其他项目的翻译文件不会受到影响。
 
 ## 开发
 

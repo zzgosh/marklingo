@@ -62,13 +62,6 @@ export function getDefaultTranslateKeys(options: { extensionHostPlatform: NodeJS
   return getDefaultShortcutKeys(TRANSLATE_SHORTCUT, options);
 }
 
-export function getDefaultTranslateKeybindingSearchQuery(options: {
-  extensionHostPlatform: NodeJS.Platform;
-  remoteName?: string;
-}): string {
-  return getDefaultShortcutKeybindingSearchQuery(TRANSLATE_SHORTCUT, options);
-}
-
 export function getDefaultShortcutKeys(
   definition: ShortcutDefinition,
   options: { extensionHostPlatform: NodeJS.Platform; remoteName?: string },
@@ -78,12 +71,10 @@ export function getDefaultShortcutKeys(
   return options.extensionHostPlatform === 'darwin' ? [definition.macKey] : [definition.nonMacKey];
 }
 
-export function getDefaultShortcutKeybindingSearchQuery(
+export function getShortcutKeybindingSearchQuery(
   definition: ShortcutDefinition,
-  options: { extensionHostPlatform: NodeJS.Platform; remoteName?: string },
 ): string {
-  const [defaultKey] = getDefaultShortcutKeys(definition, options);
-  return defaultKey ? `@keybinding:${defaultKey}` : `@command:${definition.command}`;
+  return `@command:${definition.command}`;
 }
 
 export function normalizeKeybinding(key: string): string {

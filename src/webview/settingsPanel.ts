@@ -61,7 +61,7 @@ import {
 } from '../vscodeConfigurationErrors.js';
 import {
   SHORTCUT_DEFINITIONS,
-  getDefaultShortcutKeybindingSearchQuery,
+  getShortcutKeybindingSearchQuery,
   getShortcutStatesFromKeybindings,
   type ShortcutState,
   type ShortcutId,
@@ -174,10 +174,7 @@ function getCurrentProjectDirectoryPath(projectUri: vscode.Uri | undefined): str
 
 function getKeyboardShortcutsSearchQuery(shortcutId: ShortcutId | undefined): string {
   const definition = SHORTCUT_DEFINITIONS.find((item) => item.id === shortcutId) ?? SHORTCUT_DEFINITIONS[0];
-  return getDefaultShortcutKeybindingSearchQuery(definition, {
-    extensionHostPlatform: process.platform,
-    remoteName: vscode.env.remoteName,
-  });
+  return getShortcutKeybindingSearchQuery(definition);
 }
 
 function hasExplicitStringSetting(cfg: vscode.WorkspaceConfiguration, key: string): boolean {
