@@ -2,7 +2,7 @@
 
 All notable changes to MarkLingo are documented in this file.
 
-## 0.0.4
+## 0.1.0
 
 - Add provider presets for OpenRouter, OpenAI, DeepSeek, Moonshot, Zhipu GLM, MiMo, and custom OpenAI-compatible endpoints, with per-provider Model ID memory and endpoint-origin API key storage.
 - Add model capability verification through Settings. `Save and Verify` now detects the provider request path and stores the verified provider, Base URL, Model ID, and adapter mode before translation commands run.
@@ -14,9 +14,9 @@ All notable changes to MarkLingo are documented in this file.
 - Improve translation failure actions and local-model handling, including broader HY-MT2 local model tag detection.
 - Update README guidance and expand unit and VS Code integration coverage for provider presets, verification, setup routing, request planning, placeholder protection, and translation adapters.
 
-Upgrade note for 0.0.3 users:
+**⚠️ Upgrade note for 0.0.3 users:**
 
-- Existing users who configured MarkLingo before this release may be asked to open Settings the first time they run a translation command after upgrading. This is expected because 0.0.4 requires a verified provider capability record before translating. Open `MarkLingo: Open Settings`, confirm Provider/API key/Base URL/Model ID, click `Save and Verify`, then run `MarkLingo: Translate Current Markdown` or `MarkLingo: Retranslate Current Markdown` again.
+- Existing users who configured MarkLingo before this release may be asked to open Settings the first time they run a translation command after upgrading. This is expected because 0.1.0 requires a verified provider capability record before translating. Open `MarkLingo: Open Settings`, confirm Provider/API key/Base URL/Model ID, click `Save and Verify`, then run `MarkLingo: Translate Current Markdown` or `MarkLingo: Retranslate Current Markdown` again.
 
 ## 0.0.3
 

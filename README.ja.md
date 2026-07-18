@@ -2,48 +2,51 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | 日本語
 
-AI で Markdown を翻訳します。Markdown を壊さずに。
+MarkLingo は、AI で Markdown を翻訳するオープンソースの VS Code 拡張機能です。主な機能は次のとおりです。
 
-MarkLingo は、保存済みの Markdown を多言語ドラフトに翻訳し、元のファイルは変更しません。VS Code 内で多言語の Markdown ドラフトをすばやく作成したいライター、メンテナー、ドキュメントチームのために作られています。
+- 翻訳時に元の Markdown 構造を保持します。
+- OpenRouter、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo など複数の組み込み LLM Provider と、柔軟な Custom OpenAI Compatible エンドポイントを利用できます。
+- 翻訳済みの `*_<language>_mdt.md` ファイルをソースの隣に出力し、翻訳タブと横並びの Markdown プレビューを開きます。
+- 増分翻訳キャッシュにより、新しい内容を翻訳しながら変更されていない内容の再翻訳を避け、token を節約します。
+- エクスプローラーのコンテキストメニューから、単一ファイル、フォルダー、複数の選択項目を翻訳できます。
+- 生成された翻訳ファイルをすばやく削除できます。
+- `*_mdt.md` ルールを `.git/info/exclude` に追加し、ローカルの Git ワークフローから生成済み翻訳を除外できます。
+- 翻訳済みファイル、成功したタスク、provider/model の内訳、token 使用量、推定コストを詳細な Usage ダッシュボードで確認できます。
+- API キーはユーザーのローカル環境にある VS Code `SecretStorage` に安全に保存され、テレメトリ SDK は含まれていません。
 
-- Markdown 構造を保持します：見出し、リスト、表、コード、インラインコード、HTML、frontmatter 構文、リンク、画像パス。
-- 組み込み Provider presets として [OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo を選択できます。信頼できる Custom OpenAI Compatible エンドポイントも利用できます。
-- ソースの隣に翻訳済みの `*_<language>_mdt.md` ファイルを書き出し、翻訳タブとプレビューを開き、変更されていない Markdown ブロックのキャッシュ翻訳を再利用します。
-- Settings でローカルの Usage Insights を確認できます。翻訳済みファイル、成功した翻訳タスク、provider/model の内訳、token 使用量、利用可能な場合の USD 推定コストを表示します。
-- 無料でオープンソースの拡張機能です。API キーは VS Code `SecretStorage` に保存され、テレメトリ SDK は含まれていません。
-
-![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+![コマンドパレットから MarkLingo を実行](https://raw.githubusercontent.com/zzgosh/marklingo/v0.1.0/resources/Screen-Recording-2026-07-18-new-720p-12fps.gif)
 
 ## インストール
 
-VS Code の拡張機能ビューから **MarkLingo** をインストールするか（`MarkLingo` で検索）、[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) からインストールしてください。
-
-Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo) から MarkLingo をインストールできます。
-
-[releases ページ](https://github.com/zzgosh/marklingo/releases) からパッケージ済みの `.vsix` をインストールすることもできます。
+- **方法 1：** VS Code の拡張機能ビューで `MarkLingo` を検索してインストールするか、[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) からインストールします。
+- **方法 2：** Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo) からインストールします。
+- **方法 3：** GitHub の [releases ページ](https://github.com/zzgosh/marklingo/releases) からパッケージ済みの `.vsix` をダウンロードします。
 
 ## クイックスタート
 
-最短のセットアップは OpenRouter を使う方法です。[openrouter.ai/keys](https://openrouter.ai/keys) でサインインし、API キーを作成してください。料金は、選択したモデルに応じて OpenRouter からリクエストごとに請求されます。別の組み込み Provider を使う場合は、まず `MarkLingo: Open Settings` を実行し、Provider から選択してください。
+1. 拡張機能をインストールしたら、VS Code で `Command/Ctrl + Shift + P` を押してコマンドパレットを開き、`MarkLingo: Open Settings` を実行します。
+2. LLM Provider を選択し、API key を入力してモデルを選び、`Save and Verify` をクリックして保存および検証します。
+3. 翻訳出力のターゲット言語を選択します。デフォルトは簡体字中国語です。
+4. 保存済みの Markdown ファイルを開き、コマンドパレットから `MarkLingo: Translate Current Markdown` を実行します。
+5. 翻訳が完了するまで待ちます。進行状況は VS Code の通知に表示されます。
+6. その他のコマンドを確認するには、コマンドパレットに `MarkLingo:` と入力します。
 
-1. `MarkLingo: Open Settings` を実行します。
-2. 最短セットアップでは Provider を `OpenRouter` のままにします。別の Provider は Settings で選択できます。API key を貼り付け、Model ID を選択して `Save and Verify` をクリックします。
-3. 保存済みの Markdown ファイルを開きます。
-4. コマンドパレットから `MarkLingo: Translate Current Markdown` を実行します。
-5. ターゲット言語を選択します。
-
-デフォルトのショートカット：
+### キーボードショートカット
 
 | コマンド | macOS | Windows/Linux |
 | --- | --- | --- |
 | `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
 | `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
 
-macOS で MarkLingo が `Option + Command + D` を使用できない場合は、Dock が同じショートカットを使用している可能性があります。「システム設定 > キーボード > キーボードショートカット... > Dock > Dock の自動表示/非表示」を変更するか、MarkLingo Settings の `Edit` から別の VS Code キーバインドを割り当ててください。
+> 注意：macOS で MarkLingo が `Option + Command + D` を使用できない場合は、Dock が同じショートカットを使用している可能性があります。「システム設定 > キーボード > キーボードショートカット... > Dock > Dock の自動表示/非表示」を変更するか、MarkLingo Settings の `Edit` から別の VS Code キーバインドを割り当ててください。
 
-`MarkLingo: Translate Current Markdown` から直接始めることもできます。Provider がまだ保存および検証されていない場合、MarkLingo は先に Settings を開きます。Provider、API key、表示される場合は Base URL、Model ID を設定し、`Save and Verify` をクリックしてから、翻訳コマンドをもう一度実行してください。
+### コンテキストメニューから翻訳
 
-Markdown エディターを右クリックして `MarkLingo: Translate Current Markdown` を実行することもできます。エクスプローラー内の Markdown ファイルを右クリックすると `MarkLingo: Translate This Markdown File` を実行できます。エクスプローラー内のフォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 出力はスキップします。エクスプローラーで複数の Markdown ファイルやフォルダーを選択し、`MarkLingo: Translate Selected Markdown Files` で 1 つのバッチとして翻訳することもできます。
+コマンドパレットやキーボードショートカットに加えて、MarkLingo はエクスプローラーのコンテキストメニューからも翻訳できます。
+
+1. VS Code のエクスプローラーで Markdown ファイルを右クリックし、`MarkLingo: Translate This Markdown File` を実行します。
+2. フォルダーを右クリックして `MarkLingo: Translate All Markdown in This Folder` を実行すると、そのフォルダーとサブフォルダー内の `.md` および `.markdown` ファイルを翻訳し、生成済みの `*_mdt.md` 翻訳出力はスキップします。
+3. 複数の Markdown ファイルやフォルダーを選択して右クリックし、`MarkLingo: Translate Selected Markdown Files` を実行すると、1 つのバッチとして翻訳できます。
 
 ## コマンド
 
@@ -55,10 +58,10 @@ Markdown エディターを右クリックして `MarkLingo: Translate Current M
 | `MarkLingo: Translate Selected Markdown Files` | エクスプローラーで選択したファイルやフォルダーから集めた Markdown ファイルを 1 つのバッチとして翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 選択したフォルダーとサブフォルダー内のソース Markdown ファイルを翻訳し、最初の翻訳出力を開いて、残りは各ソースの隣に書き出します。 |
 | `MarkLingo: Open Settings` | プロバイダー検証、API キー、ターゲット言語、カスタム指示、ショートカットの状態、Usage Insights、クリーンアップのための MarkLingo 設定を開きます。 |
-| `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` を現在のリポジトリのローカル Git 除外ファイルに追加します。 |
+| `MarkLingo: Add Translated Files to .git/info/exclude` | `*_mdt.md` 除外ルールを現在のリポジトリのローカル `.git/info/exclude` に追加します。 |
 | `MarkLingo: Delete Current Project Translated Files` | このプロジェクトの拡張機能が追跡する翻訳出力を削除し、プライベートな翻訳メタデータ/キャッシュは保持します。 |
 
-Provider または Model ID を変更して `Save and Verify` をクリックした後、新しく検証した provider/model で既存ファイルを最初から翻訳し直したい場合は、`MarkLingo: Retranslate Current Markdown` を使用してください。`MarkLingo: Translate Current Markdown` は増分翻訳です。以前の provider/model が作成したキャッシュ済みブロック翻訳を再利用し、変更または追加されたブロックだけを現在の provider/model に送信することがあります。
+> 注意：Provider または Model ID を変更して `Save and Verify` をクリックした後、新しく検証した provider/model で既存ファイルを最初から翻訳し直したい場合は、`MarkLingo: Retranslate Current Markdown` を使用してください。`MarkLingo: Translate Current Markdown` は増分翻訳です。以前の provider/model が作成したキャッシュ済みブロック翻訳を再利用し、変更または追加されたブロックだけを現在の provider/model に送信することがあります。
 
 ## 設定
 
@@ -66,17 +69,17 @@ Provider または Model ID を変更して `Save and Verify` をクリックし
 
 ### 組み込み Provider モデル
 
-固定 Provider presets は、選択済みのモデル候補だけを表示します。OpenRouter と Custom OpenAI Compatible では Model ID を直接入力することもできます。
+固定 Provider presets では、あらかじめ用意されたモデル候補を表示します。OpenRouter と Custom OpenAI Compatible では、別の Model ID を直接入力することもできます。
 
 | Provider | Model options |
 | --- | --- |
-| OpenRouter | デフォルトは `google/gemini-3.1-flash-lite`。推奨モデルと直接入力の Model ID を使えます |
-| OpenAI | `gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.4`、`gpt-5.5` |
-| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
-| Moonshot | `kimi-k2.6`、`kimi-k2.5` |
-| GLM | `glm-4.7`、`glm-5`、`glm-5.1` |
-| Xiaomi MiMo | `mimo-v2-flash`、`mimo-v2.5`、`mimo-v2.5-pro` |
-| Custom OpenAI Compatible | エンドポイントが公開するモデル alias。Model ID を直接入力できます |
+| OpenRouter | プリセットモデルと Model ID の直接入力 |
+| OpenAI | プリセットモデル：`gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.4`、`gpt-5.5` |
+| DeepSeek | プリセットモデル：`deepseek-v4-flash`、`deepseek-v4-pro` |
+| Moonshot | プリセットモデル：`kimi-k2.6`、`kimi-k2.5` |
+| GLM | プリセットモデル：`glm-4.7`、`glm-5`、`glm-5.1` |
+| Xiaomi MiMo | プリセットモデル：`mimo-v2.5`、`mimo-v2.5-pro` |
+| Custom OpenAI Compatible | Model ID の直接入力 |
 
 - **Provider（プロバイダー）**
   - 設定：`marklingo.openrouter.provider`
@@ -128,11 +131,13 @@ Provider または Model ID を変更して `Save and Verify` をクリックし
   - デフォルト：空
   - 選択したモデルが対応している場合、用語、トーン、スタイルの追加指示として MarkLingo に内蔵された Markdown 保護プロンプトの後に追加されます。小さなバッチの fallback が必要なモデルには送信されず、このフィールドも非表示になります。
 
-設定ページでは、Provider の認証情報は `Save and Verify` で保存されます。その他のドロップダウンは即座に保存され、Provider 以外の自由入力フィールドにはそれぞれインライン `Save` ボタンがあります。
+> 注意：設定ページでは、Provider の認証情報は `Save and Verify` で保存されます。その他のドロップダウンは即座に保存され、Provider 以外の自由入力フィールドにはそれぞれインライン `Save` ボタンがあります。
 
 ### Usage Insights
 
-Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、成功した翻訳タスク、provider/model の内訳、最近の実行、token 使用量、利用可能な場合の USD 推定コストを表示します。成功したキャッシュのみの rerun は既存の翻訳から出力を再構築するだけで provider を呼び出さないため、Usage runs には含めません。OpenRouter のコストは provider が報告したリクエストコストを使い、組み込みの direct provider は provider が報告した input/output tokens と MarkLingo に同梱された Gateway 価格表で推定します。カスタムおよびローカルの OpenAI-compatible エンドポイントでは `Cost unavailable` と表示される場合があります。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
+Settings には、翻訳履歴を見るためのローカル Usage セクションがあります。翻訳済みファイル、成功した翻訳タスク、provider/model の内訳、最近の実行、token 使用量、利用可能な場合の USD 推定コストを表示します。成功したキャッシュのみの rerun は既存の翻訳から出力を再構築するだけで provider を呼び出さないため、Usage runs には含めません。
+
+OpenRouter のコストは provider が報告したリクエストコストを使い、組み込みの direct provider は provider が報告した input/output tokens と拡張機能に同梱された Vercel AI Gateway 価格スナップショットで推定します。カスタムおよびローカルの OpenAI-compatible エンドポイントでは `Cost unavailable` と表示される場合があります。reported usage が利用できない場合は、実際に送信したリクエストの input token 推定値にフォールバックします。
 
 ## 出力ファイル
 

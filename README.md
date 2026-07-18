@@ -2,48 +2,51 @@
 
 English | [简体中文](https://github.com/zzgosh/marklingo/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/zzgosh/marklingo/blob/main/README.zh-TW.md) | [日本語](https://github.com/zzgosh/marklingo/blob/main/README.ja.md)
 
-Translate Markdown with AI, without breaking it.
+MarkLingo is an open-source VS Code extension that translates Markdown with AI. Key features include:
 
-MarkLingo translates saved Markdown into multilingual drafts while keeping the original file untouched. It is built for writers, maintainers, and documentation teams who need fast Markdown translation inside VS Code.
+- Preserve the original Markdown structure during translation.
+- Choose from multiple built-in LLM providers: OpenRouter, OpenAI, DeepSeek, Moonshot, GLM, Xiaomi MiMo, or use a flexible Custom OpenAI Compatible endpoint.
+- Write translated `*_<language>_mdt.md` files next to the source, then open the translated tab and a Markdown preview to the side.
+- Use incremental translation caching to translate new content while avoiding repeated translation of unchanged content and saving tokens.
+- Translate individual files, folders, or multiple selected resources from the Explorer context menu.
+- Quickly delete generated translated files.
+- Add the `*_mdt.md` rule to `.git/info/exclude` to keep generated translations out of the local Git workflow.
+- Review a detailed translation Usage dashboard with translated files, successful tasks, provider/model breakdowns, token usage, and estimated cost.
+- Keep API keys securely on the local machine in VS Code `SecretStorage`, with no telemetry SDK included.
 
-- Preserve Markdown structure: headings, lists, tables, code, inline code, HTML, frontmatter syntax, links, and image paths.
-- Choose from built-in provider presets for [OpenRouter](https://openrouter.ai), OpenAI, DeepSeek, Moonshot, GLM, Xiaomi MiMo, or use a trusted Custom OpenAI Compatible endpoint.
-- Write translated `*_<language>_mdt.md` files next to the source, open the translated tab and preview, and reuse cached translations for unchanged Markdown blocks.
-- Review local Usage Insights in Settings, including translated files, successful translation tasks, provider/model breakdowns, token usage, and estimated USD cost when available.
-- Use a free, open-source extension with API keys stored in VS Code `SecretStorage` and no telemetry SDK.
-
-![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.1.0/resources/Screen-Recording-2026-07-18-new-720p-12fps.gif)
 
 ## Install
 
-Install **MarkLingo** from the VS Code Extensions view (search for `MarkLingo`) or from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo).
-
-For VS Code-compatible editors that use Open VSX, install MarkLingo from the [Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo).
-
-You can also install a packaged `.vsix` from the [releases page](https://github.com/zzgosh/marklingo/releases).
+- **Option 1:** Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) by searching for `MarkLingo` in the VS Code Extensions view and clicking Install.
+- **Option 2:** For VS Code-compatible editors that use Open VSX, install MarkLingo from the [Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo).
+- **Option 3:** Download a packaged `.vsix` from the GitHub [releases page](https://github.com/zzgosh/marklingo/releases).
 
 ## Quick Start
 
-Fastest path: use OpenRouter. Sign in at [openrouter.ai/keys](https://openrouter.ai/keys) and create an API key. Usage is billed by OpenRouter per request, based on the model you choose. To use another built-in provider, start with `MarkLingo: Open Settings` and choose it from Provider.
+1. After installing the extension, press `Command/Ctrl + Shift + P` in VS Code to open the Command Palette, then run `MarkLingo: Open Settings`.
+2. Choose an LLM Provider, enter your API key, select a model, then click `Save and Verify`.
+3. Choose the target language for translated output. The default is Simplified Chinese.
+4. Open a saved Markdown file and run `MarkLingo: Translate Current Markdown` from the Command Palette.
+5. Wait for translation to finish. Progress appears in VS Code notifications.
+6. To discover other commands, enter `MarkLingo:` in the Command Palette.
 
-1. Run `MarkLingo: Open Settings`.
-2. Keep Provider as `OpenRouter` for the quickest setup, or choose another provider in Settings. Paste your API key, choose a Model ID, then click `Save and Verify`.
-3. Open a saved Markdown file.
-4. Run `MarkLingo: Translate Current Markdown` from the Command Palette.
-5. Choose the target language.
-
-Default shortcuts:
+### Keyboard Shortcuts
 
 | Command | macOS | Windows/Linux |
 | --- | --- | --- |
 | `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
 | `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
 
-If MarkLingo cannot use `Option + Command + D` on macOS, the shortcut may already be used by Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off, or use `Edit` in MarkLingo Settings to assign a different VS Code keybinding.
+> Note: If MarkLingo cannot use `Option + Command + D` on macOS, the shortcut may already be used by Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off, or use `Edit` in MarkLingo Settings to assign a different VS Code keybinding.
 
-You can also start with `MarkLingo: Translate Current Markdown`. If no provider has been saved and verified yet, MarkLingo opens Settings first. Configure Provider, API key, Base URL when shown, and Model ID, click `Save and Verify`, then run the translation command again.
+### Translate from the Context Menu
 
-Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Right-click a Markdown file in the Explorer to run `MarkLingo: Translate This Markdown File`. Right-click a folder in the Explorer to run `MarkLingo: Translate All Markdown in This Folder`, which translates `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs. You can also select multiple Markdown files or folders in the Explorer and run `MarkLingo: Translate Selected Markdown Files` to translate them as one batch.
+In addition to the Command Palette and keyboard shortcuts, MarkLingo supports translation from Explorer context menus.
+
+1. Right-click a Markdown file in the VS Code Explorer and run `MarkLingo: Translate This Markdown File`.
+2. Right-click a folder and run `MarkLingo: Translate All Markdown in This Folder` to translate `.md` and `.markdown` files in that folder and its subfolders while skipping generated `*_mdt.md` outputs.
+3. Select multiple Markdown files or folders, right-click, and run `MarkLingo: Translate Selected Markdown Files` to translate them as one batch.
 
 ## Commands
 
@@ -55,10 +58,10 @@ Right-click a Markdown editor to run `MarkLingo: Translate Current Markdown`. Ri
 | `MarkLingo: Translate Selected Markdown Files` | Translate Markdown files gathered from selected Explorer files and folders as one batch, opening the first translated output and writing the rest next to their sources. |
 | `MarkLingo: Translate All Markdown in This Folder` | Translate source Markdown files in the selected folder and subfolders, opening the first translated output and writing the rest next to their sources. |
 | `MarkLingo: Open Settings` | Open MarkLingo settings for provider verification, API key, target language, custom instructions, shortcut status, Usage Insights, and cleanup. |
-| `MarkLingo: Add Translated Files to .git/info/exclude` | Add `*_mdt.md` to the current repository's local Git exclude file. |
+| `MarkLingo: Add Translated Files to .git/info/exclude` | Add the `*_mdt.md` exclusion rule to the current repository's local `.git/info/exclude`. |
 | `MarkLingo: Delete Current Project Translated Files` | Delete this project's extension-tracked translated outputs while keeping private translation metadata/cache. |
 
-After changing Provider or Model ID and clicking `Save and Verify`, use `MarkLingo: Retranslate Current Markdown` when you want the newly verified provider/model to translate an existing file from scratch. `MarkLingo: Translate Current Markdown` is incremental: it may reuse cached block translations created by the previous provider/model and only send changed or new blocks to the current provider/model.
+> Note: After changing Provider or Model ID and clicking `Save and Verify`, use `MarkLingo: Retranslate Current Markdown` when you want the newly verified provider/model to translate an existing file from scratch. `MarkLingo: Translate Current Markdown` is incremental: it may reuse cached block translations created by the previous provider/model and only send changed or new blocks to the current provider/model.
 
 ## Settings
 
@@ -66,17 +69,17 @@ Use `MarkLingo: Open Settings` for the settings most users need.
 
 ### Built-In Provider Models
 
-Fixed provider presets expose a curated set of model choices. OpenRouter and Custom OpenAI Compatible also allow direct Model ID entry.
+Fixed provider presets expose predefined model choices. OpenRouter and Custom OpenAI Compatible also allow direct entry of another Model ID.
 
 | Provider | Model options |
 | --- | --- |
-| OpenRouter | `google/gemini-3.1-flash-lite` by default; recommended models plus direct Model ID entry |
-| OpenAI | `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.4`, `gpt-5.5` |
-| DeepSeek | `deepseek-v4-flash`, `deepseek-v4-pro` |
-| Moonshot | `kimi-k2.6`, `kimi-k2.5` |
-| GLM | `glm-4.7`, `glm-5`, `glm-5.1` |
-| Xiaomi MiMo | `mimo-v2.5`, `mimo-v2.5-pro` |
-| Custom OpenAI Compatible | Endpoint-provided model alias; direct Model ID entry |
+| OpenRouter | Preset models plus direct Model ID entry |
+| OpenAI | Preset models: `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.4`, `gpt-5.5` |
+| DeepSeek | Preset models: `deepseek-v4-flash`, `deepseek-v4-pro` |
+| Moonshot | Preset models: `kimi-k2.6`, `kimi-k2.5` |
+| GLM | Preset models: `glm-4.7`, `glm-5`, `glm-5.1` |
+| Xiaomi MiMo | Preset models: `mimo-v2.5`, `mimo-v2.5-pro` |
+| Custom OpenAI Compatible | Direct Model ID entry |
 
 - **Provider**
   - Setting: `marklingo.openrouter.provider`
@@ -126,11 +129,13 @@ Fixed provider presets expose a curated set of model choices. OpenRouter and Cus
   - Default: empty
   - Extra terminology, tone, or style instructions appended after MarkLingo's built-in Markdown-preservation prompt when the selected model supports them. This field is hidden and not sent for models that need the smaller-batch fallback.
 
-The settings page saves Provider credentials through `Save and Verify`. Other dropdown changes save immediately, and free-text fields outside Provider use their own inline `Save` buttons.
+> Note: The settings page saves Provider credentials through `Save and Verify`. Other dropdown changes save immediately, and free-text fields outside Provider use their own inline `Save` buttons.
 
 ### Usage Insights
 
-Settings includes a local Usage section for translation history. It shows translated files, successful translation tasks, provider/model breakdowns, recent runs, token usage, and estimated USD cost when available. Successful cache-only reruns that rebuild output from existing translations are not counted as Usage runs because they do not call the provider. OpenRouter cost uses the provider-reported request cost, while built-in direct providers use provider-reported input/output tokens and MarkLingo's bundled Gateway pricing table. Custom and local OpenAI-compatible endpoints may show `Cost unavailable`. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
+Settings includes a local Usage section for translation history. It shows translated files, successful translation tasks, provider/model breakdowns, recent runs, token usage, and estimated USD cost when available. Successful cache-only reruns that rebuild output from existing translations are not counted as Usage runs because they do not call the provider.
+
+OpenRouter cost uses the provider-reported request cost, while built-in direct providers use provider-reported input/output tokens and the Vercel AI Gateway pricing snapshot bundled with the extension. Custom and local OpenAI-compatible endpoints may show `Cost unavailable`. If reported usage is unavailable, MarkLingo falls back to estimated input tokens for requests it sent.
 
 ## Output Files
 
