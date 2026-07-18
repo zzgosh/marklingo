@@ -60,10 +60,11 @@ import {
   isConfigurationRegistryRefreshRequired,
 } from '../vscodeConfigurationErrors.js';
 import {
-  getDefaultTranslateKeybindingSearchQuery,
-  getDefaultTranslateKeys,
-  getShortcutStateFromKeybindings,
+  SHORTCUT_DEFINITIONS,
+  getShortcutKeybindingSearchQuery,
+  getShortcutStatesFromKeybindings,
   type ShortcutState,
+  type ShortcutId,
   type UserKeybinding,
 } from './shortcutState.js';
 import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, renderSettingsHtml, renderUsageSection, type SettingsState } from './settingsHtml.js';
@@ -150,13 +151,12 @@ async function readUserKeybindings(context: vscode.ExtensionContext): Promise<Us
   }
 }
 
-async function getShortcutState(context: vscode.ExtensionContext): Promise<ShortcutState> {
+async function getShortcutState(context: vscode.ExtensionContext): Promise<ShortcutState[]> {
   const keybindings = await readUserKeybindings(context);
-  const defaultKeys = getDefaultTranslateKeys({
+  return getShortcutStatesFromKeybindings(keybindings, {
     extensionHostPlatform: process.platform,
     remoteName: vscode.env.remoteName,
   });
-  return getShortcutStateFromKeybindings(keybindings, defaultKeys);
 }
 
 function getCurrentProjectUri(): vscode.Uri | undefined {
@@ -172,11 +172,9 @@ function getCurrentProjectDirectoryPath(projectUri: vscode.Uri | undefined): str
   return projectUri ? getProjectRootUri(projectUri).fsPath : undefined;
 }
 
-function getKeyboardShortcutsSearchQuery(): string {
-  return getDefaultTranslateKeybindingSearchQuery({
-    extensionHostPlatform: process.platform,
-    remoteName: vscode.env.remoteName,
-  });
+function getKeyboardShortcutsSearchQuery(shortcutId: ShortcutId | undefined): string {
+  const definition = SHORTCUT_DEFINITIONS.find((item) => item.id === shortcutId) ?? SHORTCUT_DEFINITIONS[0];
+  return getShortcutKeybindingSearchQuery(definition);
 }
 
 function hasExplicitStringSetting(cfg: vscode.WorkspaceConfiguration, key: string): boolean {
@@ -366,10 +364,10 @@ async function readSettingsState(
   const modelId = currentProviderState.modelId;
   const currentProviderBaseUrl = currentProviderState.baseUrl;
   const verifiedAdapterMode = currentProviderState.verifiedAdapterMode;
-  const shortcutState = await shortcutStatePromise;
+  const shortcuts = await shortcutStatePromise;
   const storageStats = await storageStatsPromise;
   return {
-    ...shortcutState,
+    shortcuts,
     providerType: provider.providerType,
     baseUrl: currentProviderBaseUrl,
     openRouterBaseUrl: DEFAULT_OPENROUTER_BASE_URL,
@@ -792,8 +790,8 @@ async function clearCurrentProjectData(context: vscode.ExtensionContext, panel: 
 }
 
 async function postShortcutState(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
-  const shortcut = await getShortcutState(context);
-  await panel.webview.postMessage({ type: 'shortcutState', ...shortcut });
+  const shortcuts = await getShortcutState(context);
+  await panel.webview.postMessage({ type: 'shortcutState', shortcuts });
 }
 
 function watchUserKeybindings(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): vscode.Disposable {
@@ -970,7 +968,8 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
         return;
       }
       if (message?.type === 'openKeyboardShortcuts') {
-        await vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', getKeyboardShortcutsSearchQuery());
+        const shortcutId = typeof message.shortcutId === 'string' ? message.shortcutId as ShortcutId : undefined;
+        await vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', getKeyboardShortcutsSearchQuery(shortcutId));
         return;
       }
       if (message?.type === 'revealStorage') {

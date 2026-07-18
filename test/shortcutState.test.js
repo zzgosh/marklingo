@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  getDefaultTranslateKeybindingSearchQuery,
+  DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+  MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY,
   getDefaultTranslateKeys,
+  getShortcutKeybindingSearchQuery,
+  getDefaultShortcutKeys,
   getShortcutStateFromKeybindings,
   MAC_TRANSLATE_KEY,
+  NON_MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY,
   NON_MAC_TRANSLATE_KEY,
+  TRANSLATE_SHORTCUT,
 } from '../out/webview/shortcutState.js';
 
 test('uses macOS default shortcut on local darwin extension hosts', () => {
@@ -14,8 +19,8 @@ test('uses macOS default shortcut on local darwin extension hosts', () => {
     [MAC_TRANSLATE_KEY],
   );
   assert.equal(
-    getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'darwin' }),
-    '@keybinding:alt+cmd+t',
+    getShortcutKeybindingSearchQuery(TRANSLATE_SHORTCUT),
+    '@command:marklingo.translateCurrentMarkdown',
   );
 });
 
@@ -25,8 +30,31 @@ test('uses Windows/Linux default shortcut on local non-darwin extension hosts', 
     [NON_MAC_TRANSLATE_KEY],
   );
   assert.equal(
-    getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'linux' }),
-    '@keybinding:ctrl+alt+t',
+    getShortcutKeybindingSearchQuery(TRANSLATE_SHORTCUT),
+    '@command:marklingo.translateCurrentMarkdown',
+  );
+});
+
+test('uses current project cleanup default shortcuts per platform', () => {
+  assert.deepEqual(
+    getDefaultShortcutKeys(DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT, { extensionHostPlatform: 'darwin' }),
+    [MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+  );
+  assert.equal(
+    getShortcutKeybindingSearchQuery(
+      DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+    ),
+    '@command:marklingo.deleteCurrentProjectTranslatedFiles',
+  );
+  assert.deepEqual(
+    getDefaultShortcutKeys(DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT, { extensionHostPlatform: 'linux' }),
+    [NON_MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+  );
+  assert.equal(
+    getShortcutKeybindingSearchQuery(
+      DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+    ),
+    '@command:marklingo.deleteCurrentProjectTranslatedFiles',
   );
 });
 
@@ -36,8 +64,8 @@ test('keeps all platform defaults when the UI platform may differ from the remot
     [MAC_TRANSLATE_KEY, NON_MAC_TRANSLATE_KEY],
   );
   assert.equal(
-    getDefaultTranslateKeybindingSearchQuery({ extensionHostPlatform: 'linux', remoteName: 'ssh-remote' }),
-    '@keybinding:alt+cmd+t',
+    getShortcutKeybindingSearchQuery(TRANSLATE_SHORTCUT),
+    '@command:marklingo.translateCurrentMarkdown',
   );
 
   const state = getShortcutStateFromKeybindings([], [MAC_TRANSLATE_KEY, NON_MAC_TRANSLATE_KEY]);
@@ -135,6 +163,43 @@ test('user-assigned translate shortcut takes precedence over removed defaults', 
   );
 
   assert.equal(state.shortcutLabel, 'Control + Shift + T');
+  assert.equal(state.shortcutStatus, 'Assigned in user keybindings.');
+  assert.equal(state.shortcutWarning, '');
+  assert.equal(
+    getShortcutKeybindingSearchQuery(TRANSLATE_SHORTCUT),
+    '@command:marklingo.translateCurrentMarkdown',
+    'Edit should find the command instead of the manifest default key',
+  );
+});
+
+test('warns about the known macOS Dock shortcut for the cleanup default', () => {
+  const state = getShortcutStateFromKeybindings(
+    [],
+    [MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+    DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+  );
+
+  assert.equal(state.shortcutLabel, 'Option + Command + D');
+  assert.equal(state.shortcutStatus, 'Default shortcut for current project cleanup.');
+  assert.equal(
+    state.shortcutWarning,
+    'If MarkLingo cannot use this shortcut, macOS may already use it for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
+  );
+});
+
+test('does not show the macOS Dock warning after assigning a custom cleanup shortcut', () => {
+  const state = getShortcutStateFromKeybindings(
+    [
+      {
+        key: 'ctrl+shift+d',
+        command: 'marklingo.deleteCurrentProjectTranslatedFiles',
+      },
+    ],
+    [MAC_DELETE_CURRENT_PROJECT_TRANSLATED_FILES_KEY],
+    DELETE_CURRENT_PROJECT_TRANSLATED_FILES_SHORTCUT,
+  );
+
+  assert.equal(state.shortcutLabel, 'Control + Shift + D');
   assert.equal(state.shortcutStatus, 'Assigned in user keybindings.');
   assert.equal(state.shortcutWarning, '');
 });

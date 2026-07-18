@@ -32,10 +32,14 @@ Fastest path: use OpenRouter. Sign in at [openrouter.ai/keys](https://openrouter
 4. Run `MarkLingo: Translate Current Markdown` from the Command Palette.
 5. Choose the target language.
 
-Default shortcut:
+Default shortcuts:
 
-- macOS: `Option + Command + T`
-- Windows/Linux: `Control + Alt + T`
+| Command | macOS | Windows/Linux |
+| --- | --- | --- |
+| `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
+| `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
+
+If MarkLingo cannot use `Option + Command + D` on macOS, the shortcut may already be used by Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off, or use `Edit` in MarkLingo Settings to assign a different VS Code keybinding.
 
 You can also start with `MarkLingo: Translate Current Markdown`. If no provider has been saved and verified yet, MarkLingo opens Settings first. Configure Provider, API key, Base URL when shown, and Model ID, click `Save and Verify`, then run the translation command again.
 
@@ -175,7 +179,7 @@ Use `MarkLingo: Open Settings` and the Danger Zone to clear saved data.
 - Tracked translated project outputs
 - Project translation metadata/cache, including Usage Insights events
 
-Use `MarkLingo: Delete Current Project Translated Files` when you only want to clean the current project's extension-tracked translated files. It intentionally deletes tracked outputs even if they were edited after generation.
+Use `MarkLingo: Delete Current Project Translated Files` or its shortcut when you only want to clean the current project's extension-tracked translated files. MarkLingo asks for confirmation first, intentionally deletes tracked outputs even if they were edited after generation, and keeps other projects' translated files untouched.
 
 ## Development
 

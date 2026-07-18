@@ -34,8 +34,12 @@ Open VSX を使用する VS Code 互換エディターでは、[Open VSX Registr
 
 デフォルトのショートカット：
 
-- macOS：`Option + Command + T`
-- Windows/Linux：`Control + Alt + T`
+| コマンド | macOS | Windows/Linux |
+| --- | --- | --- |
+| `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
+| `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
+
+macOS で MarkLingo が `Option + Command + D` を使用できない場合は、Dock が同じショートカットを使用している可能性があります。「システム設定 > キーボード > キーボードショートカット... > Dock > Dock の自動表示/非表示」を変更するか、MarkLingo Settings の `Edit` から別の VS Code キーバインドを割り当ててください。
 
 `MarkLingo: Translate Current Markdown` から直接始めることもできます。Provider がまだ保存および検証されていない場合、MarkLingo は先に Settings を開きます。Provider、API key、表示される場合は Base URL、Model ID を設定し、`Save and Verify` をクリックしてから、翻訳コマンドをもう一度実行してください。
 
@@ -177,7 +181,7 @@ Provider または Base URL を変更すると、以降の翻訳リクエスト�
 - 追跡されているプロジェクトの翻訳出力
 - プロジェクトの翻訳メタデータ/キャッシュ（Usage Insights イベントを含む）
 
-現在のプロジェクトで拡張機能が追跡する翻訳ファイルだけを整理したい場合は、`MarkLingo: Delete Current Project Translated Files` を使用します。このプロジェクト単位のコマンドは、生成後に編集されたものであっても、追跡対象の出力を意図的に削除します。
+現在のプロジェクトで拡張機能が追跡する翻訳ファイルだけを整理したい場合は、`MarkLingo: Delete Current Project Translated Files` またはそのショートカットを使用します。MarkLingo は最初に確認を求め、生成後に編集されたものであっても追跡対象の出力を意図的に削除します。他のプロジェクトの翻訳ファイルには影響しません。
 
 ## 開発
 

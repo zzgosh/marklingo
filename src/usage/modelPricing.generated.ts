@@ -3,7 +3,7 @@ export const MODEL_PRICING = {
   "schemaVersion": 1,
   "source": "vercel-ai-gateway",
   "sourceUrl": "https://ai-gateway.vercel.sh/v1/models",
-  "fetchedAt": "2026-06-13T08:12:42.390Z",
+  "fetchedAt": "2026-07-18T05:31:52.391Z",
   "currency": "USD",
   "unit": "per_token",
   "models": {
@@ -56,22 +56,22 @@ export const MODEL_PRICING = {
       "maxTokens": 262114
     },
     "zai/glm-4.7": {
-      "input": 0.00000225,
-      "output": 0.00000275,
-      "contextWindow": 131000,
-      "maxTokens": 40000
+      "input": 6e-7,
+      "output": 0.0000022,
+      "contextWindow": 200000,
+      "maxTokens": 120000
     },
     "zai/glm-5": {
-      "input": 0.000001,
-      "output": 0.0000032,
+      "input": 9.5e-7,
+      "output": 0.00000315,
       "contextWindow": 202800,
       "maxTokens": 131100
     },
     "zai/glm-5.1": {
-      "input": 0.0000014,
-      "output": 0.0000044,
-      "contextWindow": 202800,
-      "maxTokens": 64000
+      "input": 0.0000013,
+      "output": 0.0000043,
+      "contextWindow": 202000,
+      "maxTokens": 202000
     },
     "xiaomi/mimo-v2.5": {
       "input": 1.4e-7,

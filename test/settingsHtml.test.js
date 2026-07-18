@@ -4,9 +4,22 @@ import { renderSettingsHtml } from '../out/webview/settingsHtml.js';
 
 function getState(overrides = {}) {
   return {
-    shortcutLabel: 'Option + Command + T',
-    shortcutStatus: 'Default shortcut for Markdown editors.',
-    shortcutWarning: '',
+    shortcuts: [
+      {
+        id: 'translateCurrentMarkdown',
+        title: 'Translate Current Markdown',
+        shortcutLabel: 'Option + Command + T',
+        shortcutStatus: 'Default shortcut for Markdown editors.',
+        shortcutWarning: '',
+      },
+      {
+        id: 'deleteCurrentProjectTranslatedFiles',
+        title: 'Delete Current Project Translated Files',
+        shortcutLabel: 'Option + Command + D',
+        shortcutStatus: 'Default shortcut for current project cleanup.',
+        shortcutWarning: 'If MarkLingo cannot use this shortcut, macOS may already use it for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.',
+      },
+    ],
     providerType: 'openrouter',
     baseUrl: 'https://openrouter.ai/api/v1',
     openRouterBaseUrl: 'https://openrouter.ai/api/v1',
@@ -96,7 +109,12 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /<title>MarkLingo Settings<\/title>/);
   assert.match(html, /<h2>Keyboard Shortcuts<\/h2>/);
   assert.match(html, /Translate Current Markdown/);
+  assert.match(html, /Delete Current Project Translated Files/);
   assert.match(html, />Edit<\/button>/);
+  assert.match(html, /class="info-tip shortcut-info"/);
+  assert.match(html, /data-shortcut-info="deleteCurrentProjectTranslatedFiles"[\s\S]*If MarkLingo cannot use this shortcut, macOS may already use it for Dock\. Change it in System Settings &gt; Keyboard &gt; Keyboard Shortcuts\.\.\. &gt; Dock &gt; Turn Dock hiding on\/off\./);
+  assert.match(html, /data-shortcut-warning="deleteCurrentProjectTranslatedFiles"><\/div>/);
+  assert.match(html, /type: 'openKeyboardShortcuts', shortcutId:/);
   assert.match(html, /System Instructions/);
   assert.match(html, /<h2>Provider<\/h2>/);
   assert.match(html, /<section class="card provider-card">/);
@@ -194,6 +212,19 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.ok(!html.includes('Type CLEAR to confirm'));
   assert.ok(!html.includes('Can delete saved API key'));
   assert.ok(!html.includes('id="clear-data"'));
+});
+
+test('renders shortcut fallbacks when state omits shortcut details', () => {
+  const html = renderSettingsHtml({
+    cspSource: "'self'",
+    nonce: 'test-nonce',
+    state: getState({ shortcuts: undefined }),
+  });
+
+  assert.match(html, /Translate Current Markdown/);
+  assert.match(html, /Delete Current Project Translated Files/);
+  assert.match(html, /Not assigned/);
+  assert.match(html, /No active shortcut\. Edit keyboard shortcuts to assign one\./);
 });
 
 test('keeps the saved OpenAI-compatible provider draft when OpenRouter is active', () => {
@@ -322,7 +353,15 @@ test('escapes settings state before rendering into HTML', () => {
       baseUrl: '<img src=x onerror=alert(1)>',
       openAiCompatibleBaseUrl: '<img src=x onerror=alert(1)>',
       customPrompt: '<b>Keep names</b>',
-      shortcutWarning: '<script>alert(1)</script>',
+      shortcuts: [
+        {
+          id: 'translateCurrentMarkdown',
+          title: 'Translate Current Markdown',
+          shortcutLabel: 'Option + Command + T',
+          shortcutStatus: 'Default shortcut for Markdown editors.',
+          shortcutWarning: '<script>alert(1)</script>',
+        },
+      ],
       targetLanguage: 'Custom...',
       targetLanguageCustom: 'Brazilian Portuguese',
     }),
