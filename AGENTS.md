@@ -22,6 +22,7 @@ Do not edit generated `out/` or `dist/` files manually. Use the package scripts.
 - `npm run test:vscode:clean`: remove `.vscode-test`, then rerun `npm run test:vscode`.
 - `npm run check:integration`: run `npm run check`, then `npm run test:vscode`.
 - `npm run benchmark:postprocessing`: run the local Markdown postprocessing benchmark.
+- `npm run sync:model-pricing`: fetch the Vercel AI Gateway model catalog and refresh the bundled pricing snapshot when pricing or model metadata changed.
 - `npm run preview:settings`: compile, then serve a mocked Settings webview preview for browser-based UI iteration.
 - `npm run dev:vscode`: build the extension, then open the current working tree in an isolated VS Code development window for manual smoke testing.
 - `npm run package`: compile and bundle `dist/extension.js`.
@@ -29,6 +30,10 @@ Do not edit generated `out/` or `dist/` files manually. Use the package scripts.
 - `npm run vsix`: run checks, then create the `.vsix` package.
 
 For code changes, run at least `npm run check`. For extension-host behavior, storage, command, SecretStorage, or OpenRouter request-flow changes, also run `npm run test:vscode`. For packaging or VSIX-related changes, run `npm run package:dry` or `npm run vsix`.
+
+## Model Pricing Snapshot
+
+`src/usage/modelPricing.generated.ts` is a committed snapshot generated from the Vercel AI Gateway model catalog. The sync command validates complete coverage for every built-in direct-provider model and leaves the file unchanged when the fetched pricing and model metadata match the existing snapshot. `.github/workflows/sync-model-pricing.yml` runs the sync weekly and on manual dispatch, validates the result, and creates or updates a reviewable pull request when the snapshot changes. Release builds do not fetch live pricing; they package the reviewed snapshot committed to the release tag.
 
 ## Main Architecture
 

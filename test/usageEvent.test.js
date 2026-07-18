@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildUsageEventFromDebug, shouldRecordUsageEvent } from '../out/usage/usageEvent.js';
+import { estimateProviderModelCost } from '../out/usage/modelPricing.js';
 
 function baseDebug(overrides = {}) {
   return {
@@ -136,6 +137,11 @@ test('uses provider-reported tokens and cost when available', () => {
 });
 
 test('estimates direct-provider cost from reported tokens and Gateway pricing', () => {
+  const tokens = {
+    input: 1234,
+    output: 345,
+    total: 1579,
+  };
   const event = buildUsageEventFromDebug(baseDebug({
     settings: {
       ...baseDebug().settings,
@@ -144,17 +150,20 @@ test('estimates direct-provider cost from reported tokens and Gateway pricing', 
       modelId: 'gpt-5.4-mini',
     },
     usage: {
-      promptTokens: 1234,
-      completionTokens: 345,
-      totalTokens: 1579,
+      promptTokens: tokens.input,
+      completionTokens: tokens.output,
+      totalTokens: tokens.total,
       cost: 999,
       costCurrency: 'USD',
       source: 'reported',
     },
   }), ctx);
+  const expected = estimateProviderModelCost('openai', 'gpt-5.4-mini', tokens);
+  assert.ok(expected);
   assert.equal(event.cost?.currency, 'USD');
   assert.equal(event.cost?.source, 'estimated');
-  assert.equal(Number(event.cost?.amount.toFixed(6)), 0.002478);
+  assert.equal(event.cost?.amount, expected.amount);
+  assert.notEqual(event.cost?.amount, 999);
 });
 
 test('leaves local/custom provider cost unavailable without pricing', () => {

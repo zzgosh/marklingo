@@ -10,9 +10,10 @@ import { PROVIDER_PRESETS } from '../out/services/providerPresets.js';
 
 test('reads generated model pricing by Gateway model id', () => {
   const pricing = getModelPricing('openai/gpt-5.4-mini');
-  assert.equal(pricing?.input, 0.00000075);
-  assert.equal(pricing?.output, 0.0000045);
-  assert.equal(pricing?.contextWindow, 400000);
+  assert.ok(pricing);
+  assert.ok(Number.isFinite(pricing.input) && pricing.input >= 0);
+  assert.ok(Number.isFinite(pricing.output) && pricing.output >= 0);
+  assert.ok(Number.isInteger(pricing.contextWindow) && pricing.contextWindow > 0);
 });
 
 test('estimates cost from input and output tokens', () => {
@@ -32,12 +33,16 @@ test('derives output tokens from total when completion tokens are absent', () =>
 });
 
 test('estimates direct provider model cost through Gateway mapping', () => {
-  const estimate = estimateProviderModelCost('deepseek', 'deepseek-v4-flash', {
+  const tokens = {
     input: 1000,
     output: 500,
-  });
-  assert.equal(Number(estimate?.amount.toFixed(8)), 0.00028);
-  assert.equal(estimate?.currency, 'USD');
+  };
+  const pricing = getModelPricing('deepseek/deepseek-v4-flash');
+  assert.ok(pricing);
+  assert.deepEqual(
+    estimateProviderModelCost('deepseek', 'deepseek-v4-flash', tokens),
+    estimateCostFromTokens(pricing, tokens),
+  );
 });
 
 test('leaves OpenRouter and local/custom models unpriced by the Gateway table', () => {
@@ -46,7 +51,9 @@ test('leaves OpenRouter and local/custom models unpriced by the Gateway table', 
 });
 
 test('exposes Gateway context-window fallback for direct providers', () => {
-  assert.equal(getGatewayModelContextWindow('glm', 'glm-5.1'), 202800);
+  const contextWindow = getGatewayModelContextWindow('glm', 'glm-5.1');
+  assert.equal(contextWindow, getModelPricing('zai/glm-5.1')?.contextWindow);
+  assert.ok(Number.isInteger(contextWindow) && contextWindow > 0);
   assert.equal(getGatewayModelContextWindow('openaiCompatible', 'hy-mt2'), undefined);
 });
 
