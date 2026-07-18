@@ -2,48 +2,51 @@
 
 [English](./README.md) | 简体中文 | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md)
 
-用 AI 翻译 Markdown，同时不破坏 Markdown。
+MarkLingo 是一款使用 AI 翻译 Markdown 的 VS Code 开源插件，主要功能有：
 
-MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原文件不变。它面向希望在 VS Code 中快速生成多语言 Markdown 草稿的写作者、维护者和文档团队。
+- 翻译文件不破坏原有 Markdown 结构。
+- 内置多种可选的 LLM Provider：OpenRouter、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，以及更灵活的自定义 OpenAI Compatible 端点。
+- 翻译完成后，译文文件会输出到源文旁边，使用 `*_<language>_mdt.md` 命名，并打开译文标签页和侧边 Markdown 预览。
+- 采用增量缓存方式翻译，既保证新内容有效翻译，又能避免老内容重复翻译，节省 Token。
+- 支持在文件目录树的侧边栏右键快捷翻译、批量翻译。
+- 支持快速删除已翻译的文件。
+- 支持将 `*_mdt.md` 规则加入 `.git/info/exclude`，避免污染 Git 工作流。
+- 详细的文件翻译用量 Dashboard，方便查看包括已翻译文件、成功翻译任务、provider/model、token 使用量，以及预估成本。
+- API 密钥安全存储在用户本机的 VS Code `SecretStorage` 中，不包含遥测 SDK。
 
-- 保留 Markdown 结构：标题、列表、表格、代码、行内代码、HTML、frontmatter 语法、链接和图片路径。
-- 可选择内置 Provider presets：[OpenRouter](https://openrouter.ai)、OpenAI、DeepSeek、Moonshot、GLM、Xiaomi MiMo，或使用受信任的 Custom OpenAI Compatible 端点。
-- 在源文件旁写出翻译后的 `*_<language>_mdt.md` 文件，打开翻译标签页和预览，并复用未改动 Markdown 块的缓存翻译。
-- 在 Settings 中查看本地 Usage Insights，包括已翻译文件、成功翻译任务、provider/model 分组、token 使用量，以及可用时的 USD 预估成本。
-- 使用免费、开源的扩展；API 密钥存储在 VS Code `SecretStorage` 中，不包含遥测 SDK。
-
-![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.0.3/resources/Screen-Recording-2026-06-02-new-720p-12fps.gif)
+![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.1.0/resources/Screen-Recording-2026-07-18-new-720p-12fps.gif)
 
 ## 安装
 
-在 VS Code 的扩展视图中安装 **MarkLingo**（搜索 `MarkLingo`），或从 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) 安装。
-
-对于使用 Open VSX 的 VS Code 兼容编辑器，可从 [Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo) 安装 MarkLingo。
-
-也可以从 [releases 页面](https://github.com/zzgosh/marklingo/releases) 安装打包好的 `.vsix`。
+- **方式 1：** 从 [VS Code 官方插件市场](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) 安装，搜索 `MarkLingo`，点击安装。
+- **方式 2：** 对于使用 Open VSX 的 VS Code 兼容编辑器，可从 [Open VSX Registry](https://open-vsx.org/extension/zzgosh/marklingo) 安装 MarkLingo。
+- **方式 3：** 从 GitHub 源代码仓库 [releases 页面](https://github.com/zzgosh/marklingo/releases) 下载 `.vsix` 进行安装。
 
 ## 快速开始
 
-最快路径是使用 OpenRouter：在 [openrouter.ai/keys](https://openrouter.ai/keys) 登录并创建一个 API 密钥。费用由 OpenRouter 按请求计费，具体取决于你选择的模型。如需使用其他内置 Provider，先运行 `MarkLingo: Open Settings`，再从 Provider 中选择。
+1. 安装完插件后，在 VS Code 中使用 `Command/Ctrl + Shift + P` 打开命令面板，输入 `MarkLingo: Open Settings` 进入到设置页面。
+2. 选择 LLM Provider，输入你的 API key，选择模型，点击 `Save and Verify` 进行保存和验证。
+3. 选择要翻译后输出的目标语言，默认简体中文。
+4. 打开一个已保存的 Markdown 文件，从命令面板运行 `MarkLingo: Translate Current Markdown`。
+5. 等待翻译完成，翻译进度可查看 VS Code 右下角的通知面板。
+6. 其他命令，可在 VS Code 命令面板中，输入 `MarkLingo:` 来查看和使用。
 
-1. 运行 `MarkLingo: Open Settings`。
-2. 如果走最快路径，保持 Provider 为 `OpenRouter`；也可以在 Settings 中选择其他 Provider。粘贴 API key，选择 Model ID，然后点击 `Save and Verify`。
-3. 打开一个已保存的 Markdown 文件。
-4. 从命令面板运行 `MarkLingo: Translate Current Markdown`。
-5. 选择目标语言。
-
-默认快捷键：
+### 快捷键翻译
 
 | 命令 | macOS | Windows/Linux |
 | --- | --- | --- |
 | `MarkLingo: Translate Current Markdown` | `Option + Command + T` | `Control + Alt + T` |
 | `MarkLingo: Delete Current Project Translated Files` | `Option + Command + D` | `Control + Alt + D` |
 
-如果 MarkLingo 在 macOS 上无法使用 `Option + Command + D`，该快捷键可能已被 Dock 占用。可前往“系统设置 > 键盘 > 键盘快捷键... > Dock > 打开或关闭 Dock 隐藏”进行更改，或在 MarkLingo Settings 中点击 `Edit`，为该命令分配其他 VS Code 快捷键。
+> 注意：如果 MarkLingo 在 macOS 上无法使用 `Option + Command + D`，说明该快捷键可能已被 Dock 占用。可前往“系统设置 > 键盘 > 键盘快捷键... > Dock > 打开或关闭 Dock 隐藏”进行更改，或在 MarkLingo Settings 中点击 `Edit`，为该命令分配其他 VS Code 快捷键。
 
-也可以直接从 `MarkLingo: Translate Current Markdown` 开始。如果还没有保存并验证过 Provider，MarkLingo 会先打开 Settings。配置 Provider、API key、显示时的 Base URL 和 Model ID，点击 `Save and Verify`，然后再次运行翻译命令。
+### 右键翻译
 
-也可以在 Markdown 编辑器上右键运行 `MarkLingo: Translate Current Markdown`。在资源管理器中的 Markdown 文件上右键运行 `MarkLingo: Translate This Markdown File`。在资源管理器中的文件夹上右键运行 `MarkLingo: Translate All Markdown in This Folder`，可翻译该文件夹及其子文件夹中的 `.md` 和 `.markdown` 文件，并跳过已生成的 `*_mdt.md` 输出。也可以在资源管理器中多选 Markdown 文件或文件夹，再运行 `MarkLingo: Translate Selected Markdown Files` 作为一批翻译。
+除了命令面板和快捷键外，MarkLingo 也支持右键翻译功能。
+
+1. 在 VS Code 资源管理器里找到要翻译的 Markdown 文件，点击右键，运行 `MarkLingo: Translate This Markdown File` 进行翻译。
+2. 对于文件夹点击右键，运行 `MarkLingo: Translate All Markdown in This Folder`，会翻译该文件夹及其子文件夹中的 `.md` 和 `.markdown` 文件，并跳过已生成的 `*_mdt.md` 译文输出。
+3. 多选 Markdown 文件或文件夹，再点击右键，运行 `MarkLingo: Translate Selected Markdown Files`，进行翻译。
 
 ## 命令
 
@@ -55,10 +58,10 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 | `MarkLingo: Translate Selected Markdown Files` | 将资源管理器中选中的文件和文件夹收集到的 Markdown 文件作为一批翻译，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
 | `MarkLingo: Translate All Markdown in This Folder` | 翻译所选文件夹及其子文件夹中的源 Markdown 文件，打开第一个翻译输出，其余输出写在各自源文件旁边。 |
 | `MarkLingo: Open Settings` | 打开 MarkLingo 设置，管理提供方验证、API 密钥、目标语言、自定义指令、快捷键状态、Usage Insights 和清理操作。 |
-| `MarkLingo: Add Translated Files to .git/info/exclude` | 将 `*_mdt.md` 添加到当前仓库的本地 Git 排除文件中。 |
+| `MarkLingo: Add Translated Files to .git/info/exclude` | 将 `*_mdt.md` 排除规则添加到当前仓库的本地 `.git/info/exclude`。 |
 | `MarkLingo: Delete Current Project Translated Files` | 删除本项目中由扩展跟踪的翻译输出，同时保留私有翻译元数据/缓存。 |
 
-更改 Provider 或 Model ID 并点击 `Save and Verify` 后，如果希望用新验证的 provider/model 从头重新翻译已有文件，请使用 `MarkLingo: Retranslate Current Markdown`。`MarkLingo: Translate Current Markdown` 是增量翻译：它可能会复用上一个 provider/model 生成的缓存块翻译，只把已更改或新增的块发送给当前 provider/model。
+> 注意：更改 Provider 或 Model ID 并点击 `Save and Verify` 后，如果希望用新验证的 provider/model 从头重新翻译已有文件，请使用 `MarkLingo: Retranslate Current Markdown`。`MarkLingo: Translate Current Markdown` 是增量翻译：它可能会复用上一个 provider/model 生成的缓存块翻译，只把已更改或新增的块发送给当前 provider/model。
 
 ## 设置
 
@@ -66,17 +69,17 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
 
 ### 内置 Provider 模型
 
-固定 Provider presets 只提供精选模型选项。OpenRouter 和 Custom OpenAI Compatible 也支持直接输入 Model ID。
+固定 Provider presets 只提供预设的模型选项。OpenRouter 和 Custom OpenAI Compatible 也支持直接输入想要使用的其他 Model ID。
 
 | Provider | Model options |
 | --- | --- |
-| OpenRouter | 默认 `google/gemini-3.1-flash-lite`；推荐模型加直接输入 Model ID |
-| OpenAI | `gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.4`、`gpt-5.5` |
-| DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` |
-| Moonshot | `kimi-k2.6`、`kimi-k2.5` |
-| GLM | `glm-4.7`、`glm-5`、`glm-5.1` |
-| Xiaomi MiMo | `mimo-v2.5`、`mimo-v2.5-pro` |
-| Custom OpenAI Compatible | 端点暴露的模型 alias；支持直接输入 Model ID |
+| OpenRouter | 预设模型，并支持输入 Model ID |
+| OpenAI | 预设模型：`gpt-5.4-mini`、`gpt-5.4-nano`、`gpt-5.4`、`gpt-5.5` |
+| DeepSeek | 预设模型：`deepseek-v4-flash`、`deepseek-v4-pro` |
+| Moonshot | 预设模型：`kimi-k2.6`、`kimi-k2.5` |
+| GLM | 预设模型：`glm-4.7`、`glm-5`、`glm-5.1` |
+| Xiaomi MiMo | 预设模型：`mimo-v2.5`、`mimo-v2.5-pro` |
+| Custom OpenAI Compatible | 输入 Model ID |
 
 - **Provider（提供方）**
   - 设置项：`marklingo.openrouter.provider`
@@ -128,11 +131,13 @@ MarkLingo 会把已保存的 Markdown 翻译成多语言草稿，同时保持原
   - 默认值：空
   - 当所选模型支持时，附加在 MarkLingo 内置的 Markdown 保护提示之后，用于补充术语、语气或风格要求。需要小批次 fallback 的模型不会收到这些自定义指令，字段也会隐藏。
 
-设置页面通过 `Save and Verify` 保存 Provider 凭据。其他下拉框会立即保存；Provider 之外的自由文本字段使用各自的内联 `Save` 按钮。
+> 注意：设置页面通过 `Save and Verify` 保存 Provider 凭据。其他下拉框会立即保存；Provider 之外的自由文本字段使用各自的内联 `Save` 按钮。
 
 ### Usage Insights
 
-Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、成功翻译任务、provider/model 分组、最近运行记录、token 使用量，以及可用时的 USD 预估成本。成功的纯缓存 rerun 只会用已有翻译重建输出，不会调用 provider，因此不会计入 Usage runs。OpenRouter 成本来自 provider 报告的本次请求成本；内置 direct provider 使用 provider 报告的 input/output tokens 和 MarkLingo 随包附带的 Gateway 价格表估算。自定义和本地 OpenAI-compatible 端点可能显示 `Cost unavailable`。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
+Settings 中包含一个本地 Usage 区块，用来查看翻译历史。它会显示已翻译文件、成功翻译任务、provider/model 分组、最近运行记录、token 使用量，以及可用时的 USD 预估成本。成功的纯缓存 rerun 只会用已有翻译重建输出，不会调用 provider，因此不会计入 Usage runs。
+
+OpenRouter 成本来自 provider 报告的本次请求成本；内置 direct provider 使用 provider 报告的 input/output tokens 和随扩展附带的 Vercel AI Gateway 价格快照。自定义和本地 OpenAI-compatible 端点可能显示 `Cost unavailable`。如果没有 reported usage，MarkLingo 会退回到本次实际发送请求的 input token 估算值。
 
 ## 输出文件
 
