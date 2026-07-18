@@ -99,6 +99,8 @@ jobs:
             printf '%s\n' \
               'Automated refresh of the bundled Vercel AI Gateway model pricing snapshot.' \
               '' \
+              '@zzgosh, please review these pricing changes before merging.' \
+              '' \
               'Validation:' \
               '- `npm run check`' > "$pr_body"
             gh pr create \
