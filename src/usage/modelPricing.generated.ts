@@ -3,7 +3,7 @@ export const MODEL_PRICING = {
   "schemaVersion": 1,
   "source": "vercel-ai-gateway",
   "sourceUrl": "https://ai-gateway.vercel.sh/v1/models",
-  "fetchedAt": "2026-08-03T07:46:32.966Z",
+  "fetchedAt": "2026-08-10T07:05:13.690Z",
   "currency": "USD",
   "unit": "per_token",
   "models": {
@@ -38,10 +38,10 @@ export const MODEL_PRICING = {
       "maxTokens": 384000
     },
     "deepseek/deepseek-v4-pro": {
-      "input": 4.35e-7,
-      "output": 8.7e-7,
-      "contextWindow": 1000000,
-      "maxTokens": 384000
+      "input": 0.00000174,
+      "output": 0.00000348,
+      "contextWindow": 1048600,
+      "maxTokens": 1048600
     },
     "moonshotai/kimi-k2.6": {
       "input": 9.5e-7,
@@ -70,8 +70,8 @@ export const MODEL_PRICING = {
     "zai/glm-5.1": {
       "input": 0.0000014,
       "output": 0.0000044,
-      "contextWindow": 202000,
-      "maxTokens": 202000
+      "contextWindow": 202800,
+      "maxTokens": 64000
     },
     "xiaomi/mimo-v2.5": {
       "input": 1.4e-7,
