@@ -38,75 +38,143 @@ jobs:
       - name: Refresh pricing snapshot
         run: npm run sync:model-pricing
 
-      - name: Run checks
-        run: npm run check
-
-      - name: Detect pricing changes
+      - name: Prepare pricing pull request
         id: pricing
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- src/usage/modelPricing.generated.ts; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Gateway pricing is unchanged."
-          else
-            git diff --check -- src/usage/modelPricing.generated.ts
-            git diff --stat -- src/usage/modelPricing.generated.ts
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create or update pricing pull request
-        if: steps.pricing.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           base_branch="${{ github.event.repository.default_branch }}"
-          snapshot_file="$RUNNER_TEMP/modelPricing.generated.ts"
-          cp src/usage/modelPricing.generated.ts "$snapshot_file"
+          snapshot_path="src/usage/modelPricing.generated.ts"
+          candidate_file="$RUNNER_TEMP/modelPricing.generated.ts"
+          cp "$snapshot_path" "$candidate_file"
+
+          if git diff --quiet -- "$snapshot_path"; then
+            base_changed=false
+          else
+            base_changed=true
+            git diff --check -- "$snapshot_path"
+            git diff --stat -- "$snapshot_path"
+          fi
+
+          git restore --source=HEAD --worktree -- "$snapshot_path"
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo "The tracked worktree must be clean before preparing the pricing branch." >&2
+            git status --short >&2
+            exit 1
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          existing_branch="$(
+          matching_prs="$(
             gh pr list \
               --repo "$GITHUB_REPOSITORY" \
               --base "$base_branch" \
               --state open \
-              --json headRefName,isCrossRepository \
-              --jq '([.[] | select(.isCrossRepository == false and (.headRefName | startswith("automation/model-pricing-")))] | first | .headRefName) // ""'
+              --limit 1000 \
+              --json number,headRefName,isCrossRepository \
+              --jq '.[] | select(.isCrossRepository == false and (.headRefName | startswith("automation/model-pricing-"))) | [.number, .headRefName] | @tsv'
           )"
 
-          if [ -n "$existing_branch" ]; then
-            target_branch="$existing_branch"
+          matching_pr_count=0
+          matching_pr=""
+          if [ -n "$matching_prs" ]; then
+            mapfile -t matching_pr_lines <<< "$matching_prs"
+            matching_pr_count="${#matching_pr_lines[@]}"
+            matching_pr="${matching_pr_lines[0]}"
+          fi
+
+          if (( matching_pr_count > 1 )); then
+            echo "Found multiple open model pricing pull requests; refusing to choose one:" >&2
+            printf '%s\n' "$matching_prs" >&2
+            exit 1
+          fi
+
+          if (( matching_pr_count == 0 )); then
+            if [ "$base_changed" = false ]; then
+              echo "update_needed=false" >> "$GITHUB_OUTPUT"
+              echo "Gateway pricing is unchanged and no pricing pull request is open."
+              exit 0
+            fi
+
+            existing_pr_number=""
+            target_branch="automation/model-pricing-$GITHUB_RUN_ID"
+            remote_target="$(git ls-remote --heads origin "refs/heads/$target_branch")"
+            if [ -n "$remote_target" ]; then
+              echo "Reusing pricing branch from an earlier attempt: $target_branch"
+              git fetch origin "refs/heads/$target_branch:refs/remotes/origin/$target_branch"
+              git switch --create "$target_branch" --track "origin/$target_branch"
+              git merge --no-edit "origin/$base_branch"
+            else
+              git switch --create "$target_branch" "origin/$base_branch"
+            fi
+          else
+            IFS=$'\t' read -r existing_pr_number target_branch <<< "$matching_pr"
             git fetch origin "refs/heads/$target_branch:refs/remotes/origin/$target_branch"
             git switch --create "$target_branch" --track "origin/$target_branch"
             git merge --no-edit "origin/$base_branch"
-          else
-            target_branch="automation/model-pricing-$GITHUB_RUN_ID"
-            git switch --create "$target_branch" "origin/$base_branch"
           fi
 
-          cp "$snapshot_file" src/usage/modelPricing.generated.ts
-          git add src/usage/modelPricing.generated.ts
+          cp "$candidate_file" "$snapshot_path"
+          git add "$snapshot_path"
+
+          snapshot_changed=true
+          if git diff --cached --quiet; then
+            snapshot_changed=false
+          fi
+
+          unpushed_commit_count=0
+          if (( matching_pr_count == 1 )); then
+            unpushed_commit_count="$(git rev-list --count "origin/$target_branch..HEAD")"
+          fi
+
+          if (( matching_pr_count == 1 )) && [ "$snapshot_changed" = false ] && (( unpushed_commit_count == 0 )); then
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Open pricing pull request #$existing_pr_number already contains the latest Gateway pricing."
+            exit 0
+          fi
+
+          git diff --cached --check
+          echo "update_needed=true" >> "$GITHUB_OUTPUT"
+          echo "existing_pr_number=$existing_pr_number" >> "$GITHUB_OUTPUT"
+          echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
+
+      - name: Run checks
+        run: npm run check
+
+      - name: Commit and push pricing update
+        if: steps.pricing.outputs.update_needed == 'true'
+        env:
+          TARGET_BRANCH: ${{ steps.pricing.outputs.target_branch }}
+        run: |
+          set -euo pipefail
           if ! git diff --cached --quiet; then
-            git diff --cached --check
             git commit -m "chore: update model pricing snapshot"
           fi
-          git push origin "HEAD:refs/heads/$target_branch"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
 
-          if [ -z "$existing_branch" ]; then
-            pr_body="$RUNNER_TEMP/model-pricing-pr.md"
-            printf '%s\n' \
-              'Automated refresh of the bundled Vercel AI Gateway model pricing snapshot.' \
-              '' \
-              '@zzgosh, please review these pricing changes before merging.' \
-              '' \
-              'Validation:' \
-              '- `npm run check`' > "$pr_body"
-            gh pr create \
-              --repo "$GITHUB_REPOSITORY" \
-              --base "$base_branch" \
-              --head "$target_branch" \
-              --title "chore: update model pricing snapshot" \
-              --body-file "$pr_body"
-          fi
+      - name: Create pricing pull request
+        if: steps.pricing.outputs.update_needed == 'true' && steps.pricing.outputs.existing_pr_number == ''
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ steps.pricing.outputs.target_branch }}
+        run: |
+          set -euo pipefail
+          pr_body="$RUNNER_TEMP/model-pricing-pr.md"
+          printf '%s\n' \
+            'Automated refresh of the bundled Vercel AI Gateway model pricing snapshot.' \
+            '' \
+            '@zzgosh, please review these pricing changes before merging.' \
+            '' \
+            'Future pricing changes will be appended to this pull request until it is merged or closed.' \
+            '' \
+            'Validation:' \
+            '- `npm run check`' > "$pr_body"
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$BASE_BRANCH" \
+            --head "$TARGET_BRANCH" \
+            --title "chore: update model pricing snapshot" \
+            --body-file "$pr_body"
