@@ -21,3 +21,7 @@ export function getConfigurationRegistryRefreshMessage(settingKey?: string): str
 export function isConfigurationRegistryRefreshRequired(error: unknown): error is ConfigurationRegistryRefreshRequired {
   return error instanceof ConfigurationRegistryRefreshRequired;
 }
+
+export function getConfigurationRegistryReloadAction(): string {
+  return l10n('Reload Window');
+}

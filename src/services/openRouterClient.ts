@@ -25,6 +25,7 @@ import {
 } from './providerPresets.js';
 import { getGatewayModelContextWindow } from '../usage/modelPricing.js';
 import { l10n } from '../localization.js';
+import { readChatCompletionContent } from './chatCompletionResponse.js';
 
 export type OpenRouterSettings = {
   providerType: ProviderType;
@@ -592,10 +593,7 @@ export async function openRouterChatCompletion(
   }
 
   const data = res.json as any;
-  const content: unknown = data?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error(l10n('Provider returned empty content or an unexpected response shape.'));
-  }
+  const content = readChatCompletionContent(data);
   return {
     content,
     usage: normalizeChatCompletionUsage(data?.usage),

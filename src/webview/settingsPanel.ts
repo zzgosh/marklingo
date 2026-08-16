@@ -57,6 +57,7 @@ import {
 } from '../onboardingState.js';
 import {
   ConfigurationRegistryRefreshRequired,
+  getConfigurationRegistryReloadAction,
   isConfigurationRegistryRefreshRequired,
 } from '../vscodeConfigurationErrors.js';
 import {
@@ -78,8 +79,6 @@ const UPDATABLE_SETTING_KEYS = new Set<string>([
   'translation.targetLanguageCustom',
   'translation.customPrompt',
 ]);
-const RELOAD_WINDOW_ACTION = 'Reload Window';
-
 let currentPanel: vscode.WebviewPanel | undefined;
 let currentPanelProjectUri: vscode.Uri | undefined;
 
@@ -499,7 +498,7 @@ function getUserFacingSettingsErrorMessage(error: unknown): string {
 async function offerReloadWindowForConfigurationRegistryError(error: unknown): Promise<void> {
   if (!isConfigurationRegistryRefreshRequired(error)) return;
 
-  const reloadWindowAction = l10n(RELOAD_WINDOW_ACTION);
+  const reloadWindowAction = getConfigurationRegistryReloadAction();
   const selected = await vscode.window.showErrorMessage(
     l10n('MarkLingo: {0}', error.message),
     reloadWindowAction,

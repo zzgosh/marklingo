@@ -2,6 +2,7 @@ import type { ChatMessage } from '../services/openRouterClient.js';
 import type { TranslationRequestBlock } from './requestPlanner.js';
 import { buildTranslationModelUserPrompt } from './translationModelPrompts.js';
 import { l10n } from '../localization.js';
+import { ModelOutputError } from '../modelOutputError.js';
 
 export type TranslationRequestMode = 'auto' | 'chatJson' | 'translationModel';
 export type TranslationAdapterMode = 'chatJson' | 'translationModel';
@@ -131,9 +132,11 @@ function parseJsonObjectFromModelText(text: string): unknown {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
     if (start >= 0 && end > start) {
-      return JSON.parse(text.slice(start, end + 1));
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch {}
     }
-    throw new Error(l10n('Model output is not valid JSON.'));
+    throw new ModelOutputError(l10n('Model output is not valid JSON.'));
   }
 }
 
@@ -154,7 +157,7 @@ function readBlocksArrayMap(value: Record<string, unknown>): Record<string, unkn
 export function parseTranslatedBlockMap(text: string, requestedBlocks: TranslationRequestBlock[]): Record<string, unknown> {
   const parsed = parseJsonObjectFromModelText(text);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(l10n('Model output JSON must be an object.'));
+    throw new ModelOutputError(l10n('Model output JSON must be an object.'));
   }
 
   const value = parsed as Record<string, unknown>;

@@ -597,6 +597,8 @@ test('renders Simplified Chinese webview copy while preserving technical identif
     assert.match(html, /<title>MarkLingo 设置<\/title>/);
     assert.match(html, /<h2>键盘快捷键<\/h2>/);
     assert.match(html, /Markdown 内容会发送到所配置的 OpenAI-compatible 端点进行翻译。/);
+    assert.match(html, /已验证——为提高可靠性，将使用较小批次。/);
+    assert.match(html, /部分模型需要使用较小的 Markdown 批次来确保输出可靠，因此大文件的处理速度可能稍慢。/);
     assert.match(html, /SecretStorage/);
     assert.match(html, /globalStorageUri/);
     assert.match(html, /Base URL/);
