@@ -14,6 +14,7 @@ import {
   type ProviderType,
 } from '../services/providerPresets.js';
 import type { UsageQuery, UsageView } from '../usage/usageAggregate.js';
+import { l10n } from '../localization.js';
 
 export const CUSTOM_TARGET_LANGUAGE_LABEL = 'Custom...';
 
@@ -88,6 +89,7 @@ export type SettingsState = {
 
 export type RenderSettingsHtmlOptions = {
   cspSource: string;
+  locale?: string;
   nonce: string;
   state: SettingsState;
   extraHead?: string;
@@ -129,7 +131,8 @@ const DEFAULT_USAGE_QUERY_CLIENT: UsageQuery = {
 function renderOptions(selected: string): string {
   return TARGET_LANGUAGE_OPTIONS.map((option) => {
     const selectedAttr = option === selected ? ' selected' : '';
-    return `<option value="${escapeHtml(option)}"${selectedAttr}>${escapeHtml(option)}</option>`;
+    const label = option === CUSTOM_TARGET_LANGUAGE_LABEL ? l10n('Custom...') : option;
+    return `<option value="${escapeHtml(option)}"${selectedAttr}>${escapeHtml(label)}</option>`;
   }).join('');
 }
 
@@ -166,25 +169,25 @@ function renderModelIdSelectOptions(providerType: ProviderType, modelId: string)
   if (!preset.modelIdEditable) return optionsHtml;
 
   const customSelectedAttr = hasSelectedOption ? '' : ' selected';
-  return `${optionsHtml}<option value=""${customSelectedAttr}>Custom...</option>`;
+  return `${optionsHtml}<option value=""${customSelectedAttr}>${escapeHtml(l10n('Custom...'))}</option>`;
 }
 
 function renderModelTagBadges(tags: readonly ModelTag[]): string {
   return tags.map((tag) => {
     const icon = MODEL_TAG_ICONS[tag] ?? '';
-    return `<span class="model-tag model-tag-${escapeHtml(tag)}">${icon}${escapeHtml(MODEL_TAG_LABELS[tag])}</span>`;
+    return `<span class="model-tag model-tag-${escapeHtml(tag)}">${icon}${escapeHtml(l10n(MODEL_TAG_LABELS[tag]))}</span>`;
   }).join('');
 }
 
 function getShortcutWarningText(warning: string): string {
   if (!warning) return '';
   if (warning.includes('another command')) {
-    return 'Shortcut may be unavailable because another command uses it.';
+    return l10n('Shortcut may be unavailable because another command uses it.');
   }
   if (warning.includes('assign')) {
-    return 'No active shortcut. Edit keyboard shortcuts to assign one.';
+    return l10n('No active shortcut. Edit keyboard shortcuts to assign one.');
   }
-  return warning;
+  return l10n(warning);
 }
 
 function getShortcutTooltipWarningText(warning: string): string {
@@ -202,9 +205,9 @@ function getShortcutStates(state: SettingsState): ShortcutState[] {
   return SHORTCUT_DEFINITIONS.map((definition) => byId.get(definition.id) ?? {
     id: definition.id,
     title: definition.title,
-    shortcutLabel: 'Not assigned',
-    shortcutStatus: 'Open Keyboard Shortcuts to assign a shortcut.',
-    shortcutWarning: 'Open Keyboard Shortcuts to assign a new shortcut.',
+    shortcutLabel: l10n('Not assigned'),
+    shortcutStatus: l10n('Open Keyboard Shortcuts to assign a shortcut.'),
+    shortcutWarning: l10n('Open Keyboard Shortcuts to assign a new shortcut.'),
   });
 }
 
@@ -216,15 +219,15 @@ function renderShortcutRows(shortcuts: ShortcutState[]): string {
     return `
           <div class="row shortcut-row" data-shortcut-id="${escapeHtml(shortcut.id)}">
             <div>
-              <div class="label">${escapeHtml(shortcut.title)}</div>
+              <div class="label">${escapeHtml(l10n(shortcut.title))}</div>
             </div>
             <div class="shortcut-stack">
               <div class="shortcut-controls">
                 <span class="shortcut-key-group">
                   <span class="shortcut-pill" data-shortcut-label="${escapeHtml(shortcut.id)}">${escapeHtml(shortcut.shortcutLabel)}</span>
-                  <span class="info-tip shortcut-info" data-shortcut-info="${escapeHtml(shortcut.id)}" tabindex="0" aria-label="About this shortcut"${tooltipHidden}><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(tooltipWarning)}</span></span>
+                  <span class="info-tip shortcut-info" data-shortcut-info="${escapeHtml(shortcut.id)}" tabindex="0" aria-label="${escapeHtml(l10n('About this shortcut'))}"${tooltipHidden}><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(tooltipWarning)}</span></span>
                 </span>
-                <button class="secondary open-keyboard-shortcuts" type="button" data-shortcut-id="${escapeHtml(shortcut.id)}">Edit</button>
+                <button class="secondary open-keyboard-shortcuts" type="button" data-shortcut-id="${escapeHtml(shortcut.id)}">${escapeHtml(l10n('Edit'))}</button>
               </div>
               <div class="shortcut-warning" data-shortcut-warning="${escapeHtml(shortcut.id)}">${escapeHtml(inlineWarning)}</div>
             </div>
@@ -380,8 +383,8 @@ function formatUsageCost(value: number | undefined, currency: string | undefined
 }
 
 function formatUsageCostTitle(label: string, source?: string): string {
-  if (source === 'estimated') return `Calculated from preset pricing: ${label}`;
-  if (source === 'reported') return `Reported cost: ${label}`;
+  if (source === 'estimated') return l10n('Calculated from preset pricing: {0}', label);
+  if (source === 'reported') return l10n('Reported cost: {0}', label);
   return label;
 }
 
@@ -398,7 +401,7 @@ function formatUsageTime(iso?: string): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 }
 
 function formatUsageTargetLanguage(value?: string): string {
@@ -422,17 +425,17 @@ function renderUsageSegmentControl(
     .map((option) => {
       const activeClass = option.value === active ? ' active' : '';
       const tabAttrs = isTabs ? ` role="tab" aria-selected="${option.value === active ? 'true' : 'false'}"` : '';
-      return `<button type="button" class="usage-seg-btn${activeClass}" data-usage-control="${control}" data-value="${option.value}"${tabAttrs}>${escapeHtml(option.label)}</button>`;
+      return `<button type="button" class="usage-seg-btn${activeClass}" data-usage-control="${control}" data-value="${option.value}"${tabAttrs}>${escapeHtml(l10n(option.label))}</button>`;
     })
     .join('');
-  return `<div class="usage-seg" role="${isTabs ? 'tablist' : 'group'}" aria-label="${isTabs ? 'Usage breakdown' : 'Usage control'}">${buttons}</div>`;
+  return `<div class="usage-seg" role="${isTabs ? 'tablist' : 'group'}" aria-label="${escapeHtml(l10n(isTabs ? 'Usage breakdown' : 'Usage control'))}">${buttons}</div>`;
 }
 
 function renderUsageRangeSelect(active: string): string {
   const options = USAGE_RANGE_OPTIONS
-    .map((option) => `<option value="${option.value}"${option.value === active ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
+    .map((option) => `<option value="${option.value}"${option.value === active ? ' selected' : ''}>${escapeHtml(l10n(option.label))}</option>`)
     .join('');
-  return `<span class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="Usage range">${options}</select></span>`;
+  return `<span class="select-wrap usage-range-wrap"><select class="usage-range-select" data-usage-control="range" aria-label="${escapeHtml(l10n('Usage range'))}">${options}</select></span>`;
 }
 
 function renderUsageControls(query: UsageView['query']): string {
@@ -460,7 +463,7 @@ function renderUsageSkeleton(): string {
   const tableRows = Array.from({ length: 5 }, () =>
     '<div class="usage-skeleton-table-row"><span></span><span></span><span></span><span></span></div>',
   ).join('');
-  return `<div class="usage-skeleton" aria-label="Loading usage insights">
+  return `<div class="usage-skeleton" aria-label="${escapeHtml(l10n('Loading usage insights'))}">
             <div class="usage-skeleton-cards">${cards}</div>
             <div class="usage-skeleton-chart usage-skeleton-chart-wide"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
             <div class="usage-skeleton-chart usage-skeleton-ranking">${rankingRows}</div>
@@ -475,18 +478,18 @@ function usageSegmentClass(index: number, key: string): string {
 function renderUsageBars(view: UsageView): string {
   const buckets = view.buckets ?? [];
   const dimensionKeys = view.dimensionKeys ?? [];
-  const breakdownLabel = USAGE_BREAKDOWN_LABELS[view.query.breakdown] ?? view.query.breakdown;
+  const breakdownLabel = l10n(USAGE_BREAKDOWN_LABELS[view.query.breakdown] ?? view.query.breakdown);
   const chartHead = (totalTokens: number) =>
-    `<div class="usage-chart-head"><span class="usage-chart-title">Tokens by ${escapeHtml(breakdownLabel)}</span><span class="usage-chart-total">${escapeHtml(formatUsageTokens(totalTokens))} tokens</span></div>`;
+    `<div class="usage-chart-head"><span class="usage-chart-title">${escapeHtml(l10n('Tokens by {0}', breakdownLabel))}</span><span class="usage-chart-total">${escapeHtml(l10n('{0} tokens', formatUsageTokens(totalTokens)))}</span></div>`;
   if (buckets.length === 0) {
-    return `${chartHead(0)}<div class="usage-empty">No token data in this range.</div>`;
+    return `${chartHead(0)}<div class="usage-empty">${escapeHtml(l10n('No token data in this range.'))}</div>`;
   }
   const bucketTokenTotal = buckets.reduce((sum, bucket) => sum + bucket.totalTokens, 0);
   const displayTokenTotal = typeof view.tokenTotal === 'number' && Number.isFinite(view.tokenTotal)
     ? view.tokenTotal
     : bucketTokenTotal;
   if (bucketTokenTotal <= 0) {
-    return `${chartHead(displayTokenTotal)}<div class="usage-empty">No token data in this range.</div>`;
+    return `${chartHead(displayTokenTotal)}<div class="usage-empty">${escapeHtml(l10n('No token data in this range.'))}</div>`;
   }
   const maxTotal = Math.max(1, ...buckets.map((bucket) => bucket.totalTokens));
   const count = buckets.length;
@@ -502,7 +505,14 @@ function renderUsageBars(view: UsageView): string {
       yTop -= height;
       const dimIndex = dimensionKeys.indexOf(segment.key);
       const x = bucketIndex * slotWidth + barOffset;
-      const title = `${bucket.label}: ${segment.key} ${formatUsageTokens(segment.tokens)} tokens (${formatUsageCount(segment.runs)} ${segment.runs === 1 ? 'run' : 'runs'})`;
+      const title = l10n(
+        '{0}: {1} {2} tokens ({3} {4})',
+        bucket.label,
+        segment.key,
+        formatUsageTokens(segment.tokens),
+        formatUsageCount(segment.runs),
+        l10n(segment.runs === 1 ? 'run' : 'runs'),
+      );
       rects.push(`<rect class="${usageSegmentClass(dimIndex, segment.key)}" x="${x.toFixed(2)}" y="${yTop.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}"><title>${escapeHtml(title)}</title></rect>`);
     });
   });
@@ -517,7 +527,7 @@ function renderUsageBars(view: UsageView): string {
     })
     .join('');
   const legend = dimensionKeys
-    .map((key, index) => `<span class="usage-legend-item"><span class="usage-legend-swatch ${usageSegmentClass(index, key)}"></span>${escapeHtml(key)}</span>`)
+    .map((key, index) => `<span class="usage-legend-item"><span class="usage-legend-swatch ${usageSegmentClass(index, key)}"></span>${escapeHtml(key === 'Other' ? l10n('Other') : key)}</span>`)
     .join('');
   return `${chartHead(displayTokenTotal)}
           <div class="usage-bars-wrap">
@@ -563,23 +573,23 @@ function renderUsageModelRanking(view: UsageView): string {
   const tokenRows = renderUsageMetricRows(
     view.topModelsByTokens ?? [],
     (entry) => formatUsageTokens(entry.value),
-    (entry) => `${formatUsageCount(Math.round(entry.value))} tokens`,
-    'No token data.',
+    (entry) => l10n('{0} tokens', formatUsageCount(Math.round(entry.value))),
+    l10n('No token data.'),
     colorKeys,
   );
   const costRows = renderUsageMetricRows(
     view.topModelsByCost ?? [],
     (entry) => formatUsageCost(entry.value, view.costCurrency),
     (entry) => formatUsageCostTitle(formatUsageCost(entry.value, view.costCurrency), entry.source),
-    'No cost data.',
+    l10n('No cost data.'),
     colorKeys,
   );
   return `<div class="usage-ranking" data-ranking-active="tokens">
             <div class="usage-chart-head usage-ranking-head">
-              <span class="usage-chart-title" data-ranking-title>Models ranked by token usage</span>
-              <div class="usage-seg usage-ranking-toggle" role="tablist" aria-label="Model ranking metric">
-                <button type="button" class="usage-seg-btn active" data-ranking-mode="tokens" data-ranking-title="Models ranked by token usage" role="tab" aria-selected="true">Tokens</button>
-                <button type="button" class="usage-seg-btn" data-ranking-mode="cost" data-ranking-title="Models ranked by cost" role="tab" aria-selected="false">Cost</button>
+              <span class="usage-chart-title" data-ranking-title>${escapeHtml(l10n('Models ranked by token usage'))}</span>
+              <div class="usage-seg usage-ranking-toggle" role="tablist" aria-label="${escapeHtml(l10n('Model ranking metric'))}">
+                <button type="button" class="usage-seg-btn active" data-ranking-mode="tokens" data-ranking-title="${escapeHtml(l10n('Models ranked by token usage'))}" role="tab" aria-selected="true">${escapeHtml(l10n('Tokens'))}</button>
+                <button type="button" class="usage-seg-btn" data-ranking-mode="cost" data-ranking-title="${escapeHtml(l10n('Models ranked by cost'))}" role="tab" aria-selected="false">${escapeHtml(l10n('Cost'))}</button>
               </div>
             </div>
             <div class="usage-ranking-panel" data-ranking-panel="tokens">${tokenRows}</div>
@@ -598,18 +608,21 @@ function renderUsageRecentTable(view: UsageView): string {
         : run.tokensInput;
       const tokenLabel = typeof tokenTotal === 'number' ? formatUsageTokens(tokenTotal) : '—';
       const tokenTitle = typeof tokenTotal === 'number'
-        ? `${formatUsageCount(Math.round(tokenTotal))} ${run.tokensSource === 'estimated' ? 'estimated input tokens' : 'tokens'}`
-        : 'Token usage unavailable';
+        ? l10n(
+            run.tokensSource === 'estimated' ? '{0} estimated input tokens' : '{0} tokens',
+            formatUsageCount(Math.round(tokenTotal)),
+          )
+        : l10n('Token usage unavailable');
       const costLabel = run.costAmount === undefined ? '—' : formatUsageCost(run.costAmount, run.costCurrency);
-      const costTitle = run.costAmount === undefined ? 'Cost unavailable' : formatUsageCostTitle(costLabel, run.costSource);
-      const statusTitle = run.status === 'success' ? 'Success' : 'Failed';
+      const costTitle = run.costAmount === undefined ? l10n('Cost unavailable') : formatUsageCostTitle(costLabel, run.costSource);
+      const statusTitle = run.status === 'success' ? l10n('Success') : l10n('Failed');
       const fileTitle = `${run.projectName} / ${run.sourceFileName}`;
-      const languageTitle = run.targetLanguage ?? 'Target language unavailable';
+      const languageTitle = run.targetLanguage ?? l10n('Target language unavailable');
       return `<tr>
                 <td><span class="usage-cell-stack"><span>${escapeHtml(formatUsageTime(run.finishedAt ?? run.startedAt))}</span><span class="usage-cell-sub">${escapeHtml(formatUsageDuration(run.durationMs))}</span></span></td>
                 <td class="usage-file"><span class="usage-cell-stack"><span class="usage-truncate" title="${escapeHtml(fileTitle)}">${escapeHtml(run.sourceFileName)}</span><span class="usage-cell-sub">${escapeHtml(run.projectName)}</span></span></td>
                 <td title="${escapeHtml(languageTitle)}">${escapeHtml(formatUsageTargetLanguage(run.targetLanguage))}</td>
-                <td class="usage-model"><span class="usage-truncate" title="${escapeHtml(run.modelId ?? 'Model unavailable')}">${escapeHtml(run.modelId ?? '—')}</span></td>
+                <td class="usage-model"><span class="usage-truncate" title="${escapeHtml(run.modelId ?? l10n('Model unavailable'))}">${escapeHtml(run.modelId ?? '—')}</span></td>
                 <td><span class="usage-truncate" title="${escapeHtml(tokenTitle)}">${escapeHtml(tokenLabel)}</span></td>
                 <td><span class="usage-truncate" title="${escapeHtml(costTitle)}">${escapeHtml(costLabel)}</span></td>
                 <td><span class="usage-status-dot" data-status="${run.status}" title="${escapeHtml(statusTitle)}" aria-label="${escapeHtml(statusTitle)}"></span></td>
@@ -618,7 +631,7 @@ function renderUsageRecentTable(view: UsageView): string {
     .join('');
   return `<div class="usage-table-wrap">
             <table class="usage-table">
-              <thead><tr><th>Time</th><th>File</th><th>Target</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Status</th></tr></thead>
+              <thead><tr><th>${escapeHtml(l10n('Time'))}</th><th>${escapeHtml(l10n('File'))}</th><th>${escapeHtml(l10n('Target'))}</th><th>${escapeHtml(l10n('Model'))}</th><th>${escapeHtml(l10n('Tokens'))}</th><th>${escapeHtml(l10n('Cost'))}</th><th>${escapeHtml(l10n('Status'))}</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </div>`;
@@ -631,22 +644,26 @@ function renderUsageRecentTable(view: UsageView): string {
  */
 export function renderUsageSection(view: UsageView): string {
   if (!view || view.totalRuns === 0) {
-    return '<div class="usage-empty">No translations in this range yet. Translate a Markdown file, or widen the range, to see files, models, token estimates, and cost here.</div>';
+    return `<div class="usage-empty">${escapeHtml(l10n('No translations in this range yet. Translate a Markdown file, or widen the range, to see files, models, token estimates, and cost here.'))}</div>`;
   }
   const tokenTotal = typeof view.tokenTotal === 'number' && Number.isFinite(view.tokenTotal)
     ? view.tokenTotal
     : view.hasReportedTokens
       ? view.reportedTotalTokens || (view.reportedInputTokens + view.reportedOutputTokens)
       : view.estimatedInputTokens;
-  const tokenCaption = 'Tokens';
+  const tokenCaption = l10n('Tokens');
   const costText = formatUsageCost(view.hasEstimatedCost ? view.estimatedCost : undefined, view.costCurrency);
-  const costCaption = 'Estimated cost';
-  const taskTitle = `${formatUsageCount(view.successRuns)} successful / ${formatUsageCount(view.failedRuns)} failed`;
+  const costCaption = l10n('Estimated cost');
+  const taskTitle = l10n(
+    '{0} successful / {1} failed',
+    formatUsageCount(view.successRuns),
+    formatUsageCount(view.failedRuns),
+  );
   const cards = `<div class="usage-cards">
             <div class="usage-card"><div class="usage-value">${escapeHtml(formatUsageTokens(tokenTotal))}</div><div class="usage-caption">${escapeHtml(tokenCaption)}</div></div>
             <div class="usage-card"><div class="usage-value">${escapeHtml(costText)}</div><div class="usage-caption">${escapeHtml(costCaption)}</div></div>
-            <div class="usage-card" title="${escapeHtml(taskTitle)}"><div class="usage-value">${formatUsageCount(view.successRuns)}</div><div class="usage-caption">Translation tasks</div></div>
-            <div class="usage-card"><div class="usage-value">${formatUsageCount(view.filesTranslated)}</div><div class="usage-caption">Translated files</div></div>
+            <div class="usage-card" title="${escapeHtml(taskTitle)}"><div class="usage-value">${formatUsageCount(view.successRuns)}</div><div class="usage-caption">${escapeHtml(l10n('Translation tasks'))}</div></div>
+            <div class="usage-card"><div class="usage-value">${formatUsageCount(view.filesTranslated)}</div><div class="usage-caption">${escapeHtml(l10n('Translated files'))}</div></div>
           </div>`;
   return `${cards}
           <div class="usage-charts">
@@ -657,7 +674,7 @@ export function renderUsageSection(view: UsageView): string {
 }
 
 export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
-  const { beforeMainScript = '', cspSource, extraHead = '', nonce, state } = options;
+  const { beforeMainScript = '', cspSource, extraHead = '', locale = 'en', nonce, state } = options;
   const providerStates = buildProviderStateMap(state);
   const activeProviderType = coerceProviderType(state.providerType);
   const activeProviderState = providerStates[activeProviderType] ?? providerStates.openrouter;
@@ -689,7 +706,9 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const customPromptRowHidden = verifiedAdapterMode === 'translationModel' ? ' hidden' : '';
   const promptInstructions = activeProviderState.promptInstructions || state.promptInstructions;
   const promptInstructionsEnhanced = activeProviderState.promptInstructionsEnhanced || state.promptInstructionsEnhanced;
-  const promptInstructionsEnhancementNote = activeProviderState.promptInstructionsEnhancementNote || state.promptInstructionsEnhancementNote || 'MarkLingo uses a model-specific optimized prompt for this translation model.';
+  const promptInstructionsEnhancementNote = activeProviderState.promptInstructionsEnhancementNote
+    || state.promptInstructionsEnhancementNote
+    || l10n('MarkLingo uses a model-specific optimized prompt for this translation model.');
   const promptInstructionsBadge = promptInstructionsEnhanced
     ? `<span class="prompt-enhanced-badge" title="${escapeHtml(promptInstructionsEnhancementNote)}" aria-label="${escapeHtml(promptInstructionsEnhancementNote)}">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -700,7 +719,7 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const customLanguageHidden = state.targetLanguage === CUSTOM_TARGET_LANGUAGE_LABEL ? '' : ' hidden';
   const shortcuts = getShortcutStates(state);
   const pluralize = (count: number, singular: string, plural: string): string =>
-    `${count} ${count === 1 ? singular : plural}`;
+    l10n('{0} {1}', count, l10n(count === 1 ? singular : plural));
   const storageStatsTextParts = [
     pluralize(state.storageStats.projectCount, 'project', 'projects'),
     pluralize(state.storageStats.metaFileCount, 'metadata file', 'metadata files'),
@@ -721,11 +740,32 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   const currentProjectDataDisabled = currentProjectPath ? '' : ' disabled';
   const currentProjectDataDescription = currentProjectPath
     ? currentProjectPath
-    : 'Open a file or single workspace folder to select a current project.';
+    : l10n('Open a file or single workspace folder to select a current project.');
   const providerClientPresets = buildProviderClientPresets();
   const usageQuery = state.usage?.query ?? DEFAULT_USAGE_QUERY_CLIENT;
   const usageBody = state.usage ? renderUsageSection(state.usage) : renderUsageSkeleton();
   const usageBusy = state.usage ? 'false' : 'true';
+  const clientStrings = {
+    copied: l10n('Copied'),
+    copySystemInstructions: l10n('Copy system instructions'),
+    custom: l10n('Custom...'),
+    noActiveShortcut: l10n('No active shortcut. Edit keyboard shortcuts to assign one.'),
+    macSystemShortcutWarning: l10n('If MarkLingo cannot use this shortcut, macOS may already use it for Dock. Change it in System Settings > Keyboard > Keyboard Shortcuts... > Dock > Turn Dock hiding on/off.'),
+    promptEnhancedNote: l10n('MarkLingo uses a model-specific optimized prompt for this translation model.'),
+    save: l10n('Save'),
+    saved: l10n('Saved'),
+    saveAndVerify: l10n('Save and Verify'),
+    savedAndVerified: l10n('Saved and Verified'),
+    saving: l10n('Saving...'),
+    shortcutUnavailable: l10n('Shortcut may be unavailable because another command uses it.'),
+    systemInstructions: l10n('System Instructions'),
+    systemInstructionsCopied: l10n('System instructions copied'),
+    verificationFailed: l10n('Verification failed.'),
+    verifying: l10n('Verifying...'),
+  };
+  const localizedModelTagLabels = Object.fromEntries(
+    Object.entries(MODEL_TAG_LABELS).map(([tag, label]) => [tag, l10n(label)]),
+  );
   const providerBaselines = Object.fromEntries(Object.entries(providerStates).map(([providerType, providerState]) => [
     providerType,
     {
@@ -751,12 +791,12 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
   ]));
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(locale)}">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MarkLingo Settings</title>
+  <title>${escapeHtml(l10n('MarkLingo Settings'))}</title>
   ${extraHead}
   <style>
     :root {
@@ -814,6 +854,11 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
     .card.danger { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
     .provider-card .row {
       border-bottom: 0;
+    }
+    .provider-disclosure {
+      padding: 14px 20px 0;
+      color: var(--muted);
+      overflow-wrap: anywhere;
     }
     .row {
       display: grid;
@@ -1799,18 +1844,19 @@ export function renderSettingsHtml(options: RenderSettingsHtmlOptions): string {
 <body>
   <div class="shell">
     <main>
-      <h1>Settings</h1>
+      <h1>${escapeHtml(l10n('Settings'))}</h1>
       <div id="settings">
-        <h2>Keyboard Shortcuts</h2>
+        <h2>${escapeHtml(l10n('Keyboard Shortcuts'))}</h2>
         <section class="card">
 ${renderShortcutRows(shortcuts)}
         </section>
 
-        <h2>Provider</h2>
+        <h2>${escapeHtml(l10n('Provider'))}</h2>
         <section class="card provider-card">
+          <div class="provider-disclosure">${escapeHtml(l10n('Markdown content is sent to the configured OpenAI-compatible endpoint for translation.'))}</div>
           <div class="row">
             <div>
-              <div class="label">Provider</div>
+              <div class="label">${escapeHtml(l10n('Provider'))}</div>
             </div>
             <div class="control-full">
               <span class="select-wrap"><select id="providerType">${renderProviderOptions(activeProviderType)}</select></span>
@@ -1818,7 +1864,7 @@ ${renderShortcutRows(shortcuts)}
           </div>
           <div class="row" id="baseUrlRow"${providerBaseUrlHidden}>
             <div>
-              <div class="label">Base URL</div>
+              <div class="label">${escapeHtml(l10n('Base URL'))}</div>
             </div>
             <div class="control-full">
               <input id="baseUrl" value="${escapeHtml(activeProviderState.baseUrl)}">
@@ -1826,7 +1872,7 @@ ${renderShortcutRows(shortcuts)}
           </div>
           <div class="row" id="apiKeyRow"${apiKeyRowHidden}>
             <div>
-              <div class="label">API Key</div>
+              <div class="label">${escapeHtml(l10n('API Key'))}</div>
             </div>
             <div class="control-full">
               <input id="apiKey" type="password" autocomplete="off"${apiKeyInitialAttrs}>
@@ -1834,13 +1880,13 @@ ${renderShortcutRows(shortcuts)}
           </div>
           <div class="row stacked-row">
             <div>
-              <div class="label">Model ID</div>
+              <div class="label">${escapeHtml(l10n('Model ID'))}</div>
             </div>
             <div class="control-full field-stack">
               <span class="select-wrap" id="modelIdSelectWrap"${providerModelSelectHidden}>
                 <select id="modelIdSelect">${renderModelIdSelectOptions(activeProviderType, activeProviderState.modelId)}</select>
               </span>
-              <input id="modelId"${providerModelInputHidden} value="${escapeHtml(activeProviderState.modelId)}" placeholder="Enter model ID">
+              <input id="modelId"${providerModelInputHidden} value="${escapeHtml(activeProviderState.modelId)}" placeholder="${escapeHtml(l10n('Enter model ID'))}">
               <div class="model-tags" id="model-tags"${providerModelTagsHidden}>${renderModelTagBadges(activeProviderModelTags)}</div>
             </div>
           </div>
@@ -1849,31 +1895,31 @@ ${renderShortcutRows(shortcuts)}
             <div class="provider-actions">
               <div class="provider-feedback">
                 <div class="provider-status" id="provider-status"></div>
-                <span class="info-tip" id="provider-mode-tip" tabindex="0" aria-label="About smaller batches" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(PROVIDER_SMALL_BATCH_TOOLTIP)}</span></span>
+                <span class="info-tip" id="provider-mode-tip" tabindex="0" aria-label="${escapeHtml(l10n('About smaller batches'))}" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(l10n(PROVIDER_SMALL_BATCH_TOOLTIP))}</span></span>
               </div>
-              <button class="save-btn" type="button" id="verify-provider">Save and Verify</button>
+              <button class="save-btn" type="button" id="verify-provider">${escapeHtml(l10n('Save and Verify'))}</button>
             </div>
           </div>
         </section>
 
-        <h2>Translation</h2>
+        <h2>${escapeHtml(l10n('Translation'))}</h2>
         <section class="card">
           <div class="row stacked-row">
             <div>
-              <div class="label">Target Language</div>
+              <div class="label">${escapeHtml(l10n('Target Language'))}</div>
             </div>
             <div class="control-full field-stack">
               <span class="select-wrap"><select id="targetLanguage">${renderOptions(state.targetLanguage)}</select></span>
-              <input id="targetLanguageCustom"${customLanguageHidden} value="${escapeHtml(state.targetLanguageCustom)}" placeholder="Enter target language">
+              <input id="targetLanguageCustom"${customLanguageHidden} value="${escapeHtml(state.targetLanguageCustom)}" placeholder="${escapeHtml(l10n('Enter target language'))}">
             </div>
           </div>
           <div class="row top-align">
             <div>
-              <div class="label label-inline" id="promptInstructionsLabel">System Instructions${promptInstructionsBadge}</div>
+              <div class="label label-inline" id="promptInstructionsLabel">${escapeHtml(l10n('System Instructions'))}${promptInstructionsBadge}</div>
             </div>
             <div class="readonly-wrap">
-              <div class="readonly-field" id="promptInstructions" aria-label="System instructions">${escapeHtml(promptInstructions)}</div>
-              <button class="copy-icon" id="copy-system-prompt" type="button" aria-label="Copy system instructions" title="Copy system instructions">
+              <div class="readonly-field" id="promptInstructions" aria-label="${escapeHtml(l10n('System instructions'))}">${escapeHtml(promptInstructions)}</div>
+              <button class="copy-icon" id="copy-system-prompt" type="button" aria-label="${escapeHtml(l10n('Copy system instructions'))}" title="${escapeHtml(l10n('Copy system instructions'))}">
                 <svg class="copy-glyph" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <rect x="9" y="9" width="13" height="13" rx="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -1886,71 +1932,71 @@ ${renderShortcutRows(shortcuts)}
           </div>
           <div class="row top-align" id="customPromptRow"${customPromptRowHidden}>
             <div>
-              <div class="label">Custom Instructions</div>
+              <div class="label">${escapeHtml(l10n('Custom Instructions'))}</div>
             </div>
             <div class="stack">
               <textarea id="customPrompt">${escapeHtml(state.customPrompt)}</textarea>
               <div class="field-actions">
-                <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>Save</button>
+                <button class="save-btn" type="button" data-field="customPrompt" data-key="translation.customPrompt" disabled>${escapeHtml(l10n('Save'))}</button>
               </div>
             </div>
           </div>
         </section>
 
-        <h2>Usage</h2>
+        <h2>${escapeHtml(l10n('Usage'))}</h2>
         <section class="usage-section">
           ${renderUsageControls(usageQuery)}
           <div id="usage-body" aria-busy="${usageBusy}" data-loading="${usageBusy}">${usageBody}</div>
         </section>
 
-        <h2>Output</h2>
+        <h2>${escapeHtml(l10n('Output'))}</h2>
         <section class="card">
           <div class="row top-align">
             <div>
-              <div class="label">Translation Metadata Folder</div>
-              <div class="help">Stores translation metadata and cached translations.</div>
+              <div class="label">${escapeHtml(l10n('Translation Metadata Folder'))}</div>
+              <div class="help">${escapeHtml(l10n('Stores translation metadata and cached translations under VS Code globalStorageUri.'))}</div>
             </div>
             <div class="inline">
               <input class="path-field" id="storageRoot" value="${escapeHtml(state.storageRoot)}" readonly>
-              <button class="secondary" id="reveal-storage" type="button">Reveal</button>
+              <button class="secondary" id="reveal-storage" type="button">${escapeHtml(l10n('Reveal'))}</button>
             </div>
           </div>
           <div class="row top-align">
             <div>
-              <div class="label">Metadata Storage</div>
-              <div class="help">Optimize removes the oldest cache. Translated files stay.</div>
+              <div class="label">${escapeHtml(l10n('Metadata Storage'))}</div>
+              <div class="help">${escapeHtml(l10n('Optimize removes the oldest cache. Translated files stay.'))}</div>
             </div>
             <div class="storage-panel">
               <div class="storage-content">
-                <div class="storage-primary">${escapeHtml(formatBytes(state.storageStats.totalBytes))} of ${escapeHtml(formatBytes(state.storageStats.quotaBytes))} used<span class="info-tip" tabindex="0" aria-label="About the storage limit"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">When usage reaches ${escapeHtml(formatBytes(state.storageStats.quotaBytes))}, MarkLingo automatically removes the oldest cached translations to keep storage in check. Generated Markdown files are never touched.</span></span></div>
+                <div class="storage-primary">${escapeHtml(l10n('{0} of {1} used', formatBytes(state.storageStats.totalBytes), formatBytes(state.storageStats.quotaBytes)))}<span class="info-tip" tabindex="0" aria-label="${escapeHtml(l10n('About the storage limit'))}"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"></circle><line x1="8" y1="7.5" x2="8" y2="11.5"></line><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"></circle></svg><span class="tooltip" role="tooltip">${escapeHtml(l10n('When usage reaches {0}, MarkLingo automatically removes the oldest cached translations to keep storage in check. Generated Markdown files are never touched.', formatBytes(state.storageStats.quotaBytes)))}</span></span></div>
                 <div class="storage-secondary">${escapeHtml(storageStatsText)}</div>
                 <div class="storage-meter" data-state="${storageMeterState}" aria-hidden="true">
                   <span class="storage-meter-fill" style="width: ${storagePercent}%"></span>
                 </div>
               </div>
-              <button class="secondary" id="optimize-storage" type="button">Optimize</button>
+              <button class="secondary" id="optimize-storage" type="button">${escapeHtml(l10n('Optimize'))}</button>
             </div>
           </div>
         </section>
 
-        <h2 class="danger-title">Danger Zone</h2>
+        <h2 class="danger-title">${escapeHtml(l10n('Danger Zone'))}</h2>
         <section class="card danger">
           <div class="row top-align danger-row">
             <div class="danger-copy">
-              <div class="label">Clear Current Project Data</div>
+              <div class="label">${escapeHtml(l10n('Clear Current Project Data'))}</div>
               <div class="danger-list path">${escapeHtml(currentProjectDataDescription)}</div>
             </div>
             <div class="danger-action">
-              <button class="danger" type="button" id="clear-current-project-data"${currentProjectDataDisabled}>Clear current project data</button>
+              <button class="danger" type="button" id="clear-current-project-data"${currentProjectDataDisabled}>${escapeHtml(l10n('Clear current project data'))}</button>
             </div>
           </div>
           <div class="row top-align danger-row">
             <div class="danger-copy">
-              <div class="label">Clear All Data</div>
-              <div class="danger-list">Delete the saved API key, settings, metadata/cache, and tracked translated files if selected.</div>
+              <div class="label">${escapeHtml(l10n('Clear All Data'))}</div>
+              <div class="danger-list">${escapeHtml(l10n('Delete the API key from SecretStorage, settings, metadata/cache under globalStorageUri, and tracked translated files if selected.'))}</div>
             </div>
             <div class="danger-action">
-              <button class="danger" type="button" id="clear-all-data">Clear all data</button>
+              <button class="danger" type="button" id="clear-all-data">${escapeHtml(l10n('Clear all data'))}</button>
             </div>
           </div>
         </section>
@@ -1962,22 +2008,23 @@ ${renderShortcutRows(shortcuts)}
     const vscode = acquireVsCodeApi();
     const CUSTOM_LANGUAGE_LABEL = ${scriptJson(CUSTOM_TARGET_LANGUAGE_LABEL)};
     const CHAT_PROMPT_INSTRUCTIONS = ${scriptJson(state.chatPromptInstructions)};
+    const UI = ${scriptJson(clientStrings)};
     let currentPromptInstructions = ${scriptJson(promptInstructions)};
 
     function getShortcutWarningText(warning) {
       if (!warning) return '';
       if (warning.includes('another command')) {
-        return 'Shortcut may be unavailable because another command uses it.';
+        return UI.shortcutUnavailable;
       }
       if (warning.includes('assign')) {
-        return 'No active shortcut. Edit keyboard shortcuts to assign one.';
+        return UI.noActiveShortcut;
       }
       return warning;
     }
 
     function getShortcutTooltipWarningText(warning) {
       const text = getShortcutWarningText(warning);
-      return warning.includes('System Settings > Keyboard > Keyboard Shortcuts') ? text : '';
+      return warning.includes('System Settings > Keyboard > Keyboard Shortcuts') || warning === UI.macSystemShortcutWarning ? text : '';
     }
 
     function getShortcutInlineWarningText(warning) {
@@ -1998,7 +2045,7 @@ ${renderShortcutRows(shortcuts)}
       input.addEventListener('input', () => {
         if (state.timer) { clearTimeout(state.timer); state.timer = undefined; }
         button.classList.remove('saved');
-        button.textContent = 'Save';
+        button.textContent = UI.save;
         button.disabled = input.value === state.baseline;
       });
       button.addEventListener('click', () => {
@@ -2006,7 +2053,7 @@ ${renderShortcutRows(shortcuts)}
         const saveId = nextSaveId++;
         state.pendingSaveId = saveId;
         state.pendingValue = input.value;
-        button.textContent = 'Saving...';
+        button.textContent = UI.saving;
         button.disabled = true;
         vscode.postMessage({ type: 'updateSetting', key: key, value: input.value, saveId: saveId });
       });
@@ -2040,9 +2087,9 @@ ${renderShortcutRows(shortcuts)}
     syncCustomLanguageVisibility(false);
 
     const API_KEY_MASK_VALUE = ${scriptJson(API_KEY_MASK_VALUE)};
-    const PROVIDER_SMALL_BATCH_STATUS = ${scriptJson(PROVIDER_SMALL_BATCH_STATUS)};
-    const PROVIDER_SMALL_BATCH_TOOLTIP = ${scriptJson(PROVIDER_SMALL_BATCH_TOOLTIP)};
-    const MODEL_TAG_LABELS = ${scriptJson(MODEL_TAG_LABELS)};
+    const PROVIDER_SMALL_BATCH_STATUS = ${scriptJson(l10n(PROVIDER_SMALL_BATCH_STATUS))};
+    const PROVIDER_SMALL_BATCH_TOOLTIP = ${scriptJson(l10n(PROVIDER_SMALL_BATCH_TOOLTIP))};
+    const MODEL_TAG_LABELS = ${scriptJson(localizedModelTagLabels)};
     const MODEL_TAG_ICONS = ${scriptJson(MODEL_TAG_ICONS)};
     const KNOWN_LOCAL_MODEL_TAG_RULES = ${scriptJson(KNOWN_LOCAL_MODEL_TAG_RULES)};
     const providerTypeSelect = document.getElementById('providerType');
@@ -2257,7 +2304,7 @@ ${renderShortcutRows(shortcuts)}
       if (includeCustom) {
         const custom = document.createElement('option');
         custom.value = '';
-        custom.textContent = 'Custom...';
+        custom.textContent = UI.custom;
         custom.selected = !options.some((option) => option.value === selectedValue);
         select.appendChild(custom);
       }
@@ -2424,7 +2471,7 @@ ${renderShortcutRows(shortcuts)}
     }
 
     function renderPromptEnhancedBadge(note) {
-      const title = note || 'MarkLingo uses a model-specific optimized prompt for this translation model.';
+      const title = note || UI.promptEnhancedNote;
       return '<span class="prompt-enhanced-badge" title="' + escapeAttr(title) + '" aria-label="' + escapeAttr(title) + '">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.4 5.2 5.6.7-4.1 3.8 1.1 5.5-5-2.8-5 2.8 1.1-5.5-4.1-3.8 5.6-.7L12 3.5z"></path></svg>' +
         '</span>';
@@ -2447,7 +2494,7 @@ ${renderShortcutRows(shortcuts)}
       currentPromptInstructions = nextPrompt;
       if (promptInstructions) promptInstructions.textContent = nextPrompt;
       if (promptInstructionsLabel) {
-        promptInstructionsLabel.innerHTML = 'System Instructions' +
+        promptInstructionsLabel.innerHTML = UI.systemInstructions +
           (isTranslationModel && baseline.promptInstructionsEnhanced
             ? renderPromptEnhancedBadge(baseline.promptInstructionsEnhancementNote)
             : '');
@@ -2467,7 +2514,7 @@ ${renderShortcutRows(shortcuts)}
       const providerIsVerified = hasVerifiedProvider(values.providerType, baseline);
       const dirty = isProviderDirty();
       verifyProviderBtn.disabled = !dirty || !canVerifyProvider();
-      verifyProviderBtn.textContent = !dirty && providerSuccessVisible ? 'Saved and Verified' : 'Save and Verify';
+      verifyProviderBtn.textContent = !dirty && providerSuccessVisible ? UI.savedAndVerified : UI.saveAndVerify;
       verifyProviderBtn.classList.toggle('saved', !dirty && providerIsVerified && providerSuccessVisible);
       if (dirty) {
         setProviderStatus('', false);
@@ -2544,7 +2591,7 @@ ${renderShortcutRows(shortcuts)}
         baseUrl: values.baseUrl,
         modelId: values.modelId,
       };
-      verifyProviderBtn.textContent = 'Verifying...';
+      verifyProviderBtn.textContent = UI.verifying;
       verifyProviderBtn.disabled = true;
       verifyProviderBtn.classList.remove('saved');
       setProviderStatus('', false);
@@ -2573,15 +2620,15 @@ ${renderShortcutRows(shortcuts)}
         if (text.input.value === pendingValue) {
           text.input.value = savedValue;
           text.button.disabled = true;
-          text.button.textContent = 'Saved';
+          text.button.textContent = UI.saved;
           text.button.classList.add('saved');
           text.timer = setTimeout(() => {
-            text.button.textContent = 'Save';
+            text.button.textContent = UI.save;
             text.button.classList.remove('saved');
             text.timer = undefined;
           }, 2500);
         } else {
-          text.button.textContent = 'Save';
+          text.button.textContent = UI.save;
           text.button.classList.remove('saved');
           text.button.disabled = text.input.value === text.baseline;
           text.timer = undefined;
@@ -2595,7 +2642,7 @@ ${renderShortcutRows(shortcuts)}
       if (!text || (saveId !== undefined && text.pendingSaveId !== saveId)) return;
       text.pendingSaveId = undefined;
       text.pendingValue = undefined;
-      text.button.textContent = 'Save';
+      text.button.textContent = UI.save;
       text.button.classList.remove('saved');
       text.button.disabled = text.input.value === text.baseline;
     }
@@ -2614,13 +2661,13 @@ ${renderShortcutRows(shortcuts)}
     copySystemPromptBtn.addEventListener('click', () => {
       vscode.postMessage({ type: 'copySystemPrompt', value: currentPromptInstructions });
       copySystemPromptBtn.classList.add('copied');
-      copySystemPromptBtn.setAttribute('aria-label', 'System instructions copied');
-      copySystemPromptBtn.setAttribute('title', 'Copied');
+      copySystemPromptBtn.setAttribute('aria-label', UI.systemInstructionsCopied);
+      copySystemPromptBtn.setAttribute('title', UI.copied);
       if (copySystemPromptTimer) clearTimeout(copySystemPromptTimer);
       copySystemPromptTimer = setTimeout(() => {
         copySystemPromptBtn.classList.remove('copied');
-        copySystemPromptBtn.setAttribute('aria-label', 'Copy system instructions');
-        copySystemPromptBtn.setAttribute('title', 'Copy system instructions');
+        copySystemPromptBtn.setAttribute('aria-label', UI.copySystemInstructions);
+        copySystemPromptBtn.setAttribute('title', UI.copySystemInstructions);
         copySystemPromptTimer = undefined;
       }, 1600);
     });
@@ -2772,11 +2819,11 @@ ${renderShortcutRows(shortcuts)}
           return;
         }
         clearProviderSuccessFeedback();
-        verifyProviderBtn.textContent = 'Save and Verify';
+        verifyProviderBtn.textContent = UI.saveAndVerify;
         verifyProviderBtn.disabled = false;
         verifyProviderBtn.classList.remove('saved');
         syncProviderModeTip(undefined);
-        setProviderStatus(msg.message || 'Verification failed.', true);
+        setProviderStatus(msg.message || UI.verificationFailed, true);
         return;
       }
       if (msg.type === 'shortcutState') {

@@ -6,6 +6,7 @@ import {
 import { MARKLINGO_CONFIGURATION_KEYS } from '../configurationKeys.js';
 import { resetOpenRouterSecretsAndState } from '../services/openRouterClient.js';
 import { clearOnboardingState } from '../onboardingState.js';
+import { l10n } from '../localization.js';
 
 export type CleanupScopes = {
   apiKeys?: boolean;
@@ -63,26 +64,26 @@ async function clearExtensionGlobalStorage(context: vscode.ExtensionContext): Pr
 
 function buildSummaryMessage(summary: ClearExtensionDataSummary): string {
   const parts: string[] = [];
-  if (summary.apiKeysCleared) parts.push('API key');
-  if (summary.settingsCleared > 0) parts.push(`${summary.settingsCleared} user setting(s)`);
-  if (summary.globalStorageCleared) parts.push('translation metadata/cache');
+  if (summary.apiKeysCleared) parts.push(l10n('API key'));
+  if (summary.settingsCleared > 0) parts.push(l10n('{0} user setting(s)', summary.settingsCleared));
+  if (summary.globalStorageCleared) parts.push(l10n('translation metadata/cache'));
   if (summary.workspaceOutputs) {
-    parts.push(`${summary.workspaceOutputs.deleted} workspace translated file(s)`);
+    parts.push(l10n('{0} workspace translated file(s)', summary.workspaceOutputs.deleted));
     if (summary.workspaceOutputs.skipped > 0) {
-      parts.push(`${summary.workspaceOutputs.skipped} modified translated file(s) skipped`);
+      parts.push(l10n('{0} modified translated file(s) skipped', summary.workspaceOutputs.skipped));
     }
   }
 
-  if (parts.length === 0) return 'MarkLingo: No selected data was found to clear.';
-  return `MarkLingo: Cleared ${parts.join(', ')}.`;
+  if (parts.length === 0) return l10n('MarkLingo: No selected data was found to clear.');
+  return l10n('MarkLingo: Cleared {0}.', parts.join(', '));
 }
 
 function buildWarningMessage(summary: ClearExtensionDataSummary): string {
   const failed = [...new Set(summary.failedOperations)];
   const failureSummary = failed.length > 0
-    ? `Failed: ${failed.join(', ')}.`
-    : `${summary.errors.length} cleanup issue(s) occurred.`;
-  return `${buildSummaryMessage(summary)} ${failureSummary} See Developer Tools for details.`;
+    ? l10n('Failed: {0}.', failed.join(', '))
+    : l10n('{0} cleanup issue(s) occurred.', summary.errors.length);
+  return l10n('{0} {1} See Developer Tools for details.', buildSummaryMessage(summary), failureSummary);
 }
 
 function showCleanupNotification(kind: 'info' | 'warning', message: string): void {
@@ -99,7 +100,7 @@ async function runCleanup(context: vscode.ExtensionContext, ids: Set<CleanupOpti
   return vscode.window.withProgress<ClearExtensionDataSummary>(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'MarkLingo: Clearing extension data...',
+      title: l10n('MarkLingo: Clearing extension data...'),
       cancellable: false,
     },
     async (progress) => {
@@ -112,43 +113,43 @@ async function runCleanup(context: vscode.ExtensionContext, ids: Set<CleanupOpti
       };
 
       if (ids.has('apiKeys')) {
-        progress.report({ message: 'Deleting saved API key' });
+        progress.report({ message: l10n('Deleting saved API key') });
         try {
           await resetOpenRouterSecretsAndState(context);
           result.apiKeysCleared = true;
         } catch (error) {
-          addCleanupError(result, 'saved API key', error);
+          addCleanupError(result, l10n('saved API key'), error);
         }
       }
 
       if (ids.has('settings')) {
-        progress.report({ message: 'Deleting user settings' });
+        progress.report({ message: l10n('Deleting user settings') });
         try {
           result.settingsCleared = await clearUserSettings(context);
         } catch (error) {
-          addCleanupError(result, 'user settings', error);
+          addCleanupError(result, l10n('user settings'), error);
         }
       }
 
       if (ids.has('workspaceOutputs')) {
-        progress.report({ message: 'Deleting tracked workspace translated files' });
+        progress.report({ message: l10n('Deleting tracked workspace translated files') });
         try {
           result.workspaceOutputs = await deleteTrackedWorkspaceOutputs(context, progress);
           if (result.workspaceOutputs.errors.length > 0) {
-            result.failedOperations.push('tracked workspace translated files');
+            result.failedOperations.push(l10n('tracked workspace translated files'));
           }
           result.errors.push(...result.workspaceOutputs.errors);
         } catch (error) {
-          addCleanupError(result, 'tracked workspace translated files', error);
+          addCleanupError(result, l10n('tracked workspace translated files'), error);
         }
       }
 
       if (ids.has('globalStorage')) {
-        progress.report({ message: 'Deleting translation metadata/cache' });
+        progress.report({ message: l10n('Deleting translation metadata/cache') });
         try {
           result.globalStorageCleared = await clearExtensionGlobalStorage(context);
         } catch (error) {
-          addCleanupError(result, 'translation metadata/cache', error);
+          addCleanupError(result, l10n('translation metadata/cache'), error);
         }
       }
 

@@ -7,6 +7,19 @@ function readPackageJson() {
   return JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 }
 
+function readJson(relativePath) {
+  return JSON.parse(fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8'));
+}
+
+function placeholderKey(value) {
+  const match = /^%([^%]+)%$/.exec(value);
+  return match?.[1];
+}
+
+function indexedPlaceholders(value) {
+  return [...value.matchAll(/\{\d+\}/g)].map((match) => match[0]).sort();
+}
+
 function assertExcludesTranslatedOutput(whenClause) {
   assert.ok(
     whenClause.includes('!(resourceFilename =~ /_mdt[.](md|markdown)$/i)'),
@@ -149,4 +162,50 @@ test('provider enum exposes only the supported provider presets', () => {
     'xiaomiMimo',
     'openaiCompatible',
   ]);
+});
+
+test('manifest user-facing strings resolve through matching English and Simplified Chinese catalogs', () => {
+  const pkg = readPackageJson();
+  const english = readJson('../package.nls.json');
+  const simplifiedChinese = readJson('../package.nls.zh-cn.json');
+  const properties = Object.values(pkg.contributes.configuration.properties);
+  const localizedValues = [
+    pkg.displayName,
+    pkg.description,
+    pkg.capabilities.untrustedWorkspaces.description,
+    pkg.capabilities.virtualWorkspaces.description,
+    ...pkg.contributes.commands.map((command) => command.title),
+    pkg.contributes.configuration.title,
+    ...properties.map((property) => property.description),
+    ...properties.flatMap((property) => property.enumDescriptions ?? []),
+  ];
+
+  assert.equal(pkg.l10n, './l10n');
+  assert.deepEqual(Object.keys(simplifiedChinese).sort(), Object.keys(english).sort());
+  for (const value of localizedValues) {
+    const key = placeholderKey(value);
+    assert.ok(key, `expected manifest localization placeholder, got ${JSON.stringify(value)}`);
+    assert.equal(typeof english[key], 'string', `missing English manifest string for ${key}`);
+    assert.equal(typeof simplifiedChinese[key], 'string', `missing Simplified Chinese manifest string for ${key}`);
+  }
+});
+
+test('runtime localization bundles have matching keys and preserve indexed placeholders', () => {
+  const english = readJson('../l10n/bundle.l10n.json');
+  const simplifiedChinese = readJson('../l10n/bundle.l10n.zh-cn.json');
+
+  assert.deepEqual(Object.keys(simplifiedChinese).sort(), Object.keys(english).sort());
+  assert.ok(Object.keys(english).length > 100, 'expected broad runtime UI localization coverage');
+  assert.ok(
+    Object.keys(english).filter((key) => english[key] !== simplifiedChinese[key]).length > 100,
+    'expected Simplified Chinese runtime translations',
+  );
+  for (const key of Object.keys(english)) {
+    assert.equal(english[key], key, `default runtime string must preserve its English message key: ${key}`);
+    assert.deepEqual(
+      indexedPlaceholders(simplifiedChinese[key]),
+      indexedPlaceholders(english[key]),
+      `placeholder mismatch for ${key}`,
+    );
+  }
 });

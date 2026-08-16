@@ -3,6 +3,7 @@ import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { visit } from 'unist-util-visit';
+import { l10n } from '../localization.js';
 
 export type PlaceholderMap = Record<string, string>;
 
@@ -179,7 +180,7 @@ export function restoreMarkdown(translated: string, placeholders: PlaceholderMap
   let out = translated;
   for (const [token, original] of Object.entries(placeholders)) {
     if (!out.includes(token)) {
-      throw new Error(`Model output damaged or removed placeholder token: ${token}`);
+      throw new Error(l10n('Model output damaged or removed placeholder token: {0}', token));
     }
     out = out.split(token).join(original);
   }

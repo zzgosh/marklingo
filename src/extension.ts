@@ -20,8 +20,11 @@ import {
 import { storeVerifiedTranslationAdapterMode } from './services/modelCapabilities.js';
 import type { TranslationAdapterMode } from './translation/translationAdapters.js';
 import { compactPrivateStorage, readPrivateStorageStats } from './storage/privateStorage.js';
+import { initializeLocalization } from './localization.js';
 
 export function activate(context: vscode.ExtensionContext) {
+  initializeLocalization((message, ...args) => vscode.l10n.t(message, ...args));
+
   context.subscriptions.push(
     vscode.commands.registerCommand('marklingo.translateCurrentMarkdown', (resource?: vscode.Uri, selectedResources?: vscode.Uri[]) => {
       return translateCurrentMarkdown(context, resource, {}, selectedResources);

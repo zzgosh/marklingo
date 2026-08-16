@@ -24,6 +24,7 @@ import {
   type ProviderType,
 } from './providerPresets.js';
 import { getGatewayModelContextWindow } from '../usage/modelPricing.js';
+import { l10n } from '../localization.js';
 
 export type OpenRouterSettings = {
   providerType: ProviderType;
@@ -124,13 +125,13 @@ export function parseOpenRouterBaseUrl(baseUrl: string): URL {
   try {
     url = new URL(normalized);
   } catch {
-    throw new Error(`Provider base URL is not a valid URL: ${baseUrl}`);
+    throw new Error(l10n('Provider base URL is not a valid URL: {0}', baseUrl));
   }
 
   const isHttps = url.protocol === 'https:';
   const isLocalHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
   if (!isHttps && !isLocalHttp) {
-    throw new Error('Provider base URL must use HTTPS, except for localhost debugging.');
+    throw new Error(l10n('Provider base URL must use HTTPS, except for localhost debugging.'));
   }
 
   return url;
@@ -227,7 +228,7 @@ async function rememberApiKeyOrigin(context: vscode.ExtensionContext, origin: st
 
 export async function openProviderSetupSettings(message = PROVIDER_SETUP_REQUIRED_MESSAGE): Promise<never> {
   await vscode.commands.executeCommand(OPEN_MARKLINGO_SETTINGS_COMMAND);
-  await vscode.window.showWarningMessage(message);
+  await vscode.window.showWarningMessage(l10n(message));
   throw new vscode.CancellationError();
 }
 
@@ -587,13 +588,13 @@ export async function openRouterChatCompletion(
 
   if (!res.ok) {
     const errorDetail = typeof res.text === 'string' && res.text.trim() ? res.text.trim() : res.statusText;
-    throw new Error(`Provider request failed: HTTP ${res.status}. ${errorDetail}`);
+    throw new Error(l10n('Provider request failed: HTTP {0}. {1}', res.status, errorDetail));
   }
 
   const data = res.json as any;
   const content: unknown = data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('Provider returned empty content or an unexpected response shape.');
+    throw new Error(l10n('Provider returned empty content or an unexpected response shape.'));
   }
   return {
     content,

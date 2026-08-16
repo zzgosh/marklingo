@@ -17,7 +17,7 @@ test('builds provider-specific API key copy', () => {
 
   assert.equal(
     getProviderApiKeyInputPrompt('openrouter', 'https://openrouter.ai/api/v1'),
-    'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code.',
+    'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code SecretStorage.',
   );
   assert.equal(
     getProviderApiKeyInputPrompt('openaiCompatible', 'http://127.0.0.1:8080/v1', true),
@@ -25,10 +25,10 @@ test('builds provider-specific API key copy', () => {
   );
   assert.equal(
     getProviderApiKeyInputPrompt('openaiCompatible', 'http://127.0.0.1:8080/v1'),
-    'Paste the API key for http://127.0.0.1:8080/v1. MarkLingo stores it securely in VS Code.',
+    'Paste the API key for http://127.0.0.1:8080/v1. MarkLingo stores it securely in VS Code SecretStorage.',
   );
   assert.equal(
     getProviderApiKeyInputPrompt('openaiCompatible', ''),
-    'Paste the API key for Custom OpenAI Compatible. MarkLingo stores it securely in VS Code.',
+    'Paste the API key for Custom OpenAI Compatible. MarkLingo stores it securely in VS Code SecretStorage.',
   );
 });
