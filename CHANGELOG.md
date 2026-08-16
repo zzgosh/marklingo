@@ -2,6 +2,10 @@
 
 All notable changes to MarkLingo are documented in this file.
 
+## 0.1.1
+
+- Refresh the bundled Vercel AI Gateway pricing and model-limit metadata for supported DeepSeek and GLM models, keeping direct-provider cost estimates and request planning current.
+
 ## 0.1.0
 
 - Add provider presets for OpenRouter, OpenAI, DeepSeek, Moonshot, Zhipu GLM, MiMo, and custom OpenAI-compatible endpoints, with per-provider Model ID memory and endpoint-origin API key storage.
