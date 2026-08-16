@@ -16,6 +16,10 @@ MarkLingo 是一款使用 AI 翻译 Markdown 的 VS Code 开源插件，主要�
 
 ![从命令面板运行 MarkLingo](https://raw.githubusercontent.com/zzgosh/marklingo/v0.1.0/resources/Screen-Recording-2026-07-18-new-720p-12fps.gif)
 
+## 本地化
+
+扩展 UI 与面向 Marketplace 的 manifest 字符串目前支持英文和简体中文。打包的 `README.md` 仍是 Visual Studio Marketplace 与 Open VSX 使用的英文长描述；仓库读者可通过上方语言链接查看简体中文、繁体中文和日文 README 副本。
+
 ## 安装
 
 - **方式 1：** 从 [VS Code 官方插件市场](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) 安装，搜索 `MarkLingo`，点击安装。

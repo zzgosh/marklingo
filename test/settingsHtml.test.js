@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { renderSettingsHtml } from '../out/webview/settingsHtml.js';
+import { initializeLocalization } from '../out/localization.js';
 
 function getState(overrides = {}) {
   return {
@@ -118,6 +120,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /System Instructions/);
   assert.match(html, /<h2>Provider<\/h2>/);
   assert.match(html, /<section class="card provider-card">/);
+  assert.match(html, /Markdown content is sent to the configured OpenAI-compatible endpoint for translation\./);
   assert.ok(html.indexOf('<h2>Usage</h2>') < html.indexOf('<h2>Output</h2>'));
   assert.match(html, /<option value="openrouter" selected>OpenRouter<\/option>/);
   assert.match(html, /<option value="moonshot">Moonshot<\/option>/);
@@ -157,7 +160,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /You are a precise Markdown translation assistant\./);
   assert.match(html, /CHAT_PROMPT_INSTRUCTIONS/);
   assert.match(html, /Translation Metadata Folder/);
-  assert.match(html, /Stores translation metadata and cached translations\./);
+  assert.match(html, /Stores translation metadata and cached translations under VS Code globalStorageUri\./);
   assert.match(html, /Metadata Storage/);
   assert.match(html, /42 MB of 300 MB used/);
   assert.match(html, /2 projects · 7 metadata files · 1 small tracking record/);
@@ -171,7 +174,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /\/Users\/example\/project/);
   assert.match(html, /id="clear-current-project-data">Clear current project data<\/button>/);
   assert.match(html, /Clear All Data/);
-  assert.match(html, /Delete the saved API key, settings, metadata\/cache, and tracked translated files if selected\./);
+  assert.match(html, /Delete the API key from SecretStorage, settings, metadata\/cache under globalStorageUri, and tracked translated files if selected\./);
   assert.match(html, /id="clear-all-data">Clear all data<\/button>/);
   assert.match(html, /\.danger-row \{\s+grid-template-columns: minmax\(0, 1fr\) max-content;/);
   assert.match(html, /<div class="row top-align danger-row">/);
@@ -198,7 +201,7 @@ test('renders settings HTML without importing the VS Code runtime', () => {
   assert.match(html, /modelIdSelect\.addEventListener\('change', handleModelIdSelectChange\);/);
   assert.match(html, /modelCustomMode = true;\s+modelIdInput\.value = '';/);
   assert.match(html, /if \(modelCustomMode && modelIdInput && !modelIdInput\.hidden\) modelIdInput\.focus\(\);/);
-  assert.match(html, /setProviderStatus\(msg\.message \|\| 'Verification failed\.', true\);/);
+  assert.match(html, /setProviderStatus\(msg\.message \|\| UI\.verificationFailed, true\);/);
   assert.match(html, /verifyProvider/);
   assert.ok(!html.includes('API key saved · type to replace'));
   assert.ok(!html.includes('Enter API key'));
@@ -574,4 +577,36 @@ test('renders Usage summary cards and recent runs when usage exists', () => {
   assert.ok(!html.includes('Cache reuse'));
   assert.ok(!html.includes('data-value="targetLanguage"'));
   assert.ok(!html.includes('No translations recorded yet'));
+});
+
+test('renders Simplified Chinese webview copy while preserving technical identifiers', () => {
+  const bundle = JSON.parse(fs.readFileSync(new URL('../l10n/bundle.l10n.zh-cn.json', import.meta.url), 'utf8'));
+  const format = (message, ...args) => (bundle[message] ?? message).replace(/\{(\d+)\}/g, (placeholder, index) => (
+    args[Number(index)] === undefined ? placeholder : String(args[Number(index)])
+  ));
+  initializeLocalization(format);
+  try {
+    const html = renderSettingsHtml({
+      cspSource: "'self'",
+      locale: 'zh-cn',
+      nonce: 'test-nonce',
+      state: getState(),
+    });
+
+    assert.match(html, /<html lang="zh-cn">/);
+    assert.match(html, /<title>MarkLingo 设置<\/title>/);
+    assert.match(html, /<h2>键盘快捷键<\/h2>/);
+    assert.match(html, /Markdown 内容会发送到所配置的 OpenAI-compatible 端点进行翻译。/);
+    assert.match(html, /已验证——为提高可靠性，将使用较小批次。/);
+    assert.match(html, /部分模型需要使用较小的 Markdown 批次来确保输出可靠，因此大文件的处理速度可能稍慢。/);
+    assert.match(html, /SecretStorage/);
+    assert.match(html, /globalStorageUri/);
+    assert.match(html, /Base URL/);
+    assert.match(html, /Model ID/);
+    assert.match(html, /google\/gemini-3\.1-flash-lite/);
+  } finally {
+    initializeLocalization((message, ...args) => message.replace(/\{(\d+)\}/g, (placeholder, index) => (
+      args[Number(index)] === undefined ? placeholder : String(args[Number(index)])
+    )));
+  }
 });

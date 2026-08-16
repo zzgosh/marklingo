@@ -1,4 +1,5 @@
 import { getProviderPreset, type ProviderType } from './providerPresets.js';
+import { l10n } from '../localization.js';
 
 export type ProviderDisplayType = ProviderType;
 
@@ -7,7 +8,7 @@ export function getProviderDisplayName(providerType: ProviderDisplayType): strin
 }
 
 export function getProviderApiKeyInputTitle(providerType: ProviderDisplayType): string {
-  return `MarkLingo: ${getProviderDisplayName(providerType)} API Key`;
+  return l10n('MarkLingo: {0} API Key', getProviderDisplayName(providerType));
 }
 
 export function getProviderApiKeyInputPrompt(
@@ -18,12 +19,12 @@ export function getProviderApiKeyInputPrompt(
   const providerName = getProviderDisplayName(providerType);
   const endpoint = baseUrl.trim();
   if (hasExisting) {
-    return 'A key is already saved. Paste a new one to replace it.';
+    return l10n('A key is already saved. Paste a new one to replace it.');
   }
   if (providerType === 'openrouter') {
-    return 'Paste your OpenRouter API key. MarkLingo stores it securely in VS Code.';
+    return l10n('Paste your OpenRouter API key. MarkLingo stores it securely in VS Code SecretStorage.');
   }
   return endpoint
-    ? `Paste the API key for ${endpoint}. MarkLingo stores it securely in VS Code.`
-    : `Paste the API key for ${providerName}. MarkLingo stores it securely in VS Code.`;
+    ? l10n('Paste the API key for {0}. MarkLingo stores it securely in VS Code SecretStorage.', endpoint)
+    : l10n('Paste the API key for {0}. MarkLingo stores it securely in VS Code SecretStorage.', providerName);
 }

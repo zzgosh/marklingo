@@ -1,4 +1,7 @@
+import { hasModelOutputErrorCode } from '../modelOutputError.js';
+
 export function isModelOutputError(error: unknown): boolean {
+  if (hasModelOutputErrorCode(error)) return true;
   if (error instanceof SyntaxError) return true;
   const message = error instanceof Error ? error.message : String(error);
   return /JSON|Model output|unexpected response shape|empty content/i.test(message);

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { getProjectsStorageRoot, getProjectStorageRoot } from '../storage/paths.js';
 import { loadTranslationMeta, sha256 } from '../translation/cache.js';
+import { l10n } from '../localization.js';
 
 async function collectFiles(root: vscode.Uri): Promise<vscode.Uri[]> {
   let entries: [string, vscode.FileType][];
@@ -202,7 +203,7 @@ export async function deleteProjectTranslationData(
   };
 
   if (scopes.metadataCache) {
-    progress?.report({ message: 'Clearing translation metadata/cache' });
+    progress?.report({ message: l10n('Clearing translation metadata/cache') });
     const storageRoot = getProjectStorageRoot(context, projectUri);
     const cacheError = await deletePrivateTranslationCache(context, projectUri);
     if (cacheError) {
@@ -218,7 +219,7 @@ export async function deleteProjectTranslationData(
 export async function deleteCurrentProjectTranslatedFiles(context: vscode.ExtensionContext) {
   const projectUri = getCurrentProjectUri();
   if (!projectUri) {
-    await vscode.window.showErrorMessage('MarkLingo: Open a file in the project before deleting project translations.');
+    await vscode.window.showErrorMessage(l10n('MarkLingo: Open a file in the project before deleting project translations.'));
     return;
   }
 
@@ -229,21 +230,21 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   }
 
   if (existingOutputs.length === 0) {
-    await vscode.window.showInformationMessage('MarkLingo: No tracked translated files were found for the current project.');
+    await vscode.window.showInformationMessage(l10n('MarkLingo: No tracked translated files were found for the current project.'));
     return;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    "MarkLingo: Delete this project's tracked translated Markdown files, including files edited after generation?",
+    l10n("MarkLingo: Delete this project's tracked translated Markdown files, including files edited after generation?"),
     { modal: true },
-    'Delete',
+    l10n('Delete'),
   );
-  if (confirm !== 'Delete') return;
+  if (confirm !== l10n('Delete')) return;
 
   const summary = await vscode.window.withProgress<WorkspaceOutputDeleteSummary>(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'MarkLingo: Deleting current project translated files...',
+      title: l10n('MarkLingo: Deleting current project translated files...'),
       cancellable: false,
     },
     async (progress) => {
@@ -254,15 +255,24 @@ export async function deleteCurrentProjectTranslatedFiles(context: vscode.Extens
   if (summary.errors.length) {
     console.warn('[marklingo] current project delete errors:', summary.errors.slice(0, 20));
     await vscode.window.showWarningMessage(
-      `MarkLingo: Deleted ${summary.deleted} translated file(s), kept translation metadata/cache, and ${summary.errors.length} operation(s) failed.`,
+      l10n(
+        'MarkLingo: Deleted {0} translated file(s), kept translation metadata/cache, and {1} operation(s) failed.',
+        summary.deleted,
+        summary.errors.length,
+      ),
     );
     return;
   }
 
-  const missingText = summary.missing > 0
-    ? ` ${summary.missing} tracked file(s) were already missing.`
-    : '';
-  await vscode.window.showInformationMessage(
-    `MarkLingo: Deleted ${summary.deleted} tracked translated file(s). Translation metadata/cache was kept.${missingText}`,
-  );
+  const message = summary.missing > 0
+    ? l10n(
+        'MarkLingo: Deleted {0} tracked translated file(s). Translation metadata/cache was kept. {1} tracked file(s) were already missing.',
+        summary.deleted,
+        summary.missing,
+      )
+    : l10n(
+        'MarkLingo: Deleted {0} tracked translated file(s). Translation metadata/cache was kept.',
+        summary.deleted,
+      );
+  await vscode.window.showInformationMessage(message);
 }

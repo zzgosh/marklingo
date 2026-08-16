@@ -57,6 +57,7 @@ import {
 } from '../onboardingState.js';
 import {
   ConfigurationRegistryRefreshRequired,
+  getConfigurationRegistryReloadAction,
   isConfigurationRegistryRefreshRequired,
 } from '../vscodeConfigurationErrors.js';
 import {
@@ -68,6 +69,7 @@ import {
   type UserKeybinding,
 } from './shortcutState.js';
 import { CUSTOM_TARGET_LANGUAGE_LABEL, createSettingsHtmlNonce, formatBytes, renderSettingsHtml, renderUsageSection, type SettingsState } from './settingsHtml.js';
+import { l10n } from '../localization.js';
 
 // Settings the webview is allowed to write directly. Free-text fields use an inline Save button;
 // dropdowns save on change. The full system prompt, context-usage ratio and Chat JSON block cap
@@ -77,8 +79,6 @@ const UPDATABLE_SETTING_KEYS = new Set<string>([
   'translation.targetLanguageCustom',
   'translation.customPrompt',
 ]);
-const RELOAD_WINDOW_ACTION = 'Reload Window';
-
 let currentPanel: vscode.WebviewPanel | undefined;
 let currentPanelProjectUri: vscode.Uri | undefined;
 
@@ -201,7 +201,7 @@ function getTranslationPromptState(options: {
     return {
       promptInstructions: preview.prompt,
       promptInstructionsEnhanced: preview.enhanced,
-      promptInstructionsEnhancementNote: preview.enhancementNote,
+      promptInstructionsEnhancementNote: preview.enhancementNote ? l10n(preview.enhancementNote) : undefined,
     };
   }
 
@@ -416,26 +416,26 @@ async function pickClearAllDataScopes(): Promise<CleanupScopes | undefined> {
   type ClearDataItem = vscode.QuickPickItem & { scope: keyof CleanupScopes };
   const items: ClearDataItem[] = [
     {
-      label: 'Saved API key',
+      label: l10n('Saved API key'),
       description: 'SecretStorage',
       picked: true,
       scope: 'apiKeys',
     },
     {
-      label: 'MarkLingo settings',
-      description: 'User settings',
+      label: l10n('MarkLingo settings'),
+      description: l10n('User settings'),
       picked: true,
       scope: 'settings',
     },
     {
-      label: 'Translation metadata and cache',
-      description: 'All projects in extension global storage',
+      label: l10n('Translation metadata and cache'),
+      description: l10n('VS Code globalStorageUri (all projects)'),
       picked: true,
       scope: 'globalStorage',
     },
     {
-      label: 'Tracked translated files',
-      description: 'Optional unmodified *_<language>_mdt.md generated outputs',
+      label: l10n('Tracked translated files'),
+      description: l10n('Optional unmodified *_<language>_mdt.md generated outputs'),
       picked: false,
       scope: 'workspaceOutputs',
     },
@@ -443,8 +443,8 @@ async function pickClearAllDataScopes(): Promise<CleanupScopes | undefined> {
   const selected = await vscode.window.showQuickPick(items, {
     canPickMany: true,
     ignoreFocusOut: true,
-    placeHolder: 'Select data to delete, then press Enter.',
-    title: 'MarkLingo: Clear All Data',
+    placeHolder: l10n('Select data to delete, then press Enter.'),
+    title: l10n('MarkLingo: Clear All Data'),
   });
   if (!selected || selected.length === 0) return undefined;
   return {
@@ -459,14 +459,14 @@ async function pickCurrentProjectDataScopes(projectPath: string): Promise<Projec
   type CurrentProjectDataItem = vscode.QuickPickItem & { scope: keyof ProjectTranslationDataScopes };
   const items: CurrentProjectDataItem[] = [
     {
-      label: 'Tracked translated files',
-      description: '*_<language>_mdt.md in the current project',
+      label: l10n('Tracked translated files'),
+      description: l10n('*_<language>_mdt.md in the current project'),
       picked: true,
       scope: 'workspaceOutputs',
     },
     {
-      label: 'Translation metadata and cache',
-      description: 'Current project private storage',
+      label: l10n('Translation metadata and cache'),
+      description: l10n('Current project private storage under globalStorageUri'),
       detail: projectPath,
       picked: true,
       scope: 'metadataCache',
@@ -475,8 +475,8 @@ async function pickCurrentProjectDataScopes(projectPath: string): Promise<Projec
   const selected = await vscode.window.showQuickPick(items, {
     canPickMany: true,
     ignoreFocusOut: true,
-    placeHolder: 'Select current project data to delete, then press Enter.',
-    title: 'MarkLingo: Clear Current Project Data',
+    placeHolder: l10n('Select current project data to delete, then press Enter.'),
+    title: l10n('MarkLingo: Clear Current Project Data'),
   });
   if (!selected || selected.length === 0) return undefined;
   return {
@@ -498,11 +498,12 @@ function getUserFacingSettingsErrorMessage(error: unknown): string {
 async function offerReloadWindowForConfigurationRegistryError(error: unknown): Promise<void> {
   if (!isConfigurationRegistryRefreshRequired(error)) return;
 
+  const reloadWindowAction = getConfigurationRegistryReloadAction();
   const selected = await vscode.window.showErrorMessage(
-    `MarkLingo: ${error.message}`,
-    RELOAD_WINDOW_ACTION,
+    l10n('MarkLingo: {0}', error.message),
+    reloadWindowAction,
   );
-  if (selected === RELOAD_WINDOW_ACTION) {
+  if (selected === reloadWindowAction) {
     await vscode.commands.executeCommand('workbench.action.reloadWindow');
   }
 }
@@ -511,7 +512,7 @@ async function showSettingsWriteError(error: unknown): Promise<string> {
   const messageText = getUserFacingSettingsErrorMessage(error);
   await offerReloadWindowForConfigurationRegistryError(error);
   if (!isConfigurationRegistryRefreshRequired(error)) {
-    await vscode.window.showErrorMessage(`MarkLingo: ${messageText}`);
+    await vscode.window.showErrorMessage(l10n('MarkLingo: {0}', messageText));
   }
   return messageText;
 }
@@ -550,7 +551,7 @@ async function updateOptionalSettingIfRegistered(
 
 async function updateSingleSetting(context: vscode.ExtensionContext, key: string, raw: unknown): Promise<unknown> {
   if (!UPDATABLE_SETTING_KEYS.has(key)) {
-    throw new Error(`MarkLingo: Unsupported setting "${key}".`);
+    throw new Error(l10n('MarkLingo: Unsupported setting "{0}".', key));
   }
   const cfg = vscode.workspace.getConfiguration('marklingo');
   const value = coerceSettingValue(key, raw);
@@ -656,14 +657,14 @@ async function verifyProviderCandidates(
     throw new Error(message);
   }
 
-  if (candidates.length === 0) throw new Error('Base URL is required.');
+  if (candidates.length === 0) throw new Error(l10n('Base URL is required.'));
 
   const errors: string[] = [];
   let hadUsableKey = false;
   for (const candidate of candidates) {
     const existingApiKey = await getProviderVerificationApiKey(context, candidate, apiKeyInput);
     if (providerRequiresApiKey(candidate.providerType) && !existingApiKey) {
-      errors.push(`${candidate.baseUrl}: API key is required.`);
+      errors.push(l10n('{0}: API key is required.', candidate.baseUrl));
       continue;
     }
     if (existingApiKey || !providerRequiresApiKey(candidate.providerType)) hadUsableKey = true;
@@ -682,16 +683,18 @@ async function verifyProviderCandidates(
   }
 
   if (providerRequiresApiKey(settings.providerType) && !hadUsableKey) {
-    throw new Error('API key is required.');
+    throw new Error(l10n('API key is required.'));
   }
 
-  const suffix = errors.length > 0 ? ` ${errors.at(-1)}` : '';
-  throw new Error(`Verification failed for all provider endpoints.${suffix}`);
+  throw new Error(errors.length > 0
+    ? l10n('Verification failed for all provider endpoints. {0}', errors.at(-1) ?? '')
+    : l10n('Verification failed for all provider endpoints.'));
 }
 
 function getHtml(webview: vscode.Webview, state: SettingsState): string {
   return renderSettingsHtml({
     cspSource: webview.cspSource,
+    locale: vscode.env.language,
     nonce: createSettingsHtmlNonce(),
     state,
   });
@@ -723,7 +726,7 @@ async function optimizePrivateStorage(context: vscode.ExtensionContext, panel: v
   const summary = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'MarkLingo: Optimizing translation metadata...',
+      title: l10n('MarkLingo: Optimizing translation metadata...'),
       cancellable: false,
     },
     () => compactPrivateStorage(context, { targetBytes: PRIVATE_STORAGE_COMPACT_TARGET_BYTES }),
@@ -734,25 +737,34 @@ async function optimizePrivateStorage(context: vscode.ExtensionContext, panel: v
   if (summary.errors.length > 0) {
     console.warn('[marklingo] translation metadata optimization errors:', summary.errors.slice(0, 20));
     await vscode.window.showWarningMessage(
-      `MarkLingo: Removed ${formatBytes(summary.reclaimedBytes)} from ${summary.evictedEntries} old cache record(s), with ${summary.errors.length} issue(s).`,
+      l10n(
+        'MarkLingo: Removed {0} from {1} old cache record(s), with {2} issue(s).',
+        formatBytes(summary.reclaimedBytes),
+        summary.evictedEntries,
+        summary.errors.length,
+      ),
     );
     return;
   }
 
   if (summary.evictedEntries === 0) {
-    await vscode.window.showInformationMessage('MarkLingo: Translation metadata storage is already optimized.');
+    await vscode.window.showInformationMessage(l10n('MarkLingo: Translation metadata storage is already optimized.'));
     return;
   }
 
   await vscode.window.showInformationMessage(
-    `MarkLingo: Removed ${formatBytes(summary.reclaimedBytes)} from ${summary.evictedEntries} old cache record(s).`,
+    l10n(
+      'MarkLingo: Removed {0} from {1} old cache record(s).',
+      formatBytes(summary.reclaimedBytes),
+      summary.evictedEntries,
+    ),
   );
 }
 
 async function clearCurrentProjectData(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
   const projectUri = currentPanelProjectUri ?? getCurrentProjectUri();
   if (!projectUri) {
-    await vscode.window.showWarningMessage('MarkLingo: Open a file or single workspace folder before clearing current project data.');
+    await vscode.window.showWarningMessage(l10n('MarkLingo: Open a file or single workspace folder before clearing current project data.'));
     return;
   }
 
@@ -763,7 +775,7 @@ async function clearCurrentProjectData(context: vscode.ExtensionContext, panel: 
   const summary = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'MarkLingo: Clearing current project data...',
+      title: l10n('MarkLingo: Clearing current project data...'),
       cancellable: false,
     },
     (progress) => deleteProjectTranslationData(context, projectUri, progress, scopes),
@@ -774,19 +786,19 @@ async function clearCurrentProjectData(context: vscode.ExtensionContext, panel: 
   if (summary.errors.length > 0) {
     console.warn('[marklingo] current project data cleanup errors:', summary.errors.slice(0, 20));
     await vscode.window.showWarningMessage(
-      `MarkLingo: Cleared current project data with ${summary.errors.length} operation(s) failed.`,
+      l10n('MarkLingo: Cleared current project data with {0} operation(s) failed.', summary.errors.length),
     );
     return;
   }
 
   const parts: string[] = [];
   if (scopes.workspaceOutputs) {
-    parts.push(`${summary.deleted} translated file(s)`);
-    if (summary.missing > 0) parts.push(`${summary.missing} file(s) already missing`);
+    parts.push(l10n('{0} translated file(s)', summary.deleted));
+    if (summary.missing > 0) parts.push(l10n('{0} file(s) already missing', summary.missing));
   }
-  if (summary.metadataCacheCleared) parts.push('translation metadata/cache');
+  if (summary.metadataCacheCleared) parts.push(l10n('translation metadata/cache'));
 
-  await vscode.window.showInformationMessage(`MarkLingo: Cleared current project data: ${parts.join(', ')}.`);
+  await vscode.window.showInformationMessage(l10n('MarkLingo: Cleared current project data: {0}.', parts.join(', ')));
 }
 
 async function postShortcutState(context: vscode.ExtensionContext, panel: vscode.WebviewPanel): Promise<void> {
@@ -839,7 +851,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
 
   const panel = vscode.window.createWebviewPanel(
     'marklingoSettings',
-    'MarkLingo Settings',
+    l10n('MarkLingo Settings'),
     vscode.ViewColumn.Active,
     {
       enableScripts: true,
@@ -882,7 +894,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({
             type: 'providerVerification',
             ok: false,
-            message: 'Base URL is required.',
+            message: l10n('Base URL is required.'),
             saveId,
           });
           return;
@@ -891,7 +903,7 @@ export async function openSettingsPanel(context: vscode.ExtensionContext): Promi
           await panel.webview.postMessage({
             type: 'providerVerification',
             ok: false,
-            message: 'Model ID is required.',
+            message: l10n('Model ID is required.'),
             saveId,
           });
           return;

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { DEFAULT_OPENROUTER_MODEL_ID, OPENROUTER_PROVIDER_MODEL_ID_SETTING } from '../services/openRouterClient.js';
+import { l10n } from '../localization.js';
 
 const OPENROUTER_MODEL_ID_LAST_USED = 'marklingo.openrouter.lastModelId';
 
@@ -10,17 +11,17 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
   const existing = (context.globalState.get<string>(OPENROUTER_MODEL_ID_LAST_USED) ?? '').trim();
 
   const input = await vscode.window.showInputBox({
-    title: 'MarkLingo: OpenRouter Model ID',
-    prompt: `Model ID. Default: ${DEFAULT_OPENROUTER_MODEL_ID}.`,
+    title: l10n('MarkLingo: OpenRouter Model ID'),
+    prompt: l10n('Model ID. Default: {0}.', DEFAULT_OPENROUTER_MODEL_ID),
     password: false,
     value: existing || DEFAULT_OPENROUTER_MODEL_ID,
-    placeHolder: `Default: ${DEFAULT_OPENROUTER_MODEL_ID}`,
+    placeHolder: l10n('Default: {0}', DEFAULT_OPENROUTER_MODEL_ID),
     ignoreFocusOut: true,
   });
 
   if (input === undefined) return;
   if (!input.trim()) {
-    await vscode.window.showWarningMessage('MarkLingo: Model ID was empty, so the operation was canceled.');
+    await vscode.window.showWarningMessage(l10n('MarkLingo: Model ID was empty, so the operation was canceled.'));
     return;
   }
 
@@ -38,5 +39,5 @@ export async function setOpenRouterModelId(context: vscode.ExtensionContext) {
 
   await cfg.update(OPENROUTER_PROVIDER_MODEL_ID_SETTING, modelId, target);
   await cfg.update('openrouter.modelId', modelId, target);
-  await vscode.window.showInformationMessage(`MarkLingo: Model ID saved: ${modelId}`);
+  await vscode.window.showInformationMessage(l10n('MarkLingo: Model ID saved: {0}', modelId));
 }
