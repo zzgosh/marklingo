@@ -3,7 +3,7 @@ export const MODEL_PRICING = {
   "schemaVersion": 1,
   "source": "vercel-ai-gateway",
   "sourceUrl": "https://ai-gateway.vercel.sh/v1/models",
-  "fetchedAt": "2026-08-10T07:05:13.690Z",
+  "fetchedAt": "2026-08-24T05:01:04.479Z",
   "currency": "USD",
   "unit": "per_token",
   "models": {
@@ -32,8 +32,8 @@ export const MODEL_PRICING = {
       "maxTokens": 128000
     },
     "deepseek/deepseek-v4-flash": {
-      "input": 2e-7,
-      "output": 4e-7,
+      "input": 1.3e-7,
+      "output": 2.6e-7,
       "contextWindow": 1000000,
       "maxTokens": 384000
     },
