@@ -3,7 +3,7 @@ export const MODEL_PRICING = {
   "schemaVersion": 1,
   "source": "vercel-ai-gateway",
   "sourceUrl": "https://ai-gateway.vercel.sh/v1/models",
-  "fetchedAt": "2026-08-31T10:51:42.634Z",
+  "fetchedAt": "2026-09-07T09:20:37.087Z",
   "currency": "USD",
   "unit": "per_token",
   "models": {
