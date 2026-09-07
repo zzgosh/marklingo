@@ -3,7 +3,7 @@ export const MODEL_PRICING = {
   "schemaVersion": 1,
   "source": "vercel-ai-gateway",
   "sourceUrl": "https://ai-gateway.vercel.sh/v1/models",
-  "fetchedAt": "2026-08-24T05:01:04.479Z",
+  "fetchedAt": "2026-09-07T09:20:37.087Z",
   "currency": "USD",
   "unit": "per_token",
   "models": {
@@ -38,10 +38,10 @@ export const MODEL_PRICING = {
       "maxTokens": 384000
     },
     "deepseek/deepseek-v4-pro": {
-      "input": 0.00000174,
-      "output": 0.00000348,
-      "contextWindow": 1048600,
-      "maxTokens": 1048600
+      "input": 6.6e-7,
+      "output": 0.00000198,
+      "contextWindow": 1000000,
+      "maxTokens": 384000
     },
     "moonshotai/kimi-k2.6": {
       "input": 9.5e-7,
