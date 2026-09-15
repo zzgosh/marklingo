@@ -4,9 +4,11 @@ import {
   isModelOutputError,
   shouldOfferSettingsActionForFailures,
 } from '../out/commands/failureActions.js';
+import { ModelOutputError } from '../out/modelOutputError.js';
 
 test('classifies model output errors for retry and settings actions', () => {
   assert.equal(isModelOutputError(new SyntaxError('Unexpected token')), true);
+  assert.equal(isModelOutputError(new ModelOutputError('Provider 返回了空内容或非预期的响应结构。')), true);
   assert.equal(isModelOutputError('Model output is not valid JSON.'), true);
   assert.equal(isModelOutputError('Provider returned empty content or an unexpected response shape.'), true);
   assert.equal(isModelOutputError('ENOENT: no such file or directory'), false);

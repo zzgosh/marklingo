@@ -16,6 +16,10 @@ MarkLingo is an open-source VS Code extension that translates Markdown with AI. 
 
 ![Run MarkLingo from the Command Palette](https://raw.githubusercontent.com/zzgosh/marklingo/v0.1.0/resources/Screen-Recording-2026-07-18-new-720p-12fps.gif)
 
+## Localization
+
+The extension UI and Marketplace-facing manifest strings currently support English and Simplified Chinese. The packaged `README.md` remains the English long-form description used by Visual Studio Marketplace and Open VSX; repository readers can use the language links above for Simplified Chinese, Traditional Chinese, and Japanese README copies.
+
 ## Install
 
 - **Option 1:** Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=zzgosh.marklingo) by searching for `MarkLingo` in the VS Code Extensions view and clicking Install.

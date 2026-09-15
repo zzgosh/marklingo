@@ -1,3 +1,5 @@
+import { l10n } from '../localization.js';
+
 export const TRANSLATION_PROGRESS_MESSAGES = {
   prompting: 'Prompting',
   cached: 'Using saved translations',
@@ -5,9 +7,9 @@ export const TRANSLATION_PROGRESS_MESSAGES = {
 } as const;
 
 export function getTranslationRequestProgressMessage(requestIndex: number, totalRequests: number): string {
-  return `Request ${requestIndex + 1} of ${totalRequests}`;
+  return l10n('Request {0} of {1}', requestIndex + 1, totalRequests);
 }
 
 export function getBatchTranslationProgressMessage(fileIndex: number, totalFiles: number): string {
-  return `File ${fileIndex + 1} of ${totalFiles}`;
+  return l10n('File {0} of {1}', fileIndex + 1, totalFiles);
 }

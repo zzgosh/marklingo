@@ -6,6 +6,7 @@ import {
 } from './openRouterClient.js';
 import type { TranslationAdapterMode } from '../translation/translationAdapters.js';
 import { getChatJsonProbeMessages, validateChatJsonProbeResponse } from './modelCapabilityProbe.js';
+import { l10n } from '../localization.js';
 
 export type ProviderVerificationResult = {
   adapterMode: TranslationAdapterMode;
@@ -65,7 +66,7 @@ export async function verifyProviderConnectionAndCapability(
     raw = result.content;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Verification failed. ${message}`);
+    throw new Error(l10n('Verification failed. {0}', message));
   }
 
   let adapterMode: TranslationAdapterMode = 'chatJson';
@@ -78,7 +79,7 @@ export async function verifyProviderConnectionAndCapability(
   await storeVerifiedTranslationAdapterMode(context, settings, adapterMode);
   return {
     adapterMode,
-    message: 'Verified.',
+    message: l10n('Verified.'),
   };
 }
 
@@ -97,11 +98,11 @@ export async function verifyProviderConnectionOnly(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Verification failed. ${message}`);
+    throw new Error(l10n('Verification failed. {0}', message));
   }
 
   return {
     adapterMode,
-    message: 'Connection verified.',
+    message: l10n('Connection verified.'),
   };
 }

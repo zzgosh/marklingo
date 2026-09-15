@@ -1,3 +1,5 @@
+import { l10n } from '../localization.js';
+
 export const TRANSLATE_COMMAND = 'marklingo.translateCurrentMarkdown';
 export const DELETE_CURRENT_PROJECT_TRANSLATED_FILES_COMMAND = 'marklingo.deleteCurrentProjectTranslatedFiles';
 export const MAC_TRANSLATE_KEY = 'alt+cmd+t';
@@ -154,7 +156,7 @@ function getDefaultSystemWarning(
 ): string {
   if (!definition.macSystemWarning || assignedBinding) return '';
   return activeDefaultKeys.some((key) => normalizeKeybinding(key) === normalizeKeybinding(definition.macKey))
-    ? definition.macSystemWarning
+    ? l10n(definition.macSystemWarning)
     : '';
 }
 
@@ -193,12 +195,12 @@ export function getShortcutStateFromKeybindings(
   if (allDefaultsRemoved && !assignedBinding) {
     return {
       id: definition.id,
-      title: definition.title,
-      shortcutLabel: 'Not assigned',
+      title: l10n(definition.title),
+      shortcutLabel: l10n('Not assigned'),
       shortcutStatus: defaultKeys.length > 1
-        ? 'All platform default shortcuts have been removed in user keybindings.'
-        : 'Default shortcut has been removed in user keybindings.',
-      shortcutWarning: 'Open Keyboard Shortcuts to assign a new shortcut.',
+        ? l10n('All platform default shortcuts have been removed in user keybindings.')
+        : l10n('Default shortcut has been removed in user keybindings.'),
+      shortcutWarning: l10n('Open Keyboard Shortcuts to assign a new shortcut.'),
     };
   }
 
@@ -206,32 +208,32 @@ export function getShortcutStateFromKeybindings(
     const commands = describeConflicts(conflictingBindings);
     return {
       id: definition.id,
-      title: definition.title,
+      title: l10n(definition.title),
       shortcutLabel: assignedBinding ? formatKeybinding(displayedKey) : displayedKey,
-      shortcutStatus: `Potential user keybinding conflict: ${commands}`,
-      shortcutWarning: 'If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.',
+      shortcutStatus: l10n('Potential user keybinding conflict: {0}', commands),
+      shortcutWarning: l10n('If VS Code routes this key to another command, MarkLingo cannot show a prompt because its command is not invoked.'),
     };
   }
 
   if (someDefaultsRemoved && !assignedBinding) {
     return {
       id: definition.id,
-      title: definition.title,
+      title: l10n(definition.title),
       shortcutLabel: displayedKey,
-      shortcutStatus: 'A platform default shortcut has been removed in user keybindings.',
-      shortcutWarning: 'Open Keyboard Shortcuts to review platform-specific shortcuts.',
+      shortcutStatus: l10n('A platform default shortcut has been removed in user keybindings.'),
+      shortcutWarning: l10n('Open Keyboard Shortcuts to review platform-specific shortcuts.'),
     };
   }
 
   return {
     id: definition.id,
-    title: definition.title,
+    title: l10n(definition.title),
     shortcutLabel: assignedBinding ? formatKeybinding(displayedKey) : displayedKey,
     shortcutStatus: assignedBinding
-      ? 'Assigned in user keybindings.'
+      ? l10n('Assigned in user keybindings.')
       : defaultKeys.length > 1
-        ? definition.platformDefaultStatus
-        : definition.defaultStatus,
+        ? l10n(definition.platformDefaultStatus)
+        : l10n(definition.defaultStatus),
     shortcutWarning: getDefaultSystemWarning(definition, activeDefaultKeys, assignedBinding),
   };
 }

@@ -92,9 +92,9 @@ Token estimates belong in debug metadata. The estimate includes the system promp
 
 ## User-Facing Copy
 
-Use English for extension UI, notifications, command prompts, Output Channel messages, errors, README text, tests, and comments. Language option labels may remain in their native language, for example `简体中文` and `日本語`.
+Use English as the source and fallback language for extension UI, notifications, command prompts, errors, and manifest copy. Pass user-facing runtime strings through `vscode.l10n`, and keep manifest strings in `package.nls.json`; Simplified Chinese translations live in the corresponding `zh-cn` catalogs. Output Channel diagnostics, README source text, tests, and comments remain English.
 
-The custom language option label is `Custom...`.
+Do not localize command IDs, setting keys, endpoint URLs, paths, Model IDs, target language names, or dynamic technical values. Language option labels may remain in their native language, for example `简体中文` and `日本語`; the custom language option label is localized from the English source `Custom...`.
 
 The English `README.md` is packaged into the VSIX and used by Visual Studio Marketplace and Open VSX listings. Keep its language-switch links as absolute GitHub `main` URLs so they remain valid outside the repository context. Localized README files may use relative links for GitHub browsing.
 

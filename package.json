@@ -1,7 +1,7 @@
 {
   "name": "marklingo",
-  "displayName": "MarkLingo - Translate Markdown with AI",
-  "description": "Translate Markdown with OpenRouter, OpenAI, DeepSeek, Moonshot, GLM, Xiaomi MiMo, and custom endpoints without breaking Markdown.",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
   "version": "0.1.1",
   "publisher": "zzgosh",
   "type": "module",
@@ -35,52 +35,53 @@
     "theme": "dark"
   },
   "main": "./dist/extension.js",
+  "l10n": "./l10n",
   "extensionKind": [
     "workspace"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
-      "description": "MarkLingo reads Markdown documents and can send their content to a configured translation endpoint, so the workspace should be trusted before translation runs."
+      "description": "%capabilities.untrustedWorkspaces.description%"
     },
     "virtualWorkspaces": {
       "supported": false,
-      "description": "MarkLingo currently writes translated files using local filesystem paths and does not support virtual workspace file systems."
+      "description": "%capabilities.virtualWorkspaces.description%"
     }
   },
   "contributes": {
     "commands": [
       {
         "command": "marklingo.translateCurrentMarkdown",
-        "title": "MarkLingo: Translate Current Markdown"
+        "title": "%commands.translateCurrentMarkdown.title%"
       },
       {
         "command": "marklingo.translateCurrentMarkdownFull",
-        "title": "MarkLingo: Retranslate Current Markdown"
+        "title": "%commands.translateCurrentMarkdownFull.title%"
       },
       {
         "command": "marklingo.translateExplorerMarkdownFile",
-        "title": "MarkLingo: Translate This Markdown File"
+        "title": "%commands.translateExplorerMarkdownFile.title%"
       },
       {
         "command": "marklingo.translateSelectedMarkdownResources",
-        "title": "MarkLingo: Translate Selected Markdown Files"
+        "title": "%commands.translateSelectedMarkdownResources.title%"
       },
       {
         "command": "marklingo.translateFolderMarkdown",
-        "title": "MarkLingo: Translate All Markdown in This Folder"
+        "title": "%commands.translateFolderMarkdown.title%"
       },
       {
         "command": "marklingo.deleteCurrentProjectTranslatedFiles",
-        "title": "MarkLingo: Delete Current Project Translated Files"
+        "title": "%commands.deleteCurrentProjectTranslatedFiles.title%"
       },
       {
         "command": "marklingo.ignoreTranslatedFilesInGit",
-        "title": "MarkLingo: Add Translated Files to .git/info/exclude"
+        "title": "%commands.ignoreTranslatedFilesInGit.title%"
       },
       {
         "command": "marklingo.openSettings",
-        "title": "MarkLingo: Open Settings"
+        "title": "%commands.openSettings.title%"
       }
     ],
     "keybindings": [
@@ -142,7 +143,7 @@
       ]
     },
     "configuration": {
-      "title": "MarkLingo",
+      "title": "%configuration.title%",
       "properties": {
         "marklingo.openrouter.provider": {
           "type": "string",
@@ -157,80 +158,80 @@
             "openaiCompatible"
           ],
           "enumDescriptions": [
-            "Use OpenRouter's official API endpoint.",
-            "Use OpenAI's official Chat Completions endpoint.",
-            "Use DeepSeek's OpenAI-compatible API endpoint.",
-            "Use Moonshot's OpenAI-compatible API endpoint.",
-            "Use GLM's OpenAI-compatible API endpoint.",
-            "Use Xiaomi MiMo's OpenAI-compatible API endpoint.",
-            "Use a custom OpenAI-compatible API endpoint, such as llama.cpp server, Ollama, or LM Studio."
+            "%configuration.openrouter.provider.enumDescription.openrouter%",
+            "%configuration.openrouter.provider.enumDescription.openai%",
+            "%configuration.openrouter.provider.enumDescription.deepseek%",
+            "%configuration.openrouter.provider.enumDescription.moonshot%",
+            "%configuration.openrouter.provider.enumDescription.glm%",
+            "%configuration.openrouter.provider.enumDescription.xiaomiMimo%",
+            "%configuration.openrouter.provider.enumDescription.openaiCompatible%"
           ],
-          "description": "Provider used for translation requests."
+          "description": "%configuration.openrouter.provider.description%"
         },
         "marklingo.openrouter.baseUrl": {
           "type": "string",
           "scope": "application",
           "default": "https://openrouter.ai/api/v1",
-          "description": "Active provider base URL kept for compatibility. MarkLingo Settings remembers Custom OpenAI Compatible Base URL separately."
+          "description": "%configuration.openrouter.baseUrl.description%"
         },
         "marklingo.openrouter.modelId": {
           "type": "string",
           "default": "google/gemini-3.1-flash-lite",
-          "description": "Active provider model ID kept for compatibility. Prefer MarkLingo Settings for provider-specific model values."
+          "description": "%configuration.openrouter.modelId.description%"
         },
         "marklingo.providers.openrouter.modelId": {
           "type": "string",
           "default": "google/gemini-3.1-flash-lite",
-          "description": "Model ID remembered for the OpenRouter provider."
+          "description": "%configuration.providers.openrouter.modelId.description%"
         },
         "marklingo.providers.openai.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the OpenAI provider."
+          "description": "%configuration.providers.openai.modelId.description%"
         },
         "marklingo.providers.deepseek.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the DeepSeek provider."
+          "description": "%configuration.providers.deepseek.modelId.description%"
         },
         "marklingo.providers.moonshot.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the Moonshot provider."
+          "description": "%configuration.providers.moonshot.modelId.description%"
         },
         "marklingo.providers.glm.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the GLM provider."
+          "description": "%configuration.providers.glm.modelId.description%"
         },
         "marklingo.providers.xiaomiMimo.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the Xiaomi MiMo provider."
+          "description": "%configuration.providers.xiaomiMimo.modelId.description%"
         },
         "marklingo.providers.openaiCompatible.baseUrl": {
           "type": "string",
           "scope": "application",
           "default": "",
-          "description": "Base URL remembered for the Custom OpenAI Compatible provider."
+          "description": "%configuration.providers.openaiCompatible.baseUrl.description%"
         },
         "marklingo.providers.openaiCompatible.modelId": {
           "type": "string",
           "default": "",
-          "description": "Model ID remembered for the Custom OpenAI Compatible provider."
+          "description": "%configuration.providers.openaiCompatible.modelId.description%"
         },
         "marklingo.translation.maxBlocksPerRequest": {
           "type": "number",
           "default": 80,
           "minimum": 1,
-          "description": "Maximum number of Markdown blocks per Chat JSON request. When the smaller-batch request path is active, MarkLingo uses the lower of this value and the Model Blocks setting."
+          "description": "%configuration.translation.maxBlocksPerRequest.description%"
         },
         "marklingo.translation.maxContextUsageRatio": {
           "type": "number",
           "default": 0.5,
           "minimum": 0.1,
           "maximum": 0.9,
-          "description": "Max share of the model context window used for each translation request prompt when context length is available."
+          "description": "%configuration.translation.maxContextUsageRatio.description%"
         },
         "marklingo.translation.requestMode": {
           "type": "string",
@@ -241,32 +242,32 @@
             "translationModel"
           ],
           "enumDescriptions": [
-            "Use the verified provider/model behavior when available; otherwise use the standard request path.",
-            "Use the standard structured-output request path.",
-            "Use smaller Markdown batches for models that need a simpler translation request."
+            "%configuration.translation.requestMode.enumDescription.auto%",
+            "%configuration.translation.requestMode.enumDescription.chatJson%",
+            "%configuration.translation.requestMode.enumDescription.translationModel%"
           ],
-          "description": "Advanced translation request mode. Normally managed by MarkLingo Settings Save and Verify."
+          "description": "%configuration.translation.requestMode.description%"
         },
         "marklingo.translation.translationModelMaxBlocksPerRequest": {
           "type": "number",
           "default": 12,
           "minimum": 1,
           "maximum": 24,
-          "description": "Maximum number of Markdown blocks per request for the smaller-batch request path."
+          "description": "%configuration.translation.translationModelMaxBlocksPerRequest.description%"
         },
         "marklingo.translation.translationModelConcurrency": {
           "type": "number",
           "default": 1,
           "minimum": 1,
           "maximum": 4,
-          "description": "Maximum concurrent requests for the smaller-batch request path."
+          "description": "%configuration.translation.translationModelConcurrency.description%"
         },
         "marklingo.translation.translationModelMaxOutputTokens": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "maximum": 32768,
-          "description": "Maximum output tokens per request for the smaller-batch request path. Use 0 to estimate from the model context window."
+          "description": "%configuration.translation.translationModelMaxOutputTokens.description%"
         },
         "marklingo.translation.targetLanguage": {
           "type": "string",
@@ -282,22 +283,22 @@
             "Deutsch",
             "Custom..."
           ],
-          "description": "Target language for translation (shown in onboarding on first use)."
+          "description": "%configuration.translation.targetLanguage.description%"
         },
         "marklingo.translation.targetLanguageCustom": {
           "type": "string",
           "default": "",
-          "description": "Custom target language used when targetLanguage is Custom..."
+          "description": "%configuration.translation.targetLanguageCustom.description%"
         },
         "marklingo.translation.systemPrompt": {
           "type": "string",
           "default": "",
-          "description": "Advanced override for the base system prompt template (not shown in the MarkLingo settings panel). Leave empty to use the extension default. Use {targetLanguage} as the target language placeholder. Editing this can break Markdown and placeholder protection, so most users should use Custom Instructions instead."
+          "description": "%configuration.translation.systemPrompt.description%"
         },
         "marklingo.translation.customPrompt": {
           "type": "string",
           "default": "",
-          "description": "Custom instructions appended after the built-in translation prompt, such as terminology or style rules. The base Markdown and placeholder protection always applies."
+          "description": "%configuration.translation.customPrompt.description%"
         }
       }
     }
