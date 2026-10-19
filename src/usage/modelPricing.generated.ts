@@ -3,7 +3,7 @@ export const MODEL_PRICING = {
   "schemaVersion": 1,
   "source": "vercel-ai-gateway",
   "sourceUrl": "https://ai-gateway.vercel.sh/v1/models",
-  "fetchedAt": "2026-10-05T11:28:52.313Z",
+  "fetchedAt": "2026-10-19T09:53:32.801Z",
   "currency": "USD",
   "unit": "per_token",
   "models": {
@@ -80,8 +80,8 @@ export const MODEL_PRICING = {
       "maxTokens": 131100
     },
     "xiaomi/mimo-v2.5-pro": {
-      "input": 4.35e-7,
-      "output": 8.7e-7,
+      "input": 3.045e-7,
+      "output": 6.09e-7,
       "contextWindow": 1050000,
       "maxTokens": 131000
     }
